@@ -1,0 +1,98 @@
+import requests
+import time
+import hashlib
+import os
+
+# Адрес оркестратора (из docker-compose или env)
+ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator_node:5000")
+
+
+class ClientWorker:
+    def __init__(self):
+        self.client_id = None
+        self.register()  # Сразу регистрируемся при создании
+
+    def register(self):
+        """Регистрация на оркестраторе: получаем client_id для баланса и отчётов."""
+        try:
+            response = requests.get(f"{ORCHESTRATOR_URL}/register")
+            response.raise_for_status()
+            data = response.json()
+            self.client_id = data["client_id"]  # Сохраняем id для всех последующих запросов
+        except Exception as e:
+            print(f"Error registering: {e}")
+            time.sleep(5)
+            self.register()  # Повторная попытка через 5 сек
+
+    def fetch_task(self):
+        """Запрос задачи: оркестратор возвращает минимальную спецификацию (contract_id, work_units_required, difficulty)."""
+        try:
+            response = requests.get(f"{ORCHESTRATOR_URL}/get_task")
+            response.raise_for_status()
+            return response.json()  # Словарь: contract_id, work_units_required, difficulty
+        except Exception as e:
+            print(f"Error fetching task: {e}")
+            return None
+
+    def perform_computation(self, task):
+        """Выполнение работы по спецификации контракта: PoW до достижения work_units_required, один solution_hash + nonce для проверки."""
+        contract_id = task["contract_id"]
+        target_work = task["work_units_required"]  # Сколько единиц работы нужно
+        difficulty = task["difficulty"]  # Число ведущих нулей в хеше
+        target_prefix = "0" * difficulty
+
+        work_units_done = 0
+        final_result = None  # Хеш с нужным префиксом (для отчёта)
+        solution_nonce = None  # Nonce этого хеша (для строгой проверки контрактом)
+
+        while work_units_done < target_work:
+            work_units_done += 1
+            nonce = str(work_units_done)
+            text = f"{self.client_id}-{contract_id}-{nonce}"  # Та же формула, что в контракте при проверке
+            hash_result = hashlib.sha256(text.encode()).hexdigest()
+
+            if hash_result.startswith(target_prefix):
+                final_result = hash_result
+                solution_nonce = nonce  # Запоминаем nonce для верификации на оркестраторе
+
+        return work_units_done, final_result or "", solution_nonce
+
+    def submit_work(self, task, work_done, result_data, solution_nonce=None):
+        """Отправка результата оркестратору: contract_id, work_units_done, result_data, nonce (для строгой проверки контрактом)."""
+        payload = {
+            "client_id": self.client_id,
+            "contract_id": task["contract_id"],
+            "work_units_done": work_done,
+            "result_data": result_data,
+            "nonce": solution_nonce,  # Контракт пересчитает хеш и сравнит с result_data
+        }
+        try:
+            response = requests.post(f"{ORCHESTRATOR_URL}/submit_work", json=payload)
+            response.raise_for_status()
+        except Exception as e:
+            print(f"Error submitting work: {e}")
+
+    def check_balance(self):
+        """Запрос текущего баланса по client_id."""
+        try:
+            response = requests.get(f"{ORCHESTRATOR_URL}/get_balance/{self.client_id}")
+            response.raise_for_status()
+        except Exception as e:
+            print(f"Error checking balance: {e}")
+
+    def run(self):
+        """Цикл: запрос задачи → вычисление → отправка результата → проверка баланса."""
+        if not self.client_id:
+            return
+        while True:
+            task = self.fetch_task()
+            if task:
+                work_done, result, solution_nonce = self.perform_computation(task)
+                self.submit_work(task, work_done, result, solution_nonce)
+                self.check_balance()
+            time.sleep(10)  # Пауза перед следующей задачей
+
+
+if __name__ == "__main__":
+    worker = ClientWorker()
+    worker.run()

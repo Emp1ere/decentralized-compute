@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. Узел 1 (децентрализованный оркестратор)
+  orchestrator_node_1:
+    build:
+      context: ./orchestrator_node
+    ports:
+      - "5000:5000"
+    container_name: orchestrator_node_1
+    environment:
+      - PEER_URL=http://orchestrator_node_2:5000
+    # restart: unless-stopped
+
+  # 2. Узел 2 (децентрализованный оркестратор, равноправный с узлом 1)
+  orchestrator_node_2:
+    build:
+      context: ./orchestrator_node
+    ports:
+      - "5001:5000"
+    container_name: orchestrator_node_2
+    environment:
+      - PEER_URL=http://orchestrator_node_1:5000
+    depends_on:
+      - orchestrator_node_1
+    # restart: unless-stopped
+
+  # 3. Клиент-вычислитель 1 (подключается к узлу 1)
+  client_worker_1:
+    build:
+      context: ./client_worker
+    container_name: client_worker_1
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator_node_1:5000
+    depends_on:
+      - orchestrator_node_1
+    # restart: unless-stopped
+
+  # 4. Клиент-вычислитель 2 (подключается к узлу 2)
+  client_worker_2:
+    build:
+      context: ./client_worker
+    container_name: client_worker_2
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator_node_2:5000
+    depends_on:
+      - orchestrator_node_2
+    # restart: unless-stopped
