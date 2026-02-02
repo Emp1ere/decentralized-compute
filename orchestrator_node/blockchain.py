@@ -1,6 +1,9 @@
+# Консенсус: Proof-of-Work (PoW). Блок принимается только если его хеш удовлетворяет сложности (leading zeros).
+# Любой узел может майнить; первый найденный валидный блок распространяется и принимается сетью.
 import hashlib
 import time
 import json
+
 
 class Block:
     def __init__(self, index, timestamp, transactions, previous_hash, nonce=0):
@@ -9,9 +12,10 @@ class Block:
         self.transactions = transactions
         self.previous_hash = previous_hash
         self.nonce = nonce
-        self.hash = self.calculate_hash()
+        self.hash = self.calculate_hash()  # Хеш блока для проверки целостности и PoW
 
     def calculate_hash(self):
+        # Каноническая сериализация блока для детерминированного хеша
         block_string = json.dumps({
             "index": self.index,
             "timestamp": self.timestamp,
@@ -22,74 +26,63 @@ class Block:
         return hashlib.sha256(block_string.encode()).hexdigest()
 
     def mine_block(self, difficulty):
-        # Упрощенный майнинг (Proof-of-Work)
+        # Proof-of-Work: подбор nonce до тех пор, пока хеш не начнётся с difficulty нулей
         target = "0" * difficulty
         while self.hash[:difficulty] != target:
             self.nonce += 1
             self.hash = self.calculate_hash()
-        print(f"Block Completed! Hash: {self.hash}")
 
 
 class Blockchain:
     def __init__(self):
         self.chain = [self.create_genesis_block()]
-        self.pending_transactions = []
-        self.difficulty = 2 # Просто для демонстрации PoW
-        self.balances = {} # Балансы клиентов
+        self.pending_transactions = []  # Очередь транзакций, общая для всех узлов (распространяется по сети)
+        self.difficulty = 2  # Сложность PoW: число ведущих нулей в хеше блока
+        self.balances = {}
 
     def create_genesis_block(self):
-        # Фиксированное время, чтобы у всех узлов был одинаковый genesis
+        # Одинаковый genesis у всех узлов — основа консенсуса
         return Block(0, 0, [], "0")
 
     def get_last_block(self):
         return self.chain[-1]
 
     def add_transaction(self, transaction):
-        # Транзакция = {"from": "system", "to": client_id, "amount": 10}
-        #           ИЛИ {"type": "work_receipt", "client_id": ..., "work_units": ...}
+        # Добавление транзакции в очередь; майнить будет любой узел (PoW), не один «авторитет»
         self.pending_transactions.append(transaction)
         return self.get_last_block().index + 1
 
     def mine_pending_transactions(self, mining_reward_address=None):
+        # Майнинг по консенсусу PoW: любой узел вызывает этот метод при наличии pending tx
         if not self.pending_transactions and mining_reward_address is None:
-            print("No pending transactions to mine.")
             return None
-        
-        # В PoC майнером выступает сам оркестратор
+        # Опциональная награда за блок (при PoA была; при чистом PoW можно не добавлять)
         if mining_reward_address:
-             self.pending_transactions.append({
-                 "from": "network", 
-                 "to": mining_reward_address, 
-                 "amount": 1 # Награда за майнинг (если бы он был)
+            self.pending_transactions.append({
+                "from": "network",
+                "to": mining_reward_address,
+                "amount": 1
             })
-
         new_block = Block(
             index=len(self.chain),
             timestamp=time.time(),
             transactions=list(self.pending_transactions),
             previous_hash=self.get_last_block().hash
         )
-
-        new_block.mine_block(self.difficulty)
-        
-        print(f"Adding new block {new_block.index} to the chain.")
+        new_block.mine_block(self.difficulty)  # PoW: подбор nonce до валидного хеша
         self.chain.append(new_block)
-
-        # Обновляем балансы на основе транзакций
         for tx in self.pending_transactions:
             if tx.get("type") == "reward":
                 client_id = tx["to"]
                 amount = tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
-                print(f"Updated balance for {client_id}: {self.balances[client_id]}")
-
         self.pending_transactions = []
         return new_block
 
     def add_block_from_peer(self, block_dict):
         """
-        Принять блок от другого узла (децентрализованная синхронизация).
-        Проверяет целостность и обновляет балансы.
+        Принять блок от другого узла (консенсус PoW: первый валидный блок принимается).
+        Проверяет индекс, previous_hash, хеш и PoW; обновляет балансы; очищает pending.
         """
         last = self.get_last_block()
         if block_dict["index"] != len(self.chain):
@@ -105,21 +98,21 @@ class Blockchain:
         )
         if block.hash != block_dict.get("hash"):
             return False, "hash mismatch"
+        if block.hash[: self.difficulty] != "0" * self.difficulty:
+            return False, "PoW invalid"  # Хеш блока должен удовлетворять сложности PoW
         self.chain.append(block)
         for tx in block.transactions:
             if tx.get("type") == "reward":
                 client_id = tx["to"]
                 amount = tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
-                print(f"[Sync] Updated balance for {client_id}: {self.balances[client_id]}")
-        print(f"[Sync] Added block {block.index} from peer. Hash: {block.hash}")
+        self.pending_transactions = []  # Консенсус: пир выиграл раунд — не майним те же tx повторно
         return True, None
 
     def get_balance(self, client_id):
         return self.balances.get(client_id, 0)
 
     def get_chain_json(self):
-        # Сериализация цепочки для передачи пиру (GET /chain)
         return [block.__dict__ for block in self.chain]
 
     def replace_chain_from_peer(self, chain_list):

@@ -56,6 +56,27 @@ def periodic_sync():
         time.sleep(SYNC_INTERVAL)  # Интервал между проверками (по умолчанию 30 сек)
         sync_chain_from_peer()  # Подтягиваем цепочку пира, если она длиннее
 
+
+def mining_loop():
+    """
+    Консенсус PoW: любой узел может майнить. При наличии pending tx ищем nonce;
+    первый найденный валидный блок добавляется в цепочку и отправляется пиру.
+    """
+    while True:
+        time.sleep(1)  # Пауза, чтобы не нагружать CPU впустую
+        if not blockchain.pending_transactions:
+            continue  # Пустая очередь — майнить нечего
+        new_block = blockchain.mine_pending_transactions(mining_reward_address=None)  # PoW без доп. награды за блок
+        if new_block and PEER_URL:
+            try:
+                requests.post(
+                    f"{PEER_URL.rstrip('/')}/receive_block",
+                    json=new_block.__dict__,
+                    timeout=5,
+                )  # Рассылаем блок пиру; тот примет его и очистит свой pending (консенсус)
+            except Exception:
+                pass  # Ошибка сети при отправке блока — не критично
+
 # Инициализируем блокчейн
 blockchain = Blockchain()
 
@@ -114,26 +135,18 @@ def submit_work():
         "contract_id": contract_id,
         "work_units": work_units_done,
     }
-    blockchain.add_transaction(reward_tx)
+    blockchain.add_transaction(reward_tx)  # В очередь; майнить будет любой узел (PoW), не один оркестратор
     blockchain.add_transaction(work_receipt_tx)
-
-    new_block = blockchain.mine_pending_transactions(mining_reward_address="orchestrator_wallet")
-
-    if new_block and PEER_URL:
+    if PEER_URL:
         try:
-            r = requests.post(
-                f"{PEER_URL.rstrip('/')}/receive_block",
-                json=new_block.__dict__,
+            requests.post(
+                f"{PEER_URL.rstrip('/')}/add_pending_tx",
+                json={"transactions": [reward_tx, work_receipt_tx]},
                 timeout=5,
-            )
-            if r.status_code == 200 and r.json().get("accepted"):
-                pass  # Синхронизация успешна
-            else:
-                sync_chain_from_peer()  # Конфликт: подтягиваем более длинную цепочку пира
+            )  # Пир получает те же tx и тоже будет майнить — конкуренция за блок (консенсус PoW)
         except Exception:
-            pass  # Игнорируем ошибку сети при push к пиру
-
-    return jsonify({"status": "success", "reward_issued": reward_amount}), 200
+            pass
+    return jsonify({"status": "success", "reward_issued": reward_amount}), 200  # Блок создаст mining_loop
 
 @app.route("/get_balance/<client_id>", methods=["GET"])
 def get_balance(client_id):
@@ -151,10 +164,23 @@ def get_chain():
     return jsonify(blockchain.get_chain_json()), 200
 
 
+@app.route("/add_pending_tx", methods=["POST"])
+def add_pending_tx():
+    """
+    Консенсус PoW: принять транзакции от пира в очередь; оба узла майнят один и тот же pending.
+    """
+    data = request.get_json()  # Тело: { "transactions": [ tx1, tx2, ... ] }
+    if not data or "transactions" not in data:
+        return jsonify({"error": "No transactions"}), 400
+    for tx in data["transactions"]:
+        blockchain.add_transaction(tx)  # Добавляем в локальную очередь для майнинга
+    return jsonify({"accepted": True}), 200
+
+
 @app.route("/receive_block", methods=["POST"])
 def receive_block():
     """
-    Принять один блок от другого узла (децентрализованная синхронизация по блоку).
+    Принять блок от другого узла (консенсус PoW: первый валидный блок принимается, pending очищается).
     """
     data = request.get_json()
     if not data:
@@ -181,11 +207,10 @@ def receive_chain():
 
 
 if __name__ == "__main__":
-    # Запускаем начальную синхронизацию в фоне: узел подтянет цепочку с пира после старта
     t_startup = threading.Thread(target=startup_sync, daemon=True)
     t_startup.start()
-    # Запускаем периодическую синхронизацию: раз в SYNC_INTERVAL проверяем пира и принимаем более длинную цепочку
     t_periodic = threading.Thread(target=periodic_sync, daemon=True)
     t_periodic.start()
-    # 0.0.0.0 нужен для Docker
+    t_mining = threading.Thread(target=mining_loop, daemon=True)  # Консенсус PoW: майнит любой узел
+    t_mining.start()
     app.run(host="0.0.0.0", port=5000, debug=True)
