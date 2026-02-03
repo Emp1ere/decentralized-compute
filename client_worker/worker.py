@@ -35,7 +35,7 @@ class ClientWorker:
             return None
 
     def perform_computation(self, task):
-        """Выполнение работы по спецификации контракта: PoW до достижения work_units_required, один solution_hash + nonce для проверки."""
+        """Выполнение работы по спецификации контракта: PoW до work_units_required и до нахождения валидного хеша."""
         contract_id = task["contract_id"]
         target_work = task["work_units_required"]  # Сколько единиц работы нужно
         difficulty = task["difficulty"]  # Число ведущих нулей в хеше
@@ -45,7 +45,7 @@ class ClientWorker:
         final_result = None  # Хеш с нужным префиксом (для отчёта)
         solution_nonce = None  # Nonce этого хеша (для строгой проверки контрактом)
 
-        while work_units_done < target_work:
+        while work_units_done < target_work or solution_nonce is None:
             work_units_done += 1
             nonce = str(work_units_done)
             text = f"{self.client_id}-{contract_id}-{nonce}"  # Та же формула, что в контракте при проверке
@@ -77,6 +77,8 @@ class ClientWorker:
         try:
             response = requests.get(f"{ORCHESTRATOR_URL}/get_balance/{self.client_id}")
             response.raise_for_status()
+            data = response.json()
+            print(f"Balance: {data.get('balance', 0)}")
         except Exception as e:
             print(f"Error checking balance: {e}")
 

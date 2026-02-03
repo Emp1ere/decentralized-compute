@@ -1,5 +1,5 @@
-# Консенсус: Proof-of-Work (PoW). Блок принимается только если его хеш удовлетворяет сложности (leading zeros).
-# Любой узел может майнить; первый найденный валидный блок распространяется и принимается сетью.
+# Консенсус: Proof-of-Useful-Work (PoUW). Блок создаётся при верифицированной полезной работе
+# (результат submit_work); хеш блока — только для целостности, без перебора nonce (нет «пустого» майнинга).
 import hashlib
 import time
 import json
@@ -12,7 +12,7 @@ class Block:
         self.transactions = transactions
         self.previous_hash = previous_hash
         self.nonce = nonce
-        self.hash = self.calculate_hash()  # Хеш блока для проверки целостности и PoW
+        self.hash = self.calculate_hash()  # Хеш блока для целостности (PoUW: без перебора nonce)
 
     def calculate_hash(self):
         # Каноническая сериализация блока для детерминированного хеша
@@ -26,7 +26,7 @@ class Block:
         return hashlib.sha256(block_string.encode()).hexdigest()
 
     def mine_block(self, difficulty):
-        # Proof-of-Work: подбор nonce до тех пор, пока хеш не начнётся с difficulty нулей
+        # Оставлено для совместимости; при PoUW не вызывается (блок создаётся без перебора nonce)
         target = "0" * difficulty
         while self.hash[:difficulty] != target:
             self.nonce += 1
@@ -36,8 +36,8 @@ class Block:
 class Blockchain:
     def __init__(self):
         self.chain = [self.create_genesis_block()]
-        self.pending_transactions = []  # Очередь транзакций, общая для всех узлов (распространяется по сети)
-        self.difficulty = 2  # Сложность PoW: число ведущих нулей в хеше блока
+        self.pending_transactions = []  # Очередь транзакций (при PoUW блок создаётся при submit_work)
+        self.difficulty = 0  # При PoUW не используется для валидации блока (хеш только для целостности)
         self.balances = {}
 
     def create_genesis_block(self):
@@ -48,15 +48,14 @@ class Blockchain:
         return self.chain[-1]
 
     def add_transaction(self, transaction):
-        # Добавление транзакции в очередь; майнить будет любой узел (PoW), не один «авторитет»
+        # Добавление транзакции в очередь (при PoUW блок создаётся при верифицированной полезной работе)
         self.pending_transactions.append(transaction)
         return self.get_last_block().index + 1
 
     def mine_pending_transactions(self, mining_reward_address=None):
-        # Майнинг по консенсусу PoW: любой узел вызывает этот метод при наличии pending tx
+        # PoUW: создание блока из pending без перебора nonce (блок = упаковка верифицированной работы)
         if not self.pending_transactions and mining_reward_address is None:
             return None
-        # Опциональная награда за блок (при PoA была; при чистом PoW можно не добавлять)
         if mining_reward_address:
             self.pending_transactions.append({
                 "from": "network",
@@ -69,7 +68,7 @@ class Blockchain:
             transactions=list(self.pending_transactions),
             previous_hash=self.get_last_block().hash
         )
-        new_block.mine_block(self.difficulty)  # PoW: подбор nonce до валидного хеша
+        # Хеш уже вычислен в Block.__init__; при PoUW не вызываем mine_block (нет «пустого» майнинга)
         self.chain.append(new_block)
         for tx in self.pending_transactions:
             if tx.get("type") == "reward":
@@ -81,8 +80,8 @@ class Blockchain:
 
     def add_block_from_peer(self, block_dict):
         """
-        Принять блок от другого узла (консенсус PoW: первый валидный блок принимается).
-        Проверяет индекс, previous_hash, хеш и PoW; обновляет балансы; очищает pending.
+        Принять блок от другого узла (PoUW: блок валиден по целостности, без проверки «сложности» хеша).
+        Проверяет индекс, previous_hash, хеш; обновляет балансы; очищает pending.
         """
         last = self.get_last_block()
         if block_dict["index"] != len(self.chain):
@@ -98,8 +97,7 @@ class Blockchain:
         )
         if block.hash != block_dict.get("hash"):
             return False, "hash mismatch"
-        if block.hash[: self.difficulty] != "0" * self.difficulty:
-            return False, "PoW invalid"  # Хеш блока должен удовлетворять сложности PoW
+        # PoUW: не проверяем ведущие нули в хеше — доказательство = полезная работа в транзакциях
         self.chain.append(block)
         for tx in block.transactions:
             if tx.get("type") == "reward":
@@ -144,9 +142,7 @@ class Blockchain:
             # Хеш блока должен совпадать с переданным (целостность)
             if block.hash != d.get("hash"):
                 return False, f"hash mismatch at block {i}"
-            # Proof-of-Work: хеш должен начинаться с difficulty нулей
-            if block.hash[: self.difficulty] != "0" * self.difficulty:
-                return False, f"PoW invalid at block {i}"
+            # PoUW: проверка «сложности» хеша не используется
             new_chain.append(block)
             prev_hash = block.hash
         # Принимаем только если цепочка пира длиннее — правило «longest chain»

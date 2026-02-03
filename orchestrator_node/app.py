@@ -19,23 +19,37 @@ SYNC_INTERVAL = int(os.environ.get("SYNC_INTERVAL", 30))
 
 def sync_chain_from_peer():
     """
-    Запросить у пира полную цепочку и заменить локальную, если у пира длиннее и она валидна.
-    Основа начальной синхронизации при старте и разрешения конфликтов (longest chain).
+    Синхронизация с пиром: pull (GET /chain) и push (POST /receive_chain).
+    — Подтягиваем цепочку пира и заменяем локальную, если у пира длиннее и валидна.
+    — Отправляем свою цепочку пиру через /receive_chain, чтобы пир принял её, если наша длиннее.
     """
     if not PEER_URL:
         return  # Нет пира — нечего синхронизировать
+    base = PEER_URL.rstrip("/")
+
+    # Pull: запросить цепочку у пира, принять если длиннее и валидна
     try:
-        r = requests.get(f"{PEER_URL.rstrip('/')}/chain", timeout=5)  # GET /chain у пира
-        if r.status_code != 200:
-            return  # Пир недоступен или ошибка — пропускаем
-        peer_chain = r.json()  # Цепочка как список блоков (словарей)
-        ok, err = blockchain.replace_chain_from_peer(peer_chain)  # Замена только если длиннее и валидна
-        if ok:
-            print(f"[Sync] Replaced local chain with peer chain (length {len(peer_chain)})")
-        elif err and "not longer" not in err:
-            print(f"[Sync] Peer chain rejected: {err}")  # Не печатаем, если просто «не длиннее»
+        r = requests.get(f"{base}/chain", timeout=5)
+        if r.status_code == 200:
+            peer_chain = r.json()
+            ok, err = blockchain.replace_chain_from_peer(peer_chain)
+            if ok:
+                print(f"[Sync] Replaced local chain with peer chain (length {len(peer_chain)})")
+            elif err and "not longer" not in err:
+                print(f"[Sync] Peer chain rejected: {err}")
     except Exception as e:
         print(f"[Sync] Failed to fetch peer chain: {e}")
+
+    # Push: отправить свою цепочку пиру через /receive_chain (пир примет, если наша длиннее)
+    try:
+        my_chain = blockchain.get_chain_json()
+        r2 = requests.post(f"{base}/receive_chain", json=my_chain, timeout=5)
+        if r2.status_code == 200:
+            data = r2.json()
+            if data.get("accepted"):
+                print(f"[Sync] Peer accepted our chain (length {data.get('length', len(my_chain))})")
+    except Exception as e:
+        print(f"[Sync] Failed to push chain to peer: {e}")
 
 
 def startup_sync():
@@ -56,26 +70,6 @@ def periodic_sync():
         time.sleep(SYNC_INTERVAL)  # Интервал между проверками (по умолчанию 30 сек)
         sync_chain_from_peer()  # Подтягиваем цепочку пира, если она длиннее
 
-
-def mining_loop():
-    """
-    Консенсус PoW: любой узел может майнить. При наличии pending tx ищем nonce;
-    первый найденный валидный блок добавляется в цепочку и отправляется пиру.
-    """
-    while True:
-        time.sleep(1)  # Пауза, чтобы не нагружать CPU впустую
-        if not blockchain.pending_transactions:
-            continue  # Пустая очередь — майнить нечего
-        new_block = blockchain.mine_pending_transactions(mining_reward_address=None)  # PoW без доп. награды за блок
-        if new_block and PEER_URL:
-            try:
-                requests.post(
-                    f"{PEER_URL.rstrip('/')}/receive_block",
-                    json=new_block.__dict__,
-                    timeout=5,
-                )  # Рассылаем блок пиру; тот примет его и очистит свой pending (консенсус)
-            except Exception:
-                pass  # Ошибка сети при отправке блока — не критично
 
 # Инициализируем блокчейн
 blockchain = Blockchain()
@@ -135,18 +129,20 @@ def submit_work():
         "contract_id": contract_id,
         "work_units": work_units_done,
     }
-    blockchain.add_transaction(reward_tx)  # В очередь; майнить будет любой узел (PoW), не один оркестратор
+    blockchain.add_transaction(reward_tx)
     blockchain.add_transaction(work_receipt_tx)
-    if PEER_URL:
+    # PoUW: блок создаётся сразу при верифицированной полезной работе (без отдельного майнинг-цикла)
+    new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
+    if new_block and PEER_URL:
         try:
             requests.post(
-                f"{PEER_URL.rstrip('/')}/add_pending_tx",
-                json={"transactions": [reward_tx, work_receipt_tx]},
+                f"{PEER_URL.rstrip('/')}/receive_block",
+                json=new_block.__dict__,
                 timeout=5,
-            )  # Пир получает те же tx и тоже будет майнить — конкуренция за блок (консенсус PoW)
+            )  # Пир принимает блок и синхронизирует цепочку
         except Exception:
             pass
-    return jsonify({"status": "success", "reward_issued": reward_amount}), 200  # Блок создаст mining_loop
+    return jsonify({"status": "success", "reward_issued": reward_amount}), 200
 
 @app.route("/get_balance/<client_id>", methods=["GET"])
 def get_balance(client_id):
@@ -167,7 +163,7 @@ def get_chain():
 @app.route("/add_pending_tx", methods=["POST"])
 def add_pending_tx():
     """
-    Консенсус PoW: принять транзакции от пира в очередь; оба узла майнят один и тот же pending.
+    Принять транзакции от пира в очередь (при PoUW блоки создаются при submit_work; эндпоинт для совместимости).
     """
     data = request.get_json()  # Тело: { "transactions": [ tx1, tx2, ... ] }
     if not data or "transactions" not in data:
@@ -180,7 +176,7 @@ def add_pending_tx():
 @app.route("/receive_block", methods=["POST"])
 def receive_block():
     """
-    Принять блок от другого узла (консенсус PoW: первый валидный блок принимается, pending очищается).
+    Принять блок от другого узла (PoUW: блок с верифицированной полезной работой; pending очищается).
     """
     data = request.get_json()
     if not data:
@@ -211,6 +207,5 @@ if __name__ == "__main__":
     t_startup.start()
     t_periodic = threading.Thread(target=periodic_sync, daemon=True)
     t_periodic.start()
-    t_mining = threading.Thread(target=mining_loop, daemon=True)  # Консенсус PoW: майнит любой узел
-    t_mining.start()
+    # PoUW: отдельный майнинг-поток не нужен — блок создаётся в submit_work при верифицированной работе
     app.run(host="0.0.0.0", port=5000, debug=True)
