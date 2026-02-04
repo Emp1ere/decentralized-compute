@@ -227,6 +227,11 @@ def get_balance(client_id):
     balance = blockchain.get_balance(client_id)
     return jsonify({"client_id": client_id, "balance": balance}), 200
 
+@app.route("/health", methods=["GET"])
+def health():
+    """Проверка живости узла (для балансировщика нагрузки и мониторинга)."""
+    return jsonify({"status": "ok"}), 200
+
 @app.route("/chain", methods=["GET"])
 @limiter.limit("120 per minute")  # Публичный read-only; лимит от DDoS
 def get_chain():
