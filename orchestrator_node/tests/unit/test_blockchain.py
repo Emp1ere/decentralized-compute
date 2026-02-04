@@ -126,7 +126,8 @@ class TestBlockchain:
         invalid_block = Block(
             1,
             1,
-            [{"type": "reward", "to": "c1"}]  # no amount - invalid
+            [{"type": "reward", "to": "c1"}],  # no amount - invalid
+            last.hash,
         )
         ok, err = bc.add_block_from_peer(invalid_block.__dict__)
         assert ok is False

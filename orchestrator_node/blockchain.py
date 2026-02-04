@@ -161,10 +161,11 @@ class Blockchain:
         
         # Опциональная награда за блок (если передана)
         if mining_reward_address:
-             self.pending_transactions.append({
-                 "from": "network", 
-                 "to": mining_reward_address, 
-                 "amount": 1
+            self.pending_transactions.append({
+                "type": "reward",
+                "from": "network",
+                "to": mining_reward_address,
+                "amount": 1,
             })
 
         # Создаём блок с текущими pending транзакциями

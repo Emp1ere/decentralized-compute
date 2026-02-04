@@ -31,23 +31,23 @@ class ClientWorker:
 
     def register(self):
         """Регистрация на оркестраторе: получаем client_id и api_key для последующих запросов."""
-        try:
-            response = requests.get(f"{ORCHESTRATOR_URL}/register", verify=VERIFY_SSL, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            self.client_id = data.get("client_id")
-            self.api_key = data.get("api_key")
-            if not self.client_id or not self.api_key:
-                raise ValueError("Missing client_id or api_key in response")
-            logger.info("Registered: client_id=%s...", self.client_id[:8])
-        except requests.RequestException as e:
-            logger.warning("Register failed (retry in 5s): %s", e)
-            time.sleep(5)
-            self.register()
-        except (KeyError, ValueError) as e:
-            logger.error("Register invalid response: %s", e)
-            time.sleep(5)
-            self.register()
+        while True:
+            try:
+                response = requests.get(f"{ORCHESTRATOR_URL}/register", verify=VERIFY_SSL, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                self.client_id = data.get("client_id")
+                self.api_key = data.get("api_key")
+                if not self.client_id or not self.api_key:
+                    raise ValueError("Missing client_id or api_key in response")
+                logger.info("Registered: client_id=%s...", self.client_id[:8])
+                return
+            except requests.RequestException as e:
+                logger.warning("Register failed (retry in 5s): %s", e)
+                time.sleep(5)
+            except (KeyError, ValueError) as e:
+                logger.error("Register invalid response: %s", e)
+                time.sleep(5)
 
     def fetch_task(self):
         """Запрос задачи: оркестратор возвращает минимальную спецификацию (contract_id, work_units_required, difficulty)."""

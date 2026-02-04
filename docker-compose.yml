@@ -70,7 +70,7 @@ services:
       - orchestrator_node_2
     # restart: unless-stopped
 
-  # 5. Балансировщик нагрузки (опционально): воркеры могут использовать ORCHESTRATOR_URL=http://loadbalancer:8080
+  # 5. Балансировщик нагрузки: воркеры в Docker — ORCHESTRATOR_URL=http://loadbalancer (порт 80); с хоста — http://localhost:8080
   loadbalancer:
     image: nginx:alpine
     container_name: loadbalancer

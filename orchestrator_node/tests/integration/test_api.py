@@ -70,10 +70,10 @@ def test_submit_work_success(client, auth_headers):
     contract_id = task["contract_id"]
     difficulty = task["difficulty"]
     target_work = task["work_units_required"]
-    # Находим валидный nonce
+    # Находим валидный nonce (для difficulty 4 нужно до ~65536 попыток)
     result_data = None
     solution_nonce = None
-    for n in range(1, 3000):
+    for n in range(1, 100_000):
         text = f"{client_id}-{contract_id}-{n}"
         h = hashlib.sha256(text.encode()).hexdigest()
         if h.startswith("0" * difficulty):
