@@ -2,6 +2,14 @@ import requests
 import time
 import hashlib
 import os
+import logging
+
+logging.basicConfig(
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("worker")
 
 # Адрес оркестратора (из docker-compose или env); для HTTPS укажите https://...
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator_node:5000")
@@ -24,33 +32,51 @@ class ClientWorker:
     def register(self):
         """Регистрация на оркестраторе: получаем client_id и api_key для последующих запросов."""
         try:
-            response = requests.get(f"{ORCHESTRATOR_URL}/register", verify=VERIFY_SSL)
+            response = requests.get(f"{ORCHESTRATOR_URL}/register", verify=VERIFY_SSL, timeout=10)
             response.raise_for_status()
             data = response.json()
-            self.client_id = data["client_id"]
-            self.api_key = data["api_key"]  # Сохраняем для Authorization: Bearer
-        except Exception as e:
-            print(f"Error registering: {e}")
+            self.client_id = data.get("client_id")
+            self.api_key = data.get("api_key")
+            if not self.client_id or not self.api_key:
+                raise ValueError("Missing client_id or api_key in response")
+            logger.info("Registered: client_id=%s...", self.client_id[:8])
+        except requests.RequestException as e:
+            logger.warning("Register failed (retry in 5s): %s", e)
             time.sleep(5)
-            self.register()  # Повторная попытка через 5 сек
+            self.register()
+        except (KeyError, ValueError) as e:
+            logger.error("Register invalid response: %s", e)
+            time.sleep(5)
+            self.register()
 
     def fetch_task(self):
         """Запрос задачи: оркестратор возвращает минимальную спецификацию (contract_id, work_units_required, difficulty)."""
         try:
             response = requests.get(
-                f"{ORCHESTRATOR_URL}/get_task", headers=self._auth_headers(), verify=VERIFY_SSL
+                f"{ORCHESTRATOR_URL}/get_task",
+                headers=self._auth_headers(),
+                verify=VERIFY_SSL,
+                timeout=10,
             )
             response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            print(f"Error fetching task: {e}")
+            data = response.json()
+            if not isinstance(data, dict) or "contract_id" not in data:
+                logger.warning("fetch_task invalid response")
+                return None
+            return data
+        except requests.RequestException as e:
+            logger.warning("fetch_task failed: %s", e)
             return None
 
     def perform_computation(self, task):
         """Выполнение работы по спецификации контракта: PoW до work_units_required и до нахождения валидного хеша."""
-        contract_id = task["contract_id"]
-        target_work = task["work_units_required"]  # Сколько единиц работы нужно
-        difficulty = task["difficulty"]  # Число ведущих нулей в хеше
+        try:
+            contract_id = task["contract_id"]
+            target_work = int(task["work_units_required"])
+            difficulty = int(task["difficulty"])
+        except (KeyError, TypeError, ValueError) as e:
+            logger.error("perform_computation invalid task: %s", e)
+            return 0, "", None
         target_prefix = "0" * difficulty
 
         work_units_done = 0
@@ -84,10 +110,14 @@ class ClientWorker:
                 json=payload,
                 headers=self._auth_headers(),
                 verify=VERIFY_SSL,
+                timeout=30,
             )
             response.raise_for_status()
-        except Exception as e:
-            print(f"Error submitting work: {e}")
+            logger.info("submit_work success: reward=%s", response.json().get("reward_issued"))
+        except requests.RequestException as e:
+            logger.warning("submit_work failed: %s", e)
+            if hasattr(e, "response") and e.response is not None and e.response.text:
+                logger.debug("response body: %s", e.response.text[:300])
 
     def check_balance(self):
         """Запрос текущего баланса по client_id (требуется аутентификация)."""
@@ -99,9 +129,9 @@ class ClientWorker:
             )
             response.raise_for_status()
             data = response.json()
-            print(f"Balance: {data.get('balance', 0)}")
-        except Exception as e:
-            print(f"Error checking balance: {e}")
+            logger.info("Balance: %s", data.get("balance", 0))
+        except requests.RequestException as e:
+            logger.warning("check_balance failed: %s", e)
 
     def run(self):
         """Цикл: запрос задачи → вычисление → отправка результата → проверка баланса."""

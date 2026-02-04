@@ -4,6 +4,9 @@
 import hashlib
 import time
 import json
+import logging
+
+logger = logging.getLogger("blockchain")
 
 
 class Block:
@@ -33,7 +36,7 @@ class Block:
         while self.hash[:difficulty] != target:
             self.nonce += 1
             self.hash = self.calculate_hash()
-        print(f"Block Completed! Hash: {self.hash}")
+        logger.debug("Block completed: hash=%s", self.hash[:16] + "...")
 
 
 class Blockchain:
@@ -63,7 +66,7 @@ class Blockchain:
         Блок создаётся при верифицированной полезной работе (submit_work).
         """
         if not self.pending_transactions and mining_reward_address is None:
-            print("No pending transactions to mine.")
+            logger.debug("No pending transactions to mine")
             return None
         
         # Опциональная награда за блок (если передана)
@@ -83,7 +86,7 @@ class Blockchain:
         )
         # PoUW: не вызываем mine_block (difficulty=0, хеш уже вычислен в __init__)
 
-        print(f"Adding new block {new_block.index} to the chain.")
+        logger.info("Adding block index=%s to chain", new_block.index)
         self.chain.append(new_block)
 
         # Обновляем балансы на основе транзакций в блоке
@@ -92,7 +95,7 @@ class Blockchain:
                 client_id = tx["to"]
                 amount = tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
-                print(f"Updated balance for {client_id}: {self.balances[client_id]}")
+                logger.debug("Updated balance for %s: %s", client_id[:8] + "...", self.balances[client_id])
 
         self.pending_transactions = []
         return new_block
@@ -136,8 +139,8 @@ class Blockchain:
                 client_id = tx["to"]
                 amount = tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
-                print(f"[Sync] Updated balance for {client_id}: {self.balances[client_id]}")
-        print(f"[Sync] Added block {block.index} from peer. Hash: {block.hash}")
+                logger.debug("Sync updated balance for %s: %s", client_id[:8] + "...", self.balances[client_id])
+        logger.info("Sync added block index=%s from peer", block.index)
         return True, None
 
     def replace_chain_from_peer(self, chain_list):
@@ -187,7 +190,7 @@ class Blockchain:
                     client_id = tx["to"]
                     amount = tx["amount"]
                     self.balances[client_id] = self.balances.get(client_id, 0) + amount
-        print(f"[Sync] Replaced chain: {len(self.chain)} blocks")
+        logger.info("Sync replaced chain: %s blocks", len(self.chain))
         return True, None
 
     def get_balance(self, client_id):

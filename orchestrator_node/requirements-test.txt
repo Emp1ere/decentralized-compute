@@ -1,0 +1,4 @@
+# Зависимости для тестов (установить: pip install -r requirements-test.txt)
+-r requirements.txt
+pytest>=7.0
+pytest-cov>=4.0

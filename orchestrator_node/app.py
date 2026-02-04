@@ -12,7 +12,16 @@ from functools import wraps
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address  # для rate_limit_key по IP
 
+from logger_config import setup_logging, get_logger
+
+setup_logging()
+logger = get_logger("orchestrator")
+
 app = Flask(__name__)
+
+# Счётчики для мониторинга (запросы по эндпоинтам и ошибки)
+_request_counts = {}
+_error_counts = {}
 
 # Инициализируем наш блокчейн
 blockchain = Blockchain()
@@ -51,6 +60,29 @@ SYNC_INTERVAL = int(os.environ.get("SYNC_INTERVAL", "30"))
 NODE_SECRET = os.environ.get("NODE_SECRET", "")
 
 
+@app.before_request
+def _count_request():
+    """Учёт запросов по пути для /metrics."""
+    path = request.path or "unknown"
+    _request_counts[path] = _request_counts.get(path, 0) + 1
+
+
+@app.errorhandler(500)
+def _handle_500(e):
+    """Единая обработка внутренних ошибок сервера."""
+    _error_counts["500"] = _error_counts.get("500", 0) + 1
+    logger.exception("internal_error")
+    return jsonify({"error": "Internal server error"}), 500
+
+
+@app.errorhandler(429)
+def _handle_429(e):
+    """Ответ при превышении лимита (DDoS)."""
+    _error_counts["429"] = _error_counts.get("429", 0) + 1
+    logger.warning("rate_limit_exceeded: %s", request.path)
+    return jsonify({"error": "Too many requests"}), 429
+
+
 def require_node_secret(f):
     """Проверка секрета узла для эндпоинтов синхронизации (опционально, если NODE_SECRET задан)."""
     @wraps(f)
@@ -74,11 +106,13 @@ def sync_chain_from_peer():
             # Пытаемся заменить локальную цепочку на цепочку пира (longest valid chain)
             ok, err = blockchain.replace_chain_from_peer(peer_chain)
             if ok:
-                print(f"[Sync] Chain replaced from peer: {len(peer_chain)} blocks")
+                logger.info("sync_chain_replaced: blocks=%s", len(peer_chain))
             else:
-                print(f"[Sync] Chain not replaced: {err}")
-    except Exception as e:
-        print(f"[Sync] Failed to sync from peer: {e}")
+                logger.debug("sync_chain_not_replaced: %s", err)
+    except requests.RequestException as e:
+        logger.warning("sync_chain_failed: %s", e)
+    except Exception:
+        logger.exception("sync_chain_error")
 
 
 def startup_sync():
@@ -107,7 +141,7 @@ def register_client():
     api_key = secrets.token_urlsafe(32)
     api_key_to_client[api_key] = client_id
     blockchain.balances[client_id] = 0
-    print(f"New client registered: {client_id}")
+    logger.info("client_registered: %s...", client_id[:8])
     return jsonify({"client_id": client_id, "api_key": api_key}), 200
 
 @app.route("/get_task", methods=["GET"])
@@ -120,7 +154,7 @@ def get_task():
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     contract = random.choice(list(CONTRACTS.values()))
-    print(f"Issuing task {contract.contract_id} to a client.")
+    logger.info("task_issued: contract_id=%s client_id=%s...", contract.contract_id, client_id[:8])
     return jsonify(contract.get_task_spec()), 200
 
 @app.route("/submit_work", methods=["POST"])
@@ -133,7 +167,11 @@ def submit_work():
     client_id_from_key = get_client_id_from_auth()
     if client_id_from_key is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    data = request.json or {}
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        logger.warning("submit_work_invalid_json")
+        return jsonify({"error": "Invalid JSON"}), 400
     client_id = data.get("client_id")
     if client_id != client_id_from_key:
         return jsonify({"error": "client_id does not match authenticated client"}), 403
@@ -164,7 +202,7 @@ def submit_work():
         return jsonify({"error": "Work verification failed"}), 400
 
     reward_amount = contract.get_reward()
-    print(f"Work verified. Issuing reward of {reward_amount} to {client_id}.")
+    logger.info("work_verified: client_id=%s... reward=%s contract_id=%s", client_id[:8], reward_amount, contract_id)
 
     # Создаём транзакцию вознаграждения
     reward_tx = {
@@ -202,13 +240,12 @@ def submit_work():
                 headers=headers,
             )
             if response.status_code == 200 and response.json().get("accepted"):
-                print(f"[Sync] Peer accepted block {new_block.index}")
+                logger.info("peer_accepted_block: index=%s", new_block.index)
             else:
-                # Если пир отклонил блок, синхронизируемся (разрешение конфликта)
-                print(f"[Sync] Peer rejected block: {response.json().get('error', response.text)}")
+                logger.warning("peer_rejected_block: index=%s error=%s", new_block.index, response.text[:200])
                 sync_chain_from_peer()  # Подтягиваем более длинную цепочку пира
-        except Exception as e:
-            print(f"[Sync] Failed to push block to peer: {e}")
+        except requests.RequestException as e:
+            logger.warning("push_block_failed: %s", e)
 
     return jsonify({
         "status": "success", 
@@ -232,6 +269,26 @@ def health():
     """Проверка живости узла (для балансировщика нагрузки и мониторинга)."""
     return jsonify({"status": "ok"}), 200
 
+
+@app.route("/metrics", methods=["GET"])
+def metrics():
+    """Метрики для мониторинга: длина цепочки, число клиентов, pending, счётчики запросов (если велись)."""
+    try:
+        chain_len = len(blockchain.chain)
+        num_clients = len(blockchain.balances)
+        pending = len(blockchain.pending_transactions)
+    except Exception as e:
+        logger.exception("metrics_error")
+        return jsonify({"error": "metrics failed"}), 500
+    body = {
+        "chain_length": chain_len,
+        "clients_count": num_clients,
+        "pending_transactions": pending,
+        "request_counts": _request_counts,
+        "error_counts": _error_counts,
+    }
+    return jsonify(body), 200
+
 @app.route("/chain", methods=["GET"])
 @limiter.limit("120 per minute")  # Публичный read-only; лимит от DDoS
 def get_chain():
@@ -245,12 +302,11 @@ def receive_block():
     Принять блок от другого узла (децентрализованная синхронизация).
     PoUW: первый валидный блок принимается, pending очищается (блок создаёт только узел, принявший submit_work).
     """
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"accepted": False, "error": "No JSON"}), 400
     ok, err = blockchain.add_block_from_peer(data)
     if ok:
-        # Горизонтальное масштабирование: распространяем блок на свой пир (чтобы 3+ узлов получили блок)
         if PEER_URL:
             try:
                 headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
@@ -260,9 +316,10 @@ def receive_block():
                     timeout=5,
                     headers=headers,
                 )
-            except Exception as e:
-                print(f"[Sync] Forward block to peer: {e}")
+            except requests.RequestException as e:
+                logger.warning("forward_block_failed: %s", e)
         return jsonify({"accepted": True}), 200
+    logger.debug("receive_block_rejected: %s", err)
     return jsonify({"accepted": False, "error": err}), 400
 
 @app.route("/receive_chain", methods=["POST"])
@@ -305,8 +362,8 @@ if __name__ == "__main__":
     key_file = os.environ.get("TLS_KEY_FILE")
     if cert_file and key_file and os.path.isfile(cert_file) and os.path.isfile(key_file):
         ssl_context = (cert_file, key_file)
-        print("TLS enabled: HTTPS")
+        logger.info("TLS enabled: HTTPS")
     else:
-        print("TLS not configured (set TLS_CERT_FILE, TLS_KEY_FILE for HTTPS)")
+        logger.info("TLS not configured (set TLS_CERT_FILE, TLS_KEY_FILE for HTTPS)")
 
     app.run(host="0.0.0.0", port=5000, debug=True, ssl_context=ssl_context)

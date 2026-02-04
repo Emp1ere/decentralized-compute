@@ -397,3 +397,65 @@
 2. В **nginx_loadbalancer/nginx.conf**: в upstream добавить `server orchestrator_node_N:5000 max_fails=2 fail_timeout=30s;`.  
 3. Перезапустить: `docker-compose up -d`.  
 4. Новые воркеры с `ORCHESTRATOR_URL=http://loadbalancer` будут распределяться в том числе на новый узел.
+
+---
+
+## 14. Качество кода: обработка ошибок, логирование, тесты, мониторинг
+
+### Запрос из чата
+Добавить обработку ошибок (если её ещё нет), логирование, тесты (unit/integration), мониторинг проблем и производительности.
+
+### 1. Обработка ошибок
+
+- **Оркестратор (app.py):**
+  - В `submit_work`: проверка `request.get_json(silent=True)` и ответ 400 при невалидном JSON.
+  - В `receive_block`: проверка `get_json(silent=True)`, при отсутствии тела — 400.
+  - Глобальные обработчики: `@app.errorhandler(500)` — логирование и ответ «Internal server error»; `@app.errorhandler(429)` — ответ «Too many requests» при срабатывании лимитера.
+  - Синхронизация с пиром: перехват `requests.RequestException`, логирование без падения.
+- **Воркер (worker.py):**
+  - `register`: перехват `RequestException` и `KeyError`/`ValueError`, проверка наличия `client_id` и `api_key` в ответе, повтор через 5 сек при ошибке.
+  - `fetch_task`: перехват `RequestException`, проверка формата ответа (dict, наличие `contract_id`).
+  - `perform_computation`: проверка полей задачи (`contract_id`, `work_units_required`, `difficulty`), при ошибке — возврат (0, "", None).
+  - `submit_work` и `check_balance`: перехват `RequestException`, таймауты (10/30 сек), логирование тела ответа при ошибке (для отладки).
+
+### 2. Логирование
+
+- **Оркестратор:**
+  - Модуль **logger_config.py**: настройка уровня через `LOG_LEVEL` (по умолчанию INFO), формат с временем и именем логгера. Логгеры `orchestrator` и `blockchain`.
+  - Все `print` заменены на `logger.info` / `logger.warning` / `logger.debug` / `logger.exception` в app.py и blockchain.py.
+- **Воркер:**
+  - `logging.basicConfig` с уровнем из `LOG_LEVEL`, логгер `worker`. Все `print` заменены на `logger.info` / `logger.warning` / `logger.error` / `logger.debug`.
+
+### 3. Тесты
+
+- **Unit-тесты (orchestrator_node/tests/unit/):**
+  - **test_contracts.py:** проверка `get_task_spec`, `verify` (успех при валидном nonce, отказ при неверном контракте, недостаточной работе, отсутствии nonce, несовпадении хеша), `get_reward`, реестр CONTRACTS.
+  - **test_blockchain.py:** genesis, add_transaction + mine_pending_transactions, баланс; идемпотентный приём блока; отказ при неверном индексе; `get_used_proof_ids` (пусто и после work_receipt); `replace_chain_from_peer` при более длинной валидной цепочке.
+- **Интеграционные тесты (orchestrator_node/tests/integration/):**
+  - **test_api.py:** Flask test client — register (наличие client_id, api_key); get_task без авторизации (401) и с авторизацией (200, корректная спецификация); submit_work без авторизации (401) и полный сценарий (get_task → вычисление nonce → submit_work → 200, success); get_balance без авторизации (401); health (200, ok); metrics (200, chain_length, clients_count, pending_transactions); chain (200, список блоков).
+- **Запуск (если в PowerShell ошибка из‑за кодировки или пути с кириллицей):**
+  1. **Через BAT-файл (рекомендуется):** дважды щёлкнуть по `run_tests.bat` в корне проекта или по `orchestrator_node/run_tests.bat`. Либо в проводнике в адресной строке ввести `cmd`, Enter, затем `run_tests.bat`.
+  2. **Через CMD:** открыть «Командную строку» (cmd.exe), перейти в папку проекта (например `cd /d C:\path\to\distributed-compute\orchestrator_node`), выполнить `run_tests.bat` или `pip install -r requirements-test.txt` и `python -m pytest tests/ -v`.
+  3. **Если проект в пути с кириллицей:** скопировать проект в каталог без русских букв (например `C:\dc`) и запускать тесты оттуда.
+  - С покрытием: `python -m pytest tests/ -v --cov=. --cov-report=term-missing`
+
+### 4. Мониторинг проблем и производительности
+
+- **Эндпоинт GET /metrics:**
+  - Возвращает JSON: `chain_length`, `clients_count`, `pending_transactions`, `request_counts` (счётчики запросов по путям), `error_counts` (счётчики 500 и 429).
+  - Используется для наблюдения за состоянием узла и нагрузкой.
+- **Учёт запросов и ошибок:**
+  - `@app.before_request`: увеличение счётчика по `request.path` в `_request_counts`.
+  - В `errorhandler(500)` и `errorhandler(429)`: увеличение `_error_counts["500"]` и `_error_counts["429"]`.
+- **Логирование:** все критические действия (регистрация, выдача задачи, верификация работы, приём/отклонение блока, синхронизация) пишутся в лог с уровнем INFO/WARNING/DEBUG; при 500 вызывается `logger.exception` для трассировки.
+
+### Изменённые и добавленные файлы
+
+| Файл | Изменения |
+|------|-----------|
+| **orchestrator_node/logger_config.py** | Новый: настройка логирования, get_logger. |
+| **orchestrator_node/app.py** | Логирование, обработчики 500/429, before_request для счётчиков, /metrics, обработка ошибок в submit_work и receive_block. |
+| **orchestrator_node/blockchain.py** | Замена print на logger (модуль logging). |
+| **orchestrator_node/tests/** | Новые: conftest.py, unit/test_contracts.py, unit/test_blockchain.py, integration/test_api.py. |
+| **orchestrator_node/requirements-test.txt** | Новый: pytest, pytest-cov. |
+| **client_worker/worker.py** | Логирование, таймауты, проверка ответов и полей задачи, раздельная обработка RequestException и ValueError/KeyError. |
