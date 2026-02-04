@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Distributed Compute — Узел</title>
+  <style>
+    :root {
+      --bg: #1a1d23;
+      --panel: #252830;
+      --border: #3d424d;
+      --text: #e6e8ec;
+      --muted: #8b909a;
+      --accent: #5c9ead;
+      --success: #7cb342;
+      --error: #e57373;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 12px 20px 24px;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 16px;
+      color: var(--accent);
+    }
+    .tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tabs button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tabs button:hover { color: var(--text); }
+    .tabs button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .panel {
+      display: none;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .panel.active { display: block; }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .card .label { color: var(--muted); font-size: 0.85rem; margin-bottom: 4px; }
+    .card .value { font-size: 1.5rem; font-weight: 600; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    button.primary:hover { filter: brightness(1.1); }
+    button.primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      min-width: 200px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 500; }
+    tr:hover { background: rgba(255,255,255,0.03); }
+    .mono { font-family: ui-monospace, monospace; font-size: 0.85em; }
+    .hash { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .msg { margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 0.9rem; }
+    .msg.info { background: rgba(92, 158, 173, 0.2); color: var(--accent); }
+    .msg.err { background: rgba(229, 115, 115, 0.15); color: var(--error); }
+    .msg.ok { background: rgba(124, 179, 66, 0.15); color: var(--success); }
+    .node-links { margin-bottom: 16px; font-size: 0.9rem; color: var(--muted); }
+    .node-links a { color: var(--accent); margin-right: 12px; }
+    .loading { color: var(--muted); }
+    .progress-bar {
+      height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-top: 8px; max-width: 300px;
+    }
+    .progress-bar div { height: 100%; background: var(--accent); transition: width 0.2s; }
+  </style>
+</head>
+<body>
+  <h1>Distributed Compute — Узел оркестратора</h1>
+  <div class="node-links">
+    Узел: <span id="current-node">текущий</span>
+    <a href="/dashboard">Обновить</a>
+  </div>
+  <div class="tabs">
+    <button type="button" data-tab="overview" class="active">Обзор</button>
+    <button type="button" data-tab="work">Работа</button>
+    <button type="button" data-tab="contracts">Контракты</button>
+    <button type="button" data-tab="tasks">Задачи</button>
+    <button type="button" data-tab="chain">Блокчейн</button>
+    <button type="button" data-tab="stats">Статистика</button>
+  </div>
+
+  <div id="panel-overview" class="panel active">
+    <div class="overview-grid">
+      <div class="card"><div class="label">Состояние</div><div id="ov-status" class="value">—</div></div>
+      <div class="card"><div class="label">Длина цепочки</div><div id="ov-chain" class="value">—</div></div>
+      <div class="card"><div class="label">Клиентов</div><div id="ov-clients" class="value">—</div></div>
+      <div class="card"><div class="label">В очереди (pending)</div><div id="ov-pending" class="value">—</div></div>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" id="btn-register">Зарегистрироваться</button>
+      <span id="reg-msg" class="msg" style="display:none;"></span>
+    </div>
+    <div class="row">
+      <label>API-ключ (если уже есть):</label>
+      <input type="text" id="input-api-key" placeholder="Вставьте api_key">
+      <button type="button" class="primary" id="btn-balance">Показать баланс</button>
+      <span id="balance-msg" class="msg" style="display:none;"></span>
+    </div>
+  </div>
+
+  <div id="panel-work" class="panel">
+    <p class="label">API-ключ (тот же, что на вкладке «Обзор» — можно вставить здесь)</p>
+    <div class="row">
+      <input type="text" id="input-api-key-work" placeholder="Вставьте api_key">
+    </div>
+    <div class="row">
+      <button type="button" class="primary" id="btn-get-task">Получить задачу</button>
+      <span id="work-task-msg" class="msg" style="display:none;"></span>
+    </div>
+    <div id="work-task-spec" class="card" style="display:none; margin-bottom: 16px;">
+      <div class="label">Текущая задача</div>
+      <div class="mono" id="work-task-body"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" id="btn-run-work" disabled>Выполнить в браузере</button>
+      <span id="work-progress" class="msg info" style="display:none;"></span>
+    </div>
+    <div id="work-result" class="msg" style="display:none;"></div>
+  </div>
+
+  <div id="panel-contracts" class="panel">
+    <p class="loading" id="contracts-load">Загрузка…</p>
+    <table id="table-contracts" style="display:none;">
+      <thead><tr><th>Контракт</th><th>Единиц работы</th><th>Сложность</th><th>Награда</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="panel-tasks" class="panel">
+    <p class="loading" id="tasks-load">Загрузка…</p>
+    <p id="tasks-empty" style="display:none; color: var(--muted);">Нет сданных работ в последних блоках.</p>
+    <table id="table-tasks" style="display:none;">
+      <thead><tr><th>Блок</th><th>Клиент</th><th>Контракт</th><th>Единицы</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="panel-chain" class="panel">
+    <p class="loading" id="chain-load">Загрузка…</p>
+    <table id="table-chain" style="display:none;">
+      <thead><tr><th>Индекс</th><th>Хеш</th><th>Транзакций</th><th>Время</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="panel-stats" class="panel">
+    <div class="overview-grid" style="margin-bottom: 20px;">
+      <div class="card"><div class="label">Длина цепочки</div><div id="st-chain" class="value">—</div></div>
+      <div class="card"><div class="label">Клиентов</div><div id="st-clients" class="value">—</div></div>
+      <div class="card"><div class="label">Pending</div><div id="st-pending" class="value">—</div></div>
+    </div>
+    <p class="label">Запросы по путям</p>
+    <pre id="st-requests" class="mono" style="background:var(--bg); padding:12px; border-radius:6px; overflow:auto; max-height:200px;"></pre>
+    <p class="label" style="margin-top:12px;">Ошибки</p>
+    <pre id="st-errors" class="mono" style="background:var(--bg); padding:12px; border-radius:6px; overflow:auto;"></pre>
+  </div>
+
+  <script>
+    const base = window.location.origin;
+    document.getElementById('current-node').textContent = base;
+
+    function showPanel(id) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      const panel = document.getElementById('panel-' + id);
+      const btn = document.querySelector('.tabs button[data-tab="' + id + '"]');
+      if (panel) panel.classList.add('active');
+      if (btn) btn.classList.add('active');
+      if (id === 'overview') loadOverview();
+      if (id === 'work') { /* состояние задачи уже на панели */ }
+      if (id === 'contracts') loadContracts();
+      if (id === 'tasks') loadTasks();
+      if (id === 'chain') loadChain();
+      if (id === 'stats') loadStats();
+    }
+    document.querySelectorAll('.tabs button').forEach(b => {
+      b.addEventListener('click', () => showPanel(b.dataset.tab));
+    });
+
+    async function api(path) {
+      const r = await fetch(base + path);
+      if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      return r.json();
+    }
+
+    function loadOverview() {
+      Promise.all([fetch(base + '/health').then(r => r.json()), api('/metrics')])
+        .then(([health, m]) => {
+          document.getElementById('ov-status').textContent = health.status === 'ok' ? 'OK' : health.status || '—';
+          document.getElementById('ov-chain').textContent = m.chain_length ?? '—';
+          document.getElementById('ov-clients').textContent = m.clients_count ?? '—';
+          document.getElementById('ov-pending').textContent = m.pending_transactions ?? '—';
+        })
+        .catch(() => {
+          document.getElementById('ov-status').textContent = 'Ошибка';
+          document.getElementById('ov-chain').textContent = '—';
+          document.getElementById('ov-clients').textContent = '—';
+          document.getElementById('ov-pending').textContent = '—';
+        });
+    }
+
+    document.getElementById('btn-register').onclick = async () => {
+      const msg = document.getElementById('reg-msg');
+      msg.style.display = 'none';
+      try {
+        const d = await api('/register');
+        msg.className = 'msg ok';
+        msg.textContent = 'Зарегистрирован. client_id: ' + (d.client_id || '').slice(0, 8) + '…  api_key: ' + (d.api_key || '').slice(0, 12) + '… (сохраните ключ)';
+        msg.style.display = 'block';
+        if (d.api_key) {
+          document.getElementById('input-api-key').value = d.api_key;
+          document.getElementById('input-api-key-work').value = d.api_key;
+        }
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = 'Ошибка: ' + e.message;
+        msg.style.display = 'block';
+      }
+    };
+
+    let currentTask = null;
+
+    async function sha256Hex(str) {
+      const buf = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function runPoW(clientId, contractId, workUnitsRequired, difficulty, onProgress) {
+      const targetPrefix = '0'.repeat(difficulty);
+      let workUnitsDone = 0;
+      let resultData = null, solutionNonce = null;
+      while (workUnitsDone < workUnitsRequired || !solutionNonce) {
+        workUnitsDone += 1;
+        const nonce = String(workUnitsDone);
+        const text = clientId + '-' + contractId + '-' + nonce;
+        const hashHex = await sha256Hex(text);
+        if (hashHex.startsWith(targetPrefix)) {
+          resultData = hashHex;
+          solutionNonce = nonce;
+        }
+        if (workUnitsDone % 50 === 0) onProgress(workUnitsDone);
+      }
+      return { work_units_done: workUnitsDone, result_data: resultData, nonce: solutionNonce };
+    }
+
+    function getApiKey() {
+      const k1 = document.getElementById('input-api-key').value.trim();
+      const k2 = document.getElementById('input-api-key-work').value.trim();
+      return k2 || k1;
+    }
+    document.getElementById('btn-get-task').onclick = async () => {
+      const key = getApiKey();
+      const msg = document.getElementById('work-task-msg');
+      const specEl = document.getElementById('work-task-spec');
+      const bodyEl = document.getElementById('work-task-body');
+      const runBtn = document.getElementById('btn-run-work');
+      msg.style.display = 'none';
+      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите API-ключ (вкладка Обзор или поле выше).'; msg.style.display = 'block'; return; }
+      try {
+        const r = await fetch(base + '/get_task', { headers: { 'Authorization': 'Bearer ' + key } });
+        const task = await r.json();
+        if (!r.ok) throw new Error(task.error || r.status);
+        currentTask = task;
+        specEl.style.display = 'block';
+        bodyEl.textContent = JSON.stringify(task, null, 2);
+        runBtn.disabled = false;
+        msg.className = 'msg ok';
+        msg.textContent = 'Задача получена: ' + (task.contract_id || '') + ', единиц работы: ' + (task.work_units_required ?? '');
+        msg.style.display = 'block';
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = 'Ошибка: ' + e.message;
+        msg.style.display = 'block';
+      }
+    };
+
+    document.getElementById('btn-run-work').onclick = async () => {
+      const key = getApiKey();
+      if (!key) { document.getElementById('work-result').className = 'msg err'; document.getElementById('work-result').textContent = 'Введите API-ключ.'; document.getElementById('work-result').style.display = 'block'; return; }
+      if (!currentTask) { document.getElementById('work-result').className = 'msg err'; document.getElementById('work-result').textContent = 'Сначала нажмите «Получить задачу».'; document.getElementById('work-result').style.display = 'block'; return; }
+      const runBtn = document.getElementById('btn-run-work');
+      const progressEl = document.getElementById('work-progress');
+      const resultEl = document.getElementById('work-result');
+      runBtn.disabled = true;
+      progressEl.style.display = 'block';
+      progressEl.textContent = 'Получение client_id…';
+      resultEl.style.display = 'none';
+      try {
+        const meRes = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
+        const meData = await meRes.json();
+        if (!meRes.ok) throw new Error(meData.error || 'Неверный API-ключ');
+        const clientId = meData.client_id;
+        const targetWork = parseInt(currentTask.work_units_required, 10) || 0;
+        const difficulty = parseInt(currentTask.difficulty, 10) || 0;
+        progressEl.textContent = 'Вычисление (0 из ' + targetWork + ')…';
+        const result = await runPoW(clientId, currentTask.contract_id, targetWork, difficulty, (n) => {
+          progressEl.textContent = 'Вычисление (' + n + ' из ' + targetWork + ')…';
+        });
+        progressEl.textContent = 'Отправка результата…';
+        const subRes = await fetch(base + '/submit_work', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+          body: JSON.stringify({
+            client_id: clientId,
+            contract_id: currentTask.contract_id,
+            work_units_done: result.work_units_done,
+            result_data: result.result_data,
+            nonce: result.nonce
+          })
+        });
+        const subData = await subRes.json();
+        progressEl.style.display = 'none';
+        runBtn.disabled = false;
+        if (!subRes.ok) throw new Error(subData.error || subRes.status);
+        resultEl.className = 'msg ok';
+        resultEl.textContent = 'Работа принята. Начислено: ' + (subData.reward_issued ?? '') + ' токенов.';
+        resultEl.style.display = 'block';
+      } catch (e) {
+        progressEl.style.display = 'none';
+        runBtn.disabled = false;
+        resultEl.className = 'msg err';
+        resultEl.textContent = 'Ошибка: ' + e.message;
+        resultEl.style.display = 'block';
+      }
+    };
+
+    document.getElementById('btn-balance').onclick = async () => {
+      const key = document.getElementById('input-api-key').value.trim();
+      const msg = document.getElementById('balance-msg');
+      msg.style.display = 'none';
+      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите api_key'; msg.style.display = 'block'; return; }
+      try {
+        const meRes = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
+        const meData = await meRes.json();
+        if (!meRes.ok) throw new Error(meData.error || meRes.status);
+        const clientId = meData.client_id;
+        const balRes = await fetch(base + '/get_balance/' + encodeURIComponent(clientId), {
+          headers: { 'Authorization': 'Bearer ' + key }
+        });
+        const balData = await balRes.json();
+        if (!balRes.ok) throw new Error(balData.error || balRes.status);
+        msg.className = 'msg ok';
+        msg.textContent = 'Баланс: ' + (balData.balance ?? 0);
+        msg.style.display = 'block';
+      } catch (e) {
+        msg.className = 'msg err';
+        msg.textContent = 'Ошибка: ' + e.message;
+        msg.style.display = 'block';
+      }
+    };
+
+    function loadContracts() {
+      const load = document.getElementById('contracts-load');
+      const table = document.getElementById('table-contracts');
+      api('/contracts')
+        .then(list => {
+          load.style.display = 'none';
+          const tbody = table.querySelector('tbody');
+          tbody.innerHTML = '';
+          (list || []).forEach(c => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + (c.contract_id || '') + '</td><td>' + (c.work_units_required ?? '') + '</td><td>' + (c.difficulty ?? '') + '</td><td>' + (c.reward ?? '') + '</td>';
+            tbody.appendChild(tr);
+          });
+          table.style.display = (list && list.length) ? 'table' : 'none';
+        })
+        .catch(() => { load.textContent = 'Ошибка загрузки'; });
+    }
+
+    function loadTasks() {
+      const load = document.getElementById('tasks-load');
+      const empty = document.getElementById('tasks-empty');
+      const table = document.getElementById('table-tasks');
+      api('/chain')
+        .then(chain => {
+          load.style.display = 'none';
+          const rows = [];
+          (chain || []).slice(-20).forEach(block => {
+            (block.transactions || []).forEach(tx => {
+              if (tx.type === 'work_receipt')
+                rows.push({ block: block.index, client: (tx.client_id || '').slice(0, 8) + '…', contract: tx.contract_id || '', units: tx.work_units ?? '' });
+            });
+          });
+          rows.reverse();
+          const tbody = table.querySelector('tbody');
+          tbody.innerHTML = '';
+          rows.slice(0, 50).forEach(r => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + r.block + '</td><td class="mono">' + r.client + '</td><td>' + r.contract + '</td><td>' + r.units + '</td>';
+            tbody.appendChild(tr);
+          });
+          table.style.display = rows.length ? 'table' : 'none';
+          empty.style.display = rows.length ? 'none' : 'block';
+        })
+        .catch(() => { load.textContent = 'Ошибка загрузки'; });
+    }
+
+    function loadChain() {
+      const load = document.getElementById('chain-load');
+      const table = document.getElementById('table-chain');
+      api('/chain')
+        .then(chain => {
+          load.style.display = 'none';
+          const list = (chain || []).slice(-30).reverse();
+          const tbody = table.querySelector('tbody');
+          tbody.innerHTML = '';
+          list.forEach(b => {
+            const tr = document.createElement('tr');
+            const ts = b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : '—';
+            tr.innerHTML = '<td>' + b.index + '</td><td class="mono hash" title="' + (b.hash || '') + '">' + (b.hash || '') + '</td><td>' + (b.transactions && b.transactions.length) + '</td><td>' + ts + '</td>';
+            tbody.appendChild(tr);
+          });
+          table.style.display = 'table';
+        })
+        .catch(() => { load.textContent = 'Ошибка загрузки'; });
+    }
+
+    function loadStats() {
+      api('/metrics')
+        .then(m => {
+          document.getElementById('st-chain').textContent = m.chain_length ?? '—';
+          document.getElementById('st-clients').textContent = m.clients_count ?? '—';
+          document.getElementById('st-pending').textContent = m.pending_transactions ?? '—';
+          document.getElementById('st-requests').textContent = JSON.stringify(m.request_counts || {}, null, 2);
+          document.getElementById('st-errors').textContent = JSON.stringify(m.error_counts || {}, null, 2);
+        })
+        .catch(() => {
+          document.getElementById('st-requests').textContent = 'Ошибка загрузки';
+        });
+    }
+
+    loadOverview();
+  </script>
+</body>
+</html>

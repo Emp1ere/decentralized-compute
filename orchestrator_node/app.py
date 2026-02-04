@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from blockchain import Blockchain, FEE_PER_WORK_RECEIPT
 from contracts import CONTRACTS  # Исполняемые контракты вместо JSON
 import uuid
@@ -255,6 +255,16 @@ def submit_work():
         "reward_issued": reward_amount
     }), 200
 
+@app.route("/me", methods=["GET"])
+@limiter.limit("60 per minute")
+def me():
+    """Для веб-интерфейса: по API-ключу возвращает client_id (без секретов)."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify({"client_id": client_id}), 200
+
+
 @app.route("/get_balance/<client_id>", methods=["GET"])
 @limiter.limit("60 per minute")  # Защита от DDoS
 def get_balance(client_id):
@@ -297,6 +307,29 @@ def metrics():
 def get_chain():
     """Посмотреть весь блокчейн (для синхронизации и просмотра)."""
     return jsonify(blockchain.get_chain_json()), 200
+
+
+@app.route("/contracts", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_contracts():
+    """Список контрактов для веб-интерфейса (вкладка Контракты, по аналогии с BOINC Projects)."""
+    out = []
+    for cid, c in CONTRACTS.items():
+        spec = c.get_task_spec()
+        out.append({
+            "contract_id": cid,
+            "work_units_required": spec["work_units_required"],
+            "difficulty": spec["difficulty"],
+            "reward": c.get_reward(),
+        })
+    return jsonify(out), 200
+
+
+@app.route("/")
+@app.route("/dashboard")
+def dashboard():
+    """Веб-интерфейс (дашборд по принципам BOINC)."""
+    return send_from_directory(app.static_folder or "static", "dashboard.html")
 
 @app.route("/receive_block", methods=["POST"])
 @require_node_secret
