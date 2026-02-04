@@ -32,12 +32,13 @@ class BaseContract:
         prefix = "0" * self._difficulty()  # Требуемый префикс хеша
         if not (result_data and isinstance(result_data, str) and result_data.startswith(prefix)):
             return False  # Результат не является хешем с нужным префиксом
-        # Строгая проверка: пересчитываем хеш по (client_id, contract_id, nonce) и сравниваем
-        if nonce is not None:
-            expected_input = f"{client_id}-{contract_id}-{nonce}"  # Та же строка, что у воркера
-            expected_hash = hashlib.sha256(expected_input.encode()).hexdigest()
-            if expected_hash != result_data:  # Хеш должен совпадать
-                return False
+        # Защита от мошенничества: nonce обязателен — без него не принимаем (иначе можно подделать результат)
+        if nonce is None or nonce == "":
+            return False
+        expected_input = f"{client_id}-{contract_id}-{nonce}"  # Та же строка, что у воркера
+        expected_hash = hashlib.sha256(expected_input.encode()).hexdigest()
+        if expected_hash != result_data:  # Хеш должен совпадать
+            return False
         return True  # Все проверки пройдены
 
     def get_reward(self):

@@ -1,21 +1,23 @@
-# Консенсус: Proof-of-Useful-Work (PoUW). Блок создаётся при верифицированной полезной работе
-# (результат submit_work); хеш блока — только для целостности, без перебора nonce (нет «пустого» майнинга).
+# Консенсус: Proof-of-Useful-Work (PoUW)
+# Блок создаётся при верифицированной полезной работе (контракт verify + reward/work_receipt в блоке).
+# Хеш блока используется только для целостности, без перебора nonce (difficulty=0).
 import hashlib
 import time
 import json
 
 
 class Block:
+    """Блок в блокчейне: индекс, время, транзакции, хеш предыдущего блока, nonce, хеш блока."""
     def __init__(self, index, timestamp, transactions, previous_hash, nonce=0):
         self.index = index
         self.timestamp = timestamp
         self.transactions = transactions
         self.previous_hash = previous_hash
         self.nonce = nonce
-        self.hash = self.calculate_hash()  # Хеш блока для целостности (PoUW: без перебора nonce)
+        self.hash = self.calculate_hash()  # Хеш для целостности (PoUW: без перебора nonce)
 
     def calculate_hash(self):
-        # Каноническая сериализация блока для детерминированного хеша
+        """Вычисление хеша блока из всех полей."""
         block_string = json.dumps({
             "index": self.index,
             "timestamp": self.timestamp,
@@ -26,68 +28,89 @@ class Block:
         return hashlib.sha256(block_string.encode()).hexdigest()
 
     def mine_block(self, difficulty):
-        # Оставлено для совместимости; при PoUW не вызывается (блок создаётся без перебора nonce)
+        """Метод оставлен для совместимости; при PoUW не вызывается (difficulty=0)."""
         target = "0" * difficulty
         while self.hash[:difficulty] != target:
             self.nonce += 1
             self.hash = self.calculate_hash()
+        print(f"Block Completed! Hash: {self.hash}")
 
 
 class Blockchain:
+    """Блокчейн с консенсусом Proof-of-Useful-Work (PoUW)."""
     def __init__(self):
         self.chain = [self.create_genesis_block()]
-        self.pending_transactions = []  # Очередь транзакций (при PoUW блок создаётся при submit_work)
-        self.difficulty = 0  # При PoUW не используется для валидации блока (хеш только для целостности)
-        self.balances = {}
+        self.pending_transactions = []  # Очередь транзакций для упаковки в блок
+        self.difficulty = 0  # PoUW: не используется для валидации (блок создаётся при полезной работе)
+        self.balances = {}  # Балансы клиентов (пересчитываются из транзакций reward)
 
     def create_genesis_block(self):
-        # Одинаковый genesis у всех узлов — основа консенсуса
-        return Block(0, 0, [], "0")
+        """Создание genesis-блока с фиксированным временем (чтобы у всех узлов был одинаковый genesis)."""
+        return Block(0, 0, [], "0")  # Фиксированное время 0 для одинакового genesis на всех узлах
 
     def get_last_block(self):
+        """Получить последний блок в цепочке."""
         return self.chain[-1]
 
     def add_transaction(self, transaction):
-        # Добавление транзакции в очередь (при PoUW блок создаётся при верифицированной полезной работе)
+        """Добавить транзакцию в очередь pending (будет упакована в блок при submit_work)."""
         self.pending_transactions.append(transaction)
         return self.get_last_block().index + 1
 
     def mine_pending_transactions(self, mining_reward_address=None):
-        # PoUW: создание блока из pending без перебора nonce (блок = упаковка верифицированной работы)
+        """
+        PoUW: упаковка pending транзакций в блок (без перебора nonce).
+        Блок создаётся при верифицированной полезной работе (submit_work).
+        """
         if not self.pending_transactions and mining_reward_address is None:
+            print("No pending transactions to mine.")
             return None
+        
+        # Опциональная награда за блок (если передана)
         if mining_reward_address:
-            self.pending_transactions.append({
-                "from": "network",
-                "to": mining_reward_address,
-                "amount": 1
+             self.pending_transactions.append({
+                 "from": "network", 
+                 "to": mining_reward_address, 
+                 "amount": 1
             })
+
+        # Создаём блок с текущими pending транзакциями
         new_block = Block(
             index=len(self.chain),
             timestamp=time.time(),
             transactions=list(self.pending_transactions),
             previous_hash=self.get_last_block().hash
         )
-        # Хеш уже вычислен в Block.__init__; при PoUW не вызываем mine_block (нет «пустого» майнинга)
+        # PoUW: не вызываем mine_block (difficulty=0, хеш уже вычислен в __init__)
+
+        print(f"Adding new block {new_block.index} to the chain.")
         self.chain.append(new_block)
+
+        # Обновляем балансы на основе транзакций в блоке
         for tx in self.pending_transactions:
             if tx.get("type") == "reward":
                 client_id = tx["to"]
                 amount = tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
+                print(f"Updated balance for {client_id}: {self.balances[client_id]}")
+
         self.pending_transactions = []
         return new_block
 
     def add_block_from_peer(self, block_dict):
         """
-        Принять блок от другого узла (PoUW: блок валиден по целостности, без проверки «сложности» хеша).
-        Проверяет индекс, previous_hash, хеш; обновляет балансы; очищает pending.
+        Принять блок от другого узла (децентрализованная синхронизация).
+        Проверяет целостность (индекс, previous_hash, хеш) и обновляет балансы.
+        PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность.
         """
         last = self.get_last_block()
+        # Проверка индекса: блок должен быть следующим в цепочке
         if block_dict["index"] != len(self.chain):
             return False, "wrong index"
+        # Проверка previous_hash: блок должен ссылаться на последний блок
         if block_dict["previous_hash"] != last.hash:
             return False, "previous_hash mismatch"
+        # Создаём объект Block из данных пира
         block = Block(
             block_dict["index"],
             block_dict["timestamp"],
@@ -95,66 +118,92 @@ class Blockchain:
             block_dict["previous_hash"],
             block_dict.get("nonce", 0),
         )
+        # Проверка хеша: пересчитанный хеш должен совпадать с полученным
         if block.hash != block_dict.get("hash"):
             return False, "hash mismatch"
-        # PoUW: не проверяем ведущие нули в хеше — доказательство = полезная работа в транзакциях
+        # PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность
+        # Добавляем блок в цепочку
         self.chain.append(block)
+        # Обновляем балансы из транзакций блока
         for tx in block.transactions:
             if tx.get("type") == "reward":
                 client_id = tx["to"]
                 amount = tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
-        self.pending_transactions = []  # Консенсус: пир выиграл раунд — не майним те же tx повторно
+                print(f"[Sync] Updated balance for {client_id}: {self.balances[client_id]}")
+        print(f"[Sync] Added block {block.index} from peer. Hash: {block.hash}")
         return True, None
-
-    def get_balance(self, client_id):
-        return self.balances.get(client_id, 0)
-
-    def get_chain_json(self):
-        return [block.__dict__ for block in self.chain]
 
     def replace_chain_from_peer(self, chain_list):
         """
-        Заменить локальную цепочку на цепочку от пира, если она длиннее и валидна.
-        Правило «longest valid chain» — основа разрешения конфликтов в децентрализованной сети.
+        Заменить локальную цепочку на цепочку пира, если она валидна и длиннее (longest valid chain).
+        Проверяет все блоки, пересчитывает балансы из транзакций.
+        PoUW: проверка PoW для каждого блока убрана — проверяем только целостность.
         """
-        # Пустой или не список — отказ
-        if not chain_list or not isinstance(chain_list, list):
-            return False, "empty or invalid chain list"
-        # Genesis должен быть один: index=0, previous_hash="0"
-        g = chain_list[0]
-        if g.get("index") != 0 or g.get("previous_hash") != "0":
+        if not chain_list:
+            return False, "empty chain"
+        # Проверка genesis: первый блок должен быть валидным
+        genesis = chain_list[0]
+        if genesis.get("index") != 0 or genesis.get("previous_hash") != "0":
             return False, "invalid genesis"
+        # Проверка всех блоков: индекс, previous_hash, хеш
         new_chain = []
-        prev_hash = "0"
-        for i, d in enumerate(chain_list):
-            # Каждый блок должен следовать за предыдущим по индексу и previous_hash
-            if d.get("index") != i or d.get("previous_hash") != prev_hash:
-                return False, f"index or previous_hash mismatch at block {i}"
-            # Восстанавливаем объект Block из словаря пира
+        for i, block_dict in enumerate(chain_list):
+            if block_dict.get("index") != i:
+                return False, f"wrong index at block {i}"
+            if i > 0:
+                prev_hash = new_chain[-1].hash
+                if block_dict.get("previous_hash") != prev_hash:
+                    return False, f"previous_hash mismatch at block {i}"
             block = Block(
-                d["index"],
-                d["timestamp"],
-                d["transactions"],
-                d["previous_hash"],
-                d.get("nonce", 0),
+                block_dict["index"],
+                block_dict["timestamp"],
+                block_dict["transactions"],
+                block_dict["previous_hash"],
+                block_dict.get("nonce", 0),
             )
-            # Хеш блока должен совпадать с переданным (целостность)
-            if block.hash != d.get("hash"):
+            if block.hash != block_dict.get("hash"):
                 return False, f"hash mismatch at block {i}"
-            # PoUW: проверка «сложности» хеша не используется
+            # PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность
             new_chain.append(block)
-            prev_hash = block.hash
-        # Принимаем только если цепочка пира длиннее — правило «longest chain»
+        # Если цепочка пира короче или равна нашей, не заменяем
         if len(new_chain) <= len(self.chain):
-            return False, "peer chain not longer"
-        self.chain = new_chain  # Подменяем локальную цепочку на цепочку пира
-        self.pending_transactions = []  # Очищаем pending, чтобы не дублировать транзакции
-        self.balances = {}  # Пересчитываем балансы с нуля по принятой цепочке
+            return False, "chain not longer"
+        # Заменяем цепочку
+        self.chain = new_chain
+        # Очищаем pending (пир уже упаковал их в блоки)
+        self.pending_transactions = []
+        # Пересчитываем балансы из всех транзакций reward в новой цепочке
+        self.balances = {}
         for block in self.chain:
             for tx in block.transactions:
-                if tx.get("type") == "reward":  # Учитываем только награды клиентам
+                if tx.get("type") == "reward":
                     client_id = tx["to"]
                     amount = tx["amount"]
                     self.balances[client_id] = self.balances.get(client_id, 0) + amount
-        return True, None  # Успешная замена цепочки
+        print(f"[Sync] Replaced chain: {len(self.chain)} blocks")
+        return True, None
+
+    def get_balance(self, client_id):
+        """Получить баланс клиента (из пересчитанных балансов)."""
+        return self.balances.get(client_id, 0)
+
+    def get_used_proof_ids(self):
+        """
+        Защита от мошенничества (replay): возвращает множество уже использованных
+        доказательств работы (result_data) — по цепочке и по текущим pending.
+        Один и тот же результат нельзя сдать дважды для получения двойного вознаграждения.
+        """
+        used = set()
+        for block in self.chain:
+            for tx in block.transactions:
+                if tx.get("type") == "work_receipt" and tx.get("result_data"):
+                    used.add(tx["result_data"])
+        for tx in self.pending_transactions:
+            if tx.get("type") == "work_receipt" and tx.get("result_data"):
+                used.add(tx["result_data"])
+        return used
+
+    def get_chain_json(self):
+        """Получить всю цепочку в формате JSON (для синхронизации и просмотра)."""
+        return [block.__dict__ for block in self.chain]

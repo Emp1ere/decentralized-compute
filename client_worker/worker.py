@@ -3,22 +3,32 @@ import time
 import hashlib
 import os
 
-# Адрес оркестратора (из docker-compose или env)
+# Адрес оркестратора (из docker-compose или env); для HTTPS укажите https://...
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator_node:5000")
+# Для самоподписанных сертификатов (TLS) можно задать VERIFY_SSL=false
+VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() not in ("0", "false", "no")
 
 
 class ClientWorker:
     def __init__(self):
         self.client_id = None
+        self.api_key = None  # Секрет для аутентификации (Authorization: Bearer)
         self.register()  # Сразу регистрируемся при создании
 
+    def _auth_headers(self):
+        """Заголовки с API-ключом для аутентификации (и опционально для TLS — используйте https в ORCHESTRATOR_URL)."""
+        if not self.api_key:
+            return {}
+        return {"Authorization": f"Bearer {self.api_key}"}
+
     def register(self):
-        """Регистрация на оркестраторе: получаем client_id для баланса и отчётов."""
+        """Регистрация на оркестраторе: получаем client_id и api_key для последующих запросов."""
         try:
-            response = requests.get(f"{ORCHESTRATOR_URL}/register")
+            response = requests.get(f"{ORCHESTRATOR_URL}/register", verify=VERIFY_SSL)
             response.raise_for_status()
             data = response.json()
-            self.client_id = data["client_id"]  # Сохраняем id для всех последующих запросов
+            self.client_id = data["client_id"]
+            self.api_key = data["api_key"]  # Сохраняем для Authorization: Bearer
         except Exception as e:
             print(f"Error registering: {e}")
             time.sleep(5)
@@ -27,9 +37,11 @@ class ClientWorker:
     def fetch_task(self):
         """Запрос задачи: оркестратор возвращает минимальную спецификацию (contract_id, work_units_required, difficulty)."""
         try:
-            response = requests.get(f"{ORCHESTRATOR_URL}/get_task")
+            response = requests.get(
+                f"{ORCHESTRATOR_URL}/get_task", headers=self._auth_headers(), verify=VERIFY_SSL
+            )
             response.raise_for_status()
-            return response.json()  # Словарь: contract_id, work_units_required, difficulty
+            return response.json()
         except Exception as e:
             print(f"Error fetching task: {e}")
             return None
@@ -67,15 +79,24 @@ class ClientWorker:
             "nonce": solution_nonce,  # Контракт пересчитает хеш и сравнит с result_data
         }
         try:
-            response = requests.post(f"{ORCHESTRATOR_URL}/submit_work", json=payload)
+            response = requests.post(
+                f"{ORCHESTRATOR_URL}/submit_work",
+                json=payload,
+                headers=self._auth_headers(),
+                verify=VERIFY_SSL,
+            )
             response.raise_for_status()
         except Exception as e:
             print(f"Error submitting work: {e}")
 
     def check_balance(self):
-        """Запрос текущего баланса по client_id."""
+        """Запрос текущего баланса по client_id (требуется аутентификация)."""
         try:
-            response = requests.get(f"{ORCHESTRATOR_URL}/get_balance/{self.client_id}")
+            response = requests.get(
+                f"{ORCHESTRATOR_URL}/get_balance/{self.client_id}",
+                headers=self._auth_headers(),
+                verify=VERIFY_SSL,
+            )
             response.raise_for_status()
             data = response.json()
             print(f"Balance: {data.get('balance', 0)}")
