@@ -5,7 +5,13 @@ import os
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from blockchain import Blockchain, Block
+from blockchain import (
+    Blockchain,
+    Block,
+    FEE_PER_WORK_RECEIPT,
+    MAX_PENDING_TOTAL,
+    MAX_PENDING_WORK_PER_CLIENT,
+)
 
 
 class TestBlockchain:
@@ -147,3 +153,35 @@ class TestBlockchain:
         assert block is not None
         assert bc.get_balance("c1") == 10
         assert bc.get_balance("c2") == 0  # invalid tx not applied
+
+    def test_fee_deducted_from_balance(self):
+        bc = Blockchain()
+        bc.add_transaction({"type": "reward", "from": "s", "to": "c1", "amount": 10})
+        bc.add_transaction({
+            "type": "work_receipt",
+            "client_id": "c1",
+            "contract_id": "sc-001",
+            "work_units": 1000,
+            "result_data": "x",
+            "fee": 1,
+        })
+        bc.mine_pending_transactions(None)
+        assert bc.get_balance("c1") == 9  # 10 - 1 fee
+
+    def test_spam_limit_one_work_receipt_per_client_in_pending(self):
+        bc = Blockchain()
+        bc.add_transaction({
+            "type": "work_receipt",
+            "client_id": "c1",
+            "contract_id": "sc-001",
+            "work_units": 1000,
+            "result_data": "a",
+        })
+        with pytest.raises(ValueError, match="already has"):
+            bc.add_transaction({
+                "type": "work_receipt",
+                "client_id": "c1",
+                "contract_id": "sc-001",
+                "work_units": 1000,
+                "result_data": "b",
+            })

@@ -1,12 +1,24 @@
 # Консенсус: Proof-of-Useful-Work (PoUW)
 # Блок создаётся при верифицированной полезной работе (контракт verify + reward/work_receipt в блоке).
 # Хеш блока используется только для целостности, без перебора nonce (difficulty=0).
+#
+# Экономическая модель: токены создаются наградой за верифицированную работу; комиссия за квитанцию
+# сжигается (уменьшает эффективное предложение). Защита от спама: лимит pending по клиенту и общий.
 import hashlib
 import time
 import json
 import logging
+import os
 
 logger = logging.getLogger("blockchain")
+
+# --- Экономическая модель и защита от спама ---
+# Комиссия за квитанцию о работе (списывается с клиента в блоке, «сжигается»)
+FEE_PER_WORK_RECEIPT = int(os.environ.get("FEE_PER_WORK_RECEIPT", "1"))
+# Максимум транзакций в очереди pending (защита от спама)
+MAX_PENDING_TOTAL = int(os.environ.get("MAX_PENDING_TOTAL", "500"))
+# У одного клиента в pending не более N квитанций (защита от спама с одного аккаунта)
+MAX_PENDING_WORK_PER_CLIENT = int(os.environ.get("MAX_PENDING_WORK_PER_CLIENT", "1"))
 
 
 def _is_valid_reward_tx(tx):
@@ -28,7 +40,7 @@ def _is_valid_reward_tx(tx):
 
 
 def _is_valid_work_receipt_tx(tx):
-    """Проверка структуры квитанции о работе: type, client_id, contract_id, work_units; result_data желательно для replay."""
+    """Проверка структуры квитанции о работе: type, client_id, contract_id, work_units; fee опционально (число >= 0)."""
     if not isinstance(tx, dict):
         return False
     if tx.get("type") != "work_receipt":
@@ -40,7 +52,29 @@ def _is_valid_work_receipt_tx(tx):
     wu = tx.get("work_units")
     if wu is None or (not isinstance(wu, (int, float))) or wu < 0:
         return False
+    fee = tx.get("fee", 0)
+    if fee is not None and (not isinstance(fee, (int, float)) or fee < 0):
+        return False
     return True
+
+
+def _apply_block_transactions(transactions, balances):
+    """
+    Применить транзакции блока к словарю балансов (экономическая модель).
+    Сначала начисляются reward, затем списывается комиссия за work_receipt (fee сжигается).
+    """
+    for tx in transactions:
+        if _is_valid_reward_tx(tx):
+            to_addr = tx["to"]
+            amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
+            balances[to_addr] = balances.get(to_addr, 0) + amount
+    for tx in transactions:
+        if tx.get("type") == "work_receipt":
+            fee = tx.get("fee") or 0
+            if isinstance(fee, (int, float)) and fee > 0:
+                cid = tx.get("client_id")
+                if cid:
+                    balances[cid] = max(0, balances.get(cid, 0) - int(fee))
 
 
 class Block:
@@ -92,7 +126,8 @@ class Blockchain:
     def add_transaction(self, transaction):
         """
         Добавить транзакцию в очередь pending (будет упакована в блок при submit_work).
-        Проверяет структуру: reward (type, to, amount) или work_receipt (type, client_id, contract_id, work_units).
+        Проверяет структуру и лимиты от спама: не более MAX_PENDING_TOTAL транзакций,
+        у одного client_id не более MAX_PENDING_WORK_PER_CLIENT квитанций в pending.
         """
         if not isinstance(transaction, dict) or transaction.get("type") not in ("reward", "work_receipt"):
             raise ValueError("Invalid transaction: must be dict with type 'reward' or 'work_receipt'")
@@ -100,6 +135,18 @@ class Blockchain:
             raise ValueError("Invalid reward transaction: need 'to' (non-empty str) and 'amount' (number >= 0)")
         if transaction.get("type") == "work_receipt" and not _is_valid_work_receipt_tx(transaction):
             raise ValueError("Invalid work_receipt: need client_id, contract_id, work_units (number >= 0)")
+
+        # Защита от спама: общий лимит pending
+        if len(self.pending_transactions) >= MAX_PENDING_TOTAL:
+            raise ValueError(f"Pending queue full (max {MAX_PENDING_TOTAL})")
+
+        # Защита от спама: у одного клиента не более N квитанций в pending
+        if transaction.get("type") == "work_receipt":
+            cid = transaction.get("client_id")
+            n = sum(1 for t in self.pending_transactions if t.get("type") == "work_receipt" and t.get("client_id") == cid)
+            if n >= MAX_PENDING_WORK_PER_CLIENT:
+                raise ValueError(f"Client {cid[:8]}... already has {MAX_PENDING_WORK_PER_CLIENT} work_receipt(s) in pending")
+
         self.pending_transactions.append(transaction)
         return self.get_last_block().index + 1
 
@@ -132,15 +179,11 @@ class Blockchain:
         logger.info("Adding block index=%s to chain", new_block.index)
         self.chain.append(new_block)
 
-        # Обновляем балансы только по валидным reward-транзакциям
+        # Экономическая модель: начисление reward и списание комиссии за work_receipt
         for tx in self.pending_transactions:
-            if _is_valid_reward_tx(tx):
-                client_id = tx["to"]
-                amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
-                self.balances[client_id] = self.balances.get(client_id, 0) + amount
-                logger.debug("Updated balance for %s: %s", client_id[:8] + "...", self.balances[client_id])
-            elif tx.get("type") == "reward":
+            if tx.get("type") == "reward" and not _is_valid_reward_tx(tx):
                 logger.warning("Skipping invalid reward tx in mine_pending: %s", tx)
+        _apply_block_transactions(self.pending_transactions, self.balances)
 
         self.pending_transactions = []
         return new_block
@@ -181,13 +224,7 @@ class Blockchain:
             if tx.get("type") == "reward" and not _is_valid_reward_tx(tx):
                 return False, "invalid reward transaction in block"
         self.chain.append(block)
-        # Обновляем балансы только по валидным reward-транзакциям
-        for tx in block.transactions:
-            if _is_valid_reward_tx(tx):
-                client_id = tx["to"]
-                amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
-                self.balances[client_id] = self.balances.get(client_id, 0) + amount
-                logger.debug("Sync updated balance for %s: %s", client_id[:8] + "...", self.balances[client_id])
+        _apply_block_transactions(block.transactions, self.balances)
         logger.info("Sync added block index=%s from peer", block.index)
         return True, None
 
@@ -235,11 +272,7 @@ class Blockchain:
         self.pending_transactions = []
         self.balances = {}
         for block in self.chain:
-            for tx in block.transactions:
-                if _is_valid_reward_tx(tx):
-                    client_id = tx["to"]
-                    amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
-                    self.balances[client_id] = self.balances.get(client_id, 0) + amount
+            _apply_block_transactions(block.transactions, self.balances)
         logger.info("Sync replaced chain: %s blocks", len(self.chain))
         return True, None
 

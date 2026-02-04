@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from blockchain import Blockchain
+from blockchain import Blockchain, FEE_PER_WORK_RECEIPT
 from contracts import CONTRACTS  # Исполняемые контракты вместо JSON
 import uuid
 import random
@@ -202,6 +202,8 @@ def submit_work():
         return jsonify({"error": "Work verification failed"}), 400
 
     reward_amount = contract.get_reward()
+    if reward_amount < FEE_PER_WORK_RECEIPT:
+        logger.warning("Contract reward %s less than fee %s", reward_amount, FEE_PER_WORK_RECEIPT)
     logger.info("work_verified: client_id=%s... reward=%s contract_id=%s", client_id[:8], reward_amount, contract_id)
 
     # Создаём транзакцию вознаграждения
@@ -213,13 +215,14 @@ def submit_work():
         "contract_id": contract_id
     }
     
-    # Создаём "квитанцию" о работе (result_data сохраняем для защиты от replay)
+    # Создаём "квитанцию" о работе (result_data для replay; fee — комиссия, сжигается в блоке)
     work_receipt_tx = {
         "type": "work_receipt",
         "client_id": client_id,
         "contract_id": contract_id,
         "work_units": work_units_done,
-        "result_data": result_data,  # Уникальное доказательство; по нему проверяем повторную сдачу
+        "result_data": result_data,
+        "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
     }
     
     # Добавляем транзакции в блокчейн

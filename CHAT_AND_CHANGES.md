@@ -459,3 +459,35 @@
 | **orchestrator_node/tests/** | Новые: conftest.py, unit/test_contracts.py, unit/test_blockchain.py, integration/test_api.py. |
 | **orchestrator_node/requirements-test.txt** | Новый: pytest, pytest-cov. |
 | **client_worker/worker.py** | Логирование, таймауты, проверка ответов и полей задачи, раздельная обработка RequestException и ValueError/KeyError. |
+
+---
+
+## 15. Экономическая модель и защита от спама транзакциями
+
+### Концепция
+
+- **Токены:** создаются только наградой за верифицированную полезную работу (PoUW). Контракт задаёт `reward`; после проверки `verify` создаётся транзакция `reward` и квитанция `work_receipt`.
+- **Комиссия за квитанцию:** у каждой квитанции о работе есть поле `fee` (по умолчанию 1 токен). При применении блока сначала начисляется награда, затем с баланса клиента списывается комиссия (сжигается). Эффективная выплата = `reward - fee`. Так снижается инфляция и усложняется спам (каждая сдача «стоит» комиссию).
+- **Защита от спама:**  
+  - Общий лимит размера очереди pending: не более **MAX_PENDING_TOTAL** (по умолчанию 500) транзакций.  
+  - На одного клиента: не более **MAX_PENDING_WORK_PER_CLIENT** (по умолчанию 1) квитанций в pending. Нельзя выстраивать очередь из множества work_receipt с одного аккаунта.
+
+### Реализация
+
+- **blockchain.py:** константы `FEE_PER_WORK_RECEIPT`, `MAX_PENDING_TOTAL`, `MAX_PENDING_WORK_PER_CLIENT` (задаются через env). Функция `_apply_block_transactions(transactions, balances)`: сначала применяет все валидные reward, затем списывает fee по work_receipt (balance = max(0, balance - fee)). В `add_transaction`: проверка лимита по размеру pending и по числу work_receipt на одного client_id; при превышении — ValueError. В `mine_pending_transactions`, `add_block_from_peer`, `replace_chain_from_peer` применение балансов через `_apply_block_transactions`.
+- **app.py:** в work_receipt_tx передаётся `fee: FEE_PER_WORK_RECEIPT`; при `reward < fee` пишется предупреждение в лог.
+- **Валидация:** work_receipt может содержать поле `fee` (число >= 0); при применении блока fee списывается только если fee > 0 и client_id задан.
+
+### Переменные окружения
+
+| Переменная | По умолчанию | Описание |
+|------------|--------------|----------|
+| FEE_PER_WORK_RECEIPT | 1 | Комиссия за одну квитанцию (токены), списывается с клиента. |
+| MAX_PENDING_TOTAL | 500 | Максимум транзакций в очереди pending. |
+| MAX_PENDING_WORK_PER_CLIENT | 1 | Максимум квитанций в pending от одного client_id. |
+
+### Изменённые файлы
+
+- **blockchain.py:** константы экономики и спама, `_apply_block_transactions`, проверки в `add_transaction`, применение fee в блоках.
+- **app.py:** импорт `FEE_PER_WORK_RECEIPT`, поле `fee` в work_receipt_tx.
+- **tests/unit/test_blockchain.py:** тесты на списание комиссии и лимит одной квитанции в pending на клиента.
