@@ -9,6 +9,40 @@ import logging
 logger = logging.getLogger("blockchain")
 
 
+def _is_valid_reward_tx(tx):
+    """
+    Проверка структуры транзакции вознаграждения: type, to (непустая строка), amount (число >= 0).
+    Защита от некорректных данных и отрицательных сумм.
+    """
+    if not isinstance(tx, dict):
+        return False
+    if tx.get("type") != "reward":
+        return False
+    to_addr = tx.get("to")
+    if not isinstance(to_addr, str) or not to_addr.strip():
+        return False
+    amount = tx.get("amount")
+    if not isinstance(amount, (int, float)) or amount < 0:
+        return False
+    return True
+
+
+def _is_valid_work_receipt_tx(tx):
+    """Проверка структуры квитанции о работе: type, client_id, contract_id, work_units; result_data желательно для replay."""
+    if not isinstance(tx, dict):
+        return False
+    if tx.get("type") != "work_receipt":
+        return False
+    if not isinstance(tx.get("client_id"), str) or not tx.get("client_id"):
+        return False
+    if not isinstance(tx.get("contract_id"), str) or not tx.get("contract_id"):
+        return False
+    wu = tx.get("work_units")
+    if wu is None or (not isinstance(wu, (int, float))) or wu < 0:
+        return False
+    return True
+
+
 class Block:
     """Блок в блокчейне: индекс, время, транзакции, хеш предыдущего блока, nonce, хеш блока."""
     def __init__(self, index, timestamp, transactions, previous_hash, nonce=0):
@@ -56,7 +90,16 @@ class Blockchain:
         return self.chain[-1]
 
     def add_transaction(self, transaction):
-        """Добавить транзакцию в очередь pending (будет упакована в блок при submit_work)."""
+        """
+        Добавить транзакцию в очередь pending (будет упакована в блок при submit_work).
+        Проверяет структуру: reward (type, to, amount) или work_receipt (type, client_id, contract_id, work_units).
+        """
+        if not isinstance(transaction, dict) or transaction.get("type") not in ("reward", "work_receipt"):
+            raise ValueError("Invalid transaction: must be dict with type 'reward' or 'work_receipt'")
+        if transaction.get("type") == "reward" and not _is_valid_reward_tx(transaction):
+            raise ValueError("Invalid reward transaction: need 'to' (non-empty str) and 'amount' (number >= 0)")
+        if transaction.get("type") == "work_receipt" and not _is_valid_work_receipt_tx(transaction):
+            raise ValueError("Invalid work_receipt: need client_id, contract_id, work_units (number >= 0)")
         self.pending_transactions.append(transaction)
         return self.get_last_block().index + 1
 
@@ -89,13 +132,15 @@ class Blockchain:
         logger.info("Adding block index=%s to chain", new_block.index)
         self.chain.append(new_block)
 
-        # Обновляем балансы на основе транзакций в блоке
+        # Обновляем балансы только по валидным reward-транзакциям
         for tx in self.pending_transactions:
-            if tx.get("type") == "reward":
+            if _is_valid_reward_tx(tx):
                 client_id = tx["to"]
-                amount = tx["amount"]
+                amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
                 logger.debug("Updated balance for %s: %s", client_id[:8] + "...", self.balances[client_id])
+            elif tx.get("type") == "reward":
+                logger.warning("Skipping invalid reward tx in mine_pending: %s", tx)
 
         self.pending_transactions = []
         return new_block
@@ -131,13 +176,16 @@ class Blockchain:
         if block.hash != block_dict.get("hash"):
             return False, "hash mismatch"
         # PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность
-        # Добавляем блок в цепочку
-        self.chain.append(block)
-        # Обновляем балансы из транзакций блока
+        # Проверка транзакций в блоке: все reward должны быть валидными (защита от подделки пира)
         for tx in block.transactions:
-            if tx.get("type") == "reward":
+            if tx.get("type") == "reward" and not _is_valid_reward_tx(tx):
+                return False, "invalid reward transaction in block"
+        self.chain.append(block)
+        # Обновляем балансы только по валидным reward-транзакциям
+        for tx in block.transactions:
+            if _is_valid_reward_tx(tx):
                 client_id = tx["to"]
-                amount = tx["amount"]
+                amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
                 self.balances[client_id] = self.balances.get(client_id, 0) + amount
                 logger.debug("Sync updated balance for %s: %s", client_id[:8] + "...", self.balances[client_id])
         logger.info("Sync added block index=%s from peer", block.index)
@@ -178,17 +226,19 @@ class Blockchain:
         # Если цепочка пира короче или равна нашей, не заменяем
         if len(new_chain) <= len(self.chain):
             return False, "chain not longer"
-        # Заменяем цепочку
+        # Проверка: все reward-транзакции в цепочке должны быть валидными
+        for bi, block in enumerate(new_chain):
+            for tx in block.transactions:
+                if tx.get("type") == "reward" and not _is_valid_reward_tx(tx):
+                    return False, f"invalid reward transaction in block {bi}"
         self.chain = new_chain
-        # Очищаем pending (пир уже упаковал их в блоки)
         self.pending_transactions = []
-        # Пересчитываем балансы из всех транзакций reward в новой цепочке
         self.balances = {}
         for block in self.chain:
             for tx in block.transactions:
-                if tx.get("type") == "reward":
+                if _is_valid_reward_tx(tx):
                     client_id = tx["to"]
-                    amount = tx["amount"]
+                    amount = int(tx["amount"]) if isinstance(tx["amount"], float) else tx["amount"]
                     self.balances[client_id] = self.balances.get(client_id, 0) + amount
         logger.info("Sync replaced chain: %s blocks", len(self.chain))
         return True, None

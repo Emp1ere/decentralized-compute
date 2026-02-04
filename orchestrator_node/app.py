@@ -343,13 +343,20 @@ def add_pending_tx():
     """
     Принять pending транзакции от пира (для совместимости).
     PoUW: эндпоинт оставлен для совместимости, но при PoUW блок создаёт только узел, принявший submit_work.
+    Транзакции проверяются блокчейном (структура reward/work_receipt); невалидные отклоняются.
     """
     data = request.get_json()
     if not data or not isinstance(data, list):
         return jsonify({"error": "Invalid transactions format"}), 400
-    for tx in data:
-        blockchain.add_transaction(tx)
-    return jsonify({"status": "added", "count": len(data)}), 200
+    added = 0
+    for i, tx in enumerate(data):
+        try:
+            blockchain.add_transaction(tx)
+            added += 1
+        except ValueError as e:
+            logger.warning("add_pending_tx invalid tx at index %s: %s", i, e)
+            return jsonify({"error": f"Invalid transaction at index {i}", "detail": str(e)}), 400
+    return jsonify({"status": "added", "count": added}), 200
 
 
 if __name__ == "__main__":
