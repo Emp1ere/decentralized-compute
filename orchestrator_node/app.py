@@ -250,6 +250,18 @@ def receive_block():
         return jsonify({"accepted": False, "error": "No JSON"}), 400
     ok, err = blockchain.add_block_from_peer(data)
     if ok:
+        # Горизонтальное масштабирование: распространяем блок на свой пир (чтобы 3+ узлов получили блок)
+        if PEER_URL:
+            try:
+                headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
+                requests.post(
+                    f"{PEER_URL.rstrip('/')}/receive_block",
+                    json=data,
+                    timeout=5,
+                    headers=headers,
+                )
+            except Exception as e:
+                print(f"[Sync] Forward block to peer: {e}")
         return jsonify({"accepted": True}), 200
     return jsonify({"accepted": False, "error": err}), 400
 

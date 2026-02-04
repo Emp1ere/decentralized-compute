@@ -33,6 +33,21 @@ services:
       - orchestrator_node_1
     # restart: unless-stopped
 
+  # 2b. Узел 3 (для горизонтального масштабирования; опционально: раскомментируйте и добавьте в nginx upstream)
+  # orchestrator_node_3:
+  #   build:
+  #     context: ./orchestrator_node
+  #   ports:
+  #     - "5002:5000"
+  #   container_name: orchestrator_node_3
+  #   environment:
+  #     - PEER_URL=http://orchestrator_node_1:5000
+  #     - SYNC_INTERVAL=30
+  #     - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+  #   depends_on:
+  #     - orchestrator_node_1
+  #   # restart: unless-stopped
+
   # 3. Клиент-вычислитель 1 (подключается к узлу 1)
   client_worker_1:
     build:

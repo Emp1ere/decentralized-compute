@@ -101,9 +101,15 @@ class Blockchain:
         """
         Принять блок от другого узла (децентрализованная синхронизация).
         Проверяет целостность (индекс, previous_hash, хеш) и обновляет балансы.
-        PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность.
+        Идемпотентность: если блок уже есть в цепочке — возвращаем True (для распространения в 3+ узлах).
         """
+        # Уже есть столько же или больше блоков — идемпотентный приём (горизонтальное масштабирование)
+        if block_dict["index"] < len(self.chain):
+            return True, None
         last = self.get_last_block()
+        # Тот же блок уже на конце цепочки (например, мы его создали или получили по другому пути)
+        if block_dict["index"] == len(self.chain) and last.hash == block_dict.get("hash"):
+            return True, None
         # Проверка индекса: блок должен быть следующим в цепочке
         if block_dict["index"] != len(self.chain):
             return False, "wrong index"
