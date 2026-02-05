@@ -237,6 +237,70 @@ def periodic_sync():
 
 # --- API Эндпоинты ---
 
+@app.route("/auth/register", methods=["POST"])
+@limiter.limit("10 per minute")
+def auth_register():
+    """
+    Регистрация постоянного аккаунта: логин, пароль, опционально никнейм.
+    Тело: {"login": "...", "password": "...", "nickname": "..."}.
+    Возвращает client_id, api_key, login, nickname. Аккаунт сохраняется в data/users.json.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+    login = (data.get("login") or "").strip()
+    password = data.get("password") or ""
+    nickname = (data.get("nickname") or "").strip() or login
+    try:
+        user, err = auth_create_user(login, password, nickname)
+    except NameError:
+        return jsonify({"error": "Auth storage not available"}), 503
+    if err:
+        return jsonify({"error": err}), 400
+    api_key_to_client[user["api_key"]] = user["client_id"]
+    blockchain.balances[user["client_id"]] = blockchain.balances.get(user["client_id"], 0)
+    logger.info("auth_registered: login=%s client_id=%s...", login, user["client_id"][:8])
+    return jsonify({
+        "client_id": user["client_id"],
+        "api_key": user["api_key"],
+        "login": user["login"],
+        "nickname": user["nickname"],
+    }), 201
+
+
+@app.route("/auth/login", methods=["POST"])
+@limiter.limit("20 per minute")
+def auth_login():
+    """
+    Вход в постоянный аккаунт: логин и пароль.
+    Тело: {"login": "...", "password": "..."}.
+    Возвращает client_id, api_key, login, nickname, balance.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+    login = (data.get("login") or "").strip()
+    password = data.get("password") or ""
+    try:
+        user, err = auth_verify_login(login, password)
+    except NameError:
+        return jsonify({"error": "Auth storage not available"}), 503
+    if err:
+        return jsonify({"error": err}), 401
+    api_key_to_client[user["api_key"]] = user["client_id"]
+    balance = blockchain.get_balance(user["client_id"])
+    logger.info("auth_login: login=%s client_id=%s...", login, user["client_id"][:8])
+    return jsonify({
+        "client_id": user["client_id"],
+        "api_key": user["api_key"],
+        "login": user["login"],
+        "nickname": user["nickname"],
+        "balance": balance,
+    }), 200
+
+
 @app.route("/register", methods=["GET"])
 @limiter.limit("10 per minute")  # Защита от DDoS: не более 10 регистраций с одного IP в минуту
 def register_client():

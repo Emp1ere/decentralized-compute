@@ -1,0 +1,11 @@
+{
+  "users": [
+    {
+      "login": "emp1re",
+      "password_hash": "pbkdf2:sha256:1000000$WbDVQabzQLMaGuRh$167df255e65437fecf1021a4465821a78cc6b59ee16e59e03e2f2e3a7427b154",
+      "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+      "api_key": "Xq5ZcDDQgaiCAZwwL5CAsrz34o_xuEmND1mJDvoMzcM",
+      "nickname": "Empire"
+    }
+  ]
+}

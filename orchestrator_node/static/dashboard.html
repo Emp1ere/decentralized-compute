@@ -159,6 +159,26 @@
       <div class="card"><div class="label">Клиентов</div><div id="ov-clients" class="value">—</div></div>
       <div class="card"><div class="label">В очереди (pending)</div><div id="ov-pending" class="value">—</div></div>
     </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="label">Постоянный аккаунт (логин и пароль)</div>
+      <div id="auth-forms">
+        <div class="row" style="margin-bottom:12px;">
+          <input type="text" id="auth-login" placeholder="Логин" style="min-width:140px;">
+          <input type="password" id="auth-password" placeholder="Пароль" style="min-width:140px;">
+          <button type="button" class="primary" id="btn-auth-login">Войти</button>
+        </div>
+        <div class="row">
+          <input type="text" id="auth-reg-nickname" placeholder="Никнейм (необязательно)" style="min-width:180px;">
+          <button type="button" class="primary" id="btn-auth-register">Зарегистрироваться</button>
+        </div>
+        <span id="auth-msg" class="msg" style="display:none;"></span>
+      </div>
+      <div id="auth-profile" style="display:none;">
+        <p><strong>Вы вошли как</strong> <span id="profile-nickname">—</span> <span id="profile-login" class="muted" style="font-size:0.9em;"></span></p>
+        <p>Баланс: <strong id="profile-balance">0</strong> токенов · Сдано работ: <strong id="profile-submissions">0</strong></p>
+        <button type="button" id="btn-auth-logout">Выйти</button>
+      </div>
+    </div>
     <p class="label">Работа от имени нескольких клиентов</p>
     <div class="row" style="align-items: flex-start;">
       <div>
@@ -397,6 +417,94 @@
     };
     refreshClientSelect();
     refreshSavedClientsList();
+
+    const AUTH_API_KEY = 'dc_auth_api_key';
+    const AUTH_NICKNAME = 'dc_auth_nickname';
+    const AUTH_LOGIN = 'dc_auth_login';
+    function showAuthProfile() {
+      document.getElementById('auth-forms').style.display = 'none';
+      document.getElementById('auth-profile').style.display = 'block';
+    }
+    function showAuthForms() {
+      document.getElementById('auth-forms').style.display = 'block';
+      document.getElementById('auth-profile').style.display = 'none';
+      document.getElementById('auth-msg').style.display = 'none';
+    }
+    async function refreshProfileFromMe() {
+      const key = localStorage.getItem(AUTH_API_KEY);
+      if (!key) return;
+      try {
+        const r = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
+        if (!r.ok) return;
+        const d = await r.json();
+        document.getElementById('profile-nickname').textContent = d.nickname || d.login || d.client_id?.slice(0, 8) + '…';
+        document.getElementById('profile-login').textContent = d.login ? '(' + d.login + ')' : '';
+        document.getElementById('profile-balance').textContent = d.balance ?? 0;
+        document.getElementById('profile-submissions').textContent = d.submissions_count ?? 0;
+      } catch (e) {}
+    }
+    function applyAuthSession(apiKey, nickname, login) {
+      localStorage.setItem(AUTH_API_KEY, apiKey);
+      if (nickname) localStorage.setItem(AUTH_NICKNAME, nickname);
+      if (login) localStorage.setItem(AUTH_LOGIN, login);
+      document.getElementById('input-api-key').value = apiKey;
+      document.getElementById('input-api-key-work').value = apiKey;
+      const list = getSavedClients();
+      const existing = list.find(c => c.apiKey === apiKey);
+      if (!existing) {
+        list.push({ id: 'auth-' + Date.now(), label: nickname || login || 'Аккаунт', apiKey: apiKey });
+        setSavedClients(list);
+        refreshClientSelect();
+        refreshSavedClientsList();
+      }
+      showAuthProfile();
+      refreshProfileFromMe();
+    }
+    document.getElementById('btn-auth-login').onclick = async function() {
+      const login = document.getElementById('auth-login').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const msg = document.getElementById('auth-msg');
+      msg.style.display = 'none';
+      if (!login || !password) { msg.className = 'msg err'; msg.textContent = 'Введите логин и пароль.'; msg.style.display = 'block'; return; }
+      try {
+        const r = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, password: password }) });
+        const d = await r.json();
+        if (!r.ok) { msg.className = 'msg err'; msg.textContent = d.error || r.status; msg.style.display = 'block'; return; }
+        applyAuthSession(d.api_key, d.nickname, d.login);
+      } catch (e) { msg.className = 'msg err'; msg.textContent = 'Ошибка: ' + e.message; msg.style.display = 'block'; }
+    };
+    document.getElementById('btn-auth-register').onclick = async function() {
+      const login = document.getElementById('auth-login').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const nickname = document.getElementById('auth-reg-nickname').value.trim();
+      const msg = document.getElementById('auth-msg');
+      msg.style.display = 'none';
+      if (!login || !password) { msg.className = 'msg err'; msg.textContent = 'Введите логин и пароль (пароль не менее 6 символов).'; msg.style.display = 'block'; return; }
+      try {
+        const r = await fetch(base + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, password: password, nickname: nickname || login }) });
+        const d = await r.json();
+        if (!r.ok) { msg.className = 'msg err'; msg.textContent = d.error || r.status; msg.style.display = 'block'; return; }
+        applyAuthSession(d.api_key, d.nickname, d.login);
+      } catch (e) { msg.className = 'msg err'; msg.textContent = 'Ошибка: ' + e.message; msg.style.display = 'block'; }
+    };
+    document.getElementById('btn-auth-logout').onclick = function() {
+      localStorage.removeItem(AUTH_API_KEY);
+      localStorage.removeItem(AUTH_NICKNAME);
+      localStorage.removeItem(AUTH_LOGIN);
+      document.getElementById('input-api-key').value = '';
+      document.getElementById('input-api-key-work').value = '';
+      showAuthForms();
+      if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
+    };
+    if (localStorage.getItem(AUTH_API_KEY)) {
+      const key = localStorage.getItem(AUTH_API_KEY);
+      document.getElementById('input-api-key').value = key;
+      document.getElementById('input-api-key-work').value = key;
+      showAuthProfile();
+      refreshProfileFromMe();
+    } else {
+      showAuthForms();
+    }
 
     async function sha256Hex(str) {
       const buf = new TextEncoder().encode(str);

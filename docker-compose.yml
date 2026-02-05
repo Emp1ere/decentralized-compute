@@ -15,6 +15,8 @@ services:
     volumes:
       # Для автозапуска воркера из интерфейса (POST /run_worker)
       - /var/run/docker.sock:/var/run/docker.sock
+      # Постоянное хранение аккаунтов (users.json) и данных авторизации
+      - ./orchestrator_node/data:/app/data
     environment:
       - PEER_URL=http://orchestrator_node_2:5000
       - SYNC_INTERVAL=30
@@ -39,6 +41,7 @@ services:
     container_name: orchestrator_node_2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./orchestrator_node/data:/app/data
     environment:
       - PEER_URL=http://orchestrator_node_1:5000
       - SYNC_INTERVAL=30
