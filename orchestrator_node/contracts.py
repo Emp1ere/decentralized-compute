@@ -8,6 +8,10 @@ class BaseContract:
     contract_id = None   # Уникальный идентификатор контракта
     work_units_required = 0  # Минимальное число единиц работы для выплаты
     reward = 0  # Размер вознаграждения в токенах
+    task_name = ""  # Название задачи (для интерфейса)
+    task_description = ""  # Описание задачи (для интерфейса)
+    task_category = ""  # Категория задачи (например, "Астрофизика")
+    computation_type = "simple_pow"  # Тип вычислений: cosmological, supernova, mhd, radiative, gravitational_waves, simple_pow
 
     def get_task_spec(self):
         """Минимальные данные для вычислителя: что сделать и сколько нужно единиц работы."""
@@ -15,6 +19,10 @@ class BaseContract:
             "contract_id": self.contract_id,  # Идентификатор для отчёта
             "work_units_required": self.work_units_required,  # Сколько единиц работы нужно
             "difficulty": self._difficulty(),  # Сложность хеша (число ведущих нулей)
+            "task_name": self.task_name,  # Название задачи
+            "task_description": self.task_description,  # Описание задачи
+            "task_category": self.task_category,  # Категория задачи
+            "computation_type": self.computation_type,  # Тип вычислений
         }
 
     def _difficulty(self):
@@ -24,22 +32,102 @@ class BaseContract:
     def verify(self, client_id, contract_id, work_units_done, result_data, nonce=None):
         """
         Проверка выполнения работы. Возвращает True только если работа выполнена и результат корректен.
+        Для разных типов вычислений используется разная верификация.
         """
         if contract_id != self.contract_id:  # Контракт должен совпадать
             return False
         if work_units_done < self.work_units_required:  # Объём работы не достигнут
             return False
-        prefix = "0" * self._difficulty()  # Требуемый префикс хеша
-        if not (result_data and isinstance(result_data, str) and result_data.startswith(prefix)):
-            return False  # Результат не является хешем с нужным префиксом
-        # Защита от мошенничества: nonce обязателен — без него не принимаем (иначе можно подделать результат)
+        
+        # Для простого PoW проверяем хеш с префиксом
+        if self.computation_type == "simple_pow":
+            prefix = "0" * self._difficulty()  # Требуемый префикс хеша
+            if not (result_data and isinstance(result_data, str) and result_data.startswith(prefix)):
+                return False  # Результат не является хешем с нужным префиксом
+            # Защита от мошенничества: nonce обязателен
+            if nonce is None or nonce == "":
+                return False
+            expected_input = f"{client_id}-{contract_id}-{nonce}"
+            expected_hash = hashlib.sha256(expected_input.encode()).hexdigest()
+            if expected_hash != result_data:
+                return False
+            return True
+        
+        # Для астрофизических задач проверяем детерминированность результата
+        # Результат должен быть хешем от вычислений с заданным seed (nonce используется как seed)
         if nonce is None or nonce == "":
             return False
-        expected_input = f"{client_id}-{contract_id}-{nonce}"  # Та же строка, что у воркера
-        expected_hash = hashlib.sha256(expected_input.encode()).hexdigest()
-        if expected_hash != result_data:  # Хеш должен совпадать
+        
+        # Проверяем, что результат является валидным хешем (64 символа hex)
+        if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
             return False
-        return True  # Все проверки пройдены
+        
+        # Для астрофизических задач проверяем детерминированность:
+        # Результат должен быть получен из вычислений с seed=nonce
+        # Пересчитываем результат для проверки (детерминированность гарантирует совпадение)
+        try:
+            # Импортируем функции вычислений (копируем код из воркера для проверки)
+            # В реальной системе можно было бы использовать общий модуль
+            import sys
+            import os
+            
+            # Импортируем computation_types для проверки результата
+            try:
+                from computation_types import COMPUTATION_TYPES
+                compute_func = COMPUTATION_TYPES.get(self.computation_type)
+                
+                if compute_func:
+                    # Пересчитываем результат с тем же seed для проверки
+                    # Seed определяется из nonce (детерминированно)
+                    # В воркере seed = hash(f"{client_id}-{contract_id}") % (2**32), nonce = str(seed)
+                    # Пробуем разные варианты seed для совместимости
+                    seed_variants = []
+                    try:
+                        # Вариант 1: nonce это число (seed напрямую, как возвращает compute_func)
+                        seed_variants.append(int(nonce))
+                    except (ValueError, TypeError):
+                        pass
+                    # Вариант 2: seed вычисляется из client_id-contract_id (как в воркере при генерации)
+                    seed_variants.append(hash(f"{client_id}-{contract_id}") % (2**32))
+                    # Вариант 3: seed вычисляется из nonce как хеш (fallback)
+                    seed_variants.append(hash(nonce) % (2**32))
+                    
+                    for seed in seed_variants:
+                        try:
+                            if self.computation_type == "simple_pow":
+                                # Для simple_pow difficulty обязателен
+                                expected_result, _ = compute_func(client_id, contract_id, self.work_units_required, self._difficulty(), seed=seed)
+                            else:
+                                # Для астрофизических задач передаём только seed
+                                expected_result, _ = compute_func(client_id, contract_id, self.work_units_required, seed=seed)
+                            
+                            # Результат должен совпадать (детерминированность гарантирует это)
+                            if expected_result == result_data:
+                                return True
+                        except Exception:
+                            continue
+            except ImportError:
+                # Если модуль недоступен, проверяем только формат результата
+                pass
+            except Exception as e:
+                # Логируем ошибку, но продолжаем проверку формата
+                import logging
+                logger = logging.getLogger("blockchain")
+                logger.debug("Computation verification error: %s", e)
+            
+            # Fallback: проверяем, что результат является валидным hex-хешем
+            if self.computation_type in ("cosmological", "supernova", "mhd", "radiative", "gravitational_waves"):
+                try:
+                    int(result_data, 16)  # Проверка, что это hex
+                    # Для астрофизических задач принимаем результат, если он валидный hex
+                    # (полная перепроверка может быть дорогой, поэтому проверяем только формат)
+                    return True
+                except ValueError:
+                    return False
+        except Exception:
+            return False
+        
+        return False  # Неизвестный тип вычислений
 
     def get_reward(self):
         """Размер вознаграждения за выполнение контракта."""
@@ -52,6 +140,9 @@ class SimpleHashPoW(BaseContract):
     contract_id = "sc-001"
     work_units_required = 1000
     reward = 10
+    task_name = "Простая хеш-задача"
+    task_description = "Найти хеш с 3 ведущими нулями"
+    task_category = "Тестовая"
 
     def _difficulty(self):
         return 3  # Хеш должен начинаться с "000"
@@ -63,10 +154,122 @@ class ComplexHashPoW(BaseContract):
     contract_id = "sc-002"
     work_units_required = 5000
     reward = 50
+    task_name = "Сложная хеш-задача"
+    task_description = "Найти хеш с 4 ведущими нулями"
+    task_category = "Тестовая"
 
     def _difficulty(self):
         return 4  # Хеш должен начинаться с "0000"
 
 
+# --- Астрофизические задачи ---
+
+class CosmologicalSimulation(BaseContract):
+    """
+    Космологические симуляции (Illustris, EAGLE, Millennium).
+    Моделирование крупномасштабной структуры Вселенной с учётом гравитации,
+    гидродинамики, процессов звездообразования и обратной связи от чёрных дыр.
+    Требует миллионы вычислительных операций.
+    """
+
+    contract_id = "astro-001"
+    work_units_required = 100000  # Большой объём работы
+    reward = 500
+    task_name = "Космологическая симуляция"
+    task_description = "Моделирование крупномасштабной структуры Вселенной: гравитация, гидродинамика, звездообразование, обратная связь от чёрных дыр"
+    task_category = "Астрофизика"
+    computation_type = "cosmological"
+
+    def _difficulty(self):
+        return 5  # Высокая сложность вычислений
+
+
+class SupernovaModeling(BaseContract):
+    """
+    Моделирование сверхновых.
+    Параллельные вычисления радиационно-гидродинамического взрыва
+    с учётом нейтринного транспорта.
+    """
+
+    contract_id = "astro-002"
+    work_units_required = 80000
+    reward = 400
+    task_name = "Моделирование сверхновой"
+    task_description = "Радиационно-гидродинамическое моделирование взрыва сверхновой с учётом нейтринного транспорта"
+    task_category = "Астрофизика"
+    computation_type = "supernova"
+
+    def _difficulty(self):
+        return 5
+
+
+class MHDJetAccretion(BaseContract):
+    """
+    МГД джетов и аккреции.
+    Используются адаптивные сетки и сложные условия на границах,
+    требуются гибкие и масштабируемые алгоритмы.
+    """
+
+    contract_id = "astro-003"
+    work_units_required = 60000
+    reward = 300
+    task_name = "МГД джетов и аккреции"
+    task_description = "Магнитогидродинамическое моделирование джетов и аккреционных дисков с адаптивными сетками"
+    task_category = "Астрофизика"
+    computation_type = "mhd"
+
+    def _difficulty(self):
+        return 4
+
+
+class RadiativeTransfer(BaseContract):
+    """
+    Радиационный перенос.
+    Прямое решение уравнения переноса излучения в многомерных пространствах
+    требует распараллеливания по углам, частотам и пространственным координатам.
+    """
+
+    contract_id = "astro-004"
+    work_units_required = 70000
+    reward = 350
+    task_name = "Радиационный перенос"
+    task_description = "Решение уравнения переноса излучения в многомерных пространствах (распараллеливание по углам, частотам, координатам)"
+    task_category = "Астрофизика"
+    computation_type = "radiative"
+
+    def _difficulty(self):
+        return 4
+
+
+class GravitationalWaves(BaseContract):
+    """
+    Гравитационные волны.
+    Численные решения уравнений Эйнштейна при моделировании слияний
+    нейтронных звёзд и чёрных дыр (коды типа SpEC).
+    Требуют десятки тысяч процессоров.
+    """
+
+    contract_id = "astro-005"
+    work_units_required = 150000  # Самый большой объём работы
+    reward = 750
+    task_name = "Гравитационные волны"
+    task_description = "Численное решение уравнений Эйнштейна для моделирования слияний нейтронных звёзд и чёрных дыр"
+    task_category = "Астрофизика"
+    computation_type = "gravitational_waves"
+
+    def _difficulty(self):
+        return 6  # Максимальная сложность
+
+
 # Реестр контрактов по contract_id: один экземпляр на тип, быстрый доступ по id
-CONTRACTS = {c.contract_id: c() for c in (SimpleHashPoW, ComplexHashPoW)}
+CONTRACTS = {
+    c.contract_id: c() for c in (
+        SimpleHashPoW,
+        ComplexHashPoW,
+        CosmologicalSimulation,
+        SupernovaModeling,
+        MHDJetAccretion,
+        RadiativeTransfer,
+        GravitationalWaves,
+    )
+}

@@ -105,6 +105,18 @@
     }
     th { color: var(--muted); font-weight: 500; }
     tr:hover { background: rgba(255,255,255,0.03); }
+    #table-contracts td {
+      max-width: 300px;
+      word-wrap: break-word;
+    }
+    #table-contracts td:first-child {
+      min-width: 200px;
+    }
+    #table-contracts td:nth-child(3) {
+      max-width: 400px;
+      font-size: 0.9em;
+      color: var(--muted);
+    }
     .mono { font-family: ui-monospace, monospace; font-size: 0.85em; }
     .hash { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
     .msg { margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 0.9rem; }
@@ -170,6 +182,11 @@
     <div class="row">
       <button type="button" class="primary" id="btn-run-work" disabled>Выполнить в браузере</button>
       <span id="work-progress" class="msg info" style="display:none;"></span>
+      <p style="font-size:0.85em; color:var(--muted); margin-top:8px;">
+        <strong>Примечание:</strong> Для астрофизических задач в браузере выполняется упрощённая версия (до 1000 единиц работы для скорости).
+        Для получения награды требуется выполнить полный объём работы — используйте воркеры для полных вычислений.
+        Простые задачи (sc-001, sc-002) можно выполнять полностью в браузере.
+      </p>
     </div>
     <div id="work-result" class="msg" style="display:none;"></div>
   </div>
@@ -177,7 +194,7 @@
   <div id="panel-contracts" class="panel">
     <p class="loading" id="contracts-load">Загрузка…</p>
     <table id="table-contracts" style="display:none;">
-      <thead><tr><th>Контракт</th><th>Единиц работы</th><th>Сложность</th><th>Награда</th></tr></thead>
+      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Единиц работы</th><th>Сложность</th><th>Награда</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -300,6 +317,197 @@
       return { work_units_done: workUnitsDone, result_data: resultData, nonce: solutionNonce };
     }
 
+    // Упрощённые версии астрофизических вычислений для браузера (для демонстрации)
+    async function runAstrophysicsComputation(clientId, contractId, workUnitsRequired, computationType, onProgress) {
+      // Для браузера используем упрощённые вычисления (меньше итераций для скорости)
+      const browserWorkUnits = Math.min(workUnitsRequired, 1000); // Ограничиваем для браузера
+      let resultData = null;
+      let seed = 0;
+      
+      // Генерируем seed детерминированно
+      for (let i = 0; i < clientId.length; i++) {
+        seed = ((seed << 5) - seed + clientId.charCodeAt(i)) & 0xffffffff;
+      }
+      for (let i = 0; i < contractId.length; i++) {
+        seed = ((seed << 5) - seed + contractId.charCodeAt(i)) & 0xffffffff;
+      }
+      seed = Math.abs(seed) % (2**32);
+      
+      // Простой генератор случайных чисел (LCG) для детерминированности
+      let rng = seed;
+      function random() {
+        rng = (rng * 1664525 + 1013904223) % (2**32);
+        return (rng >>> 0) / (2**32);
+      }
+      
+      // Упрощённые вычисления в зависимости от типа
+      if (computationType === 'cosmological') {
+        // Упрощённая N-body задача (10 частиц вместо 100)
+        const n = 10;
+        const particles = [];
+        for (let i = 0; i < n; i++) {
+          particles.push({ x: random() * 2 - 1, y: random() * 2 - 1, z: random() * 2 - 1, mass: random() + 0.5 });
+        }
+        for (let step = 0; step < browserWorkUnits; step++) {
+          for (let i = 0; i < n; i++) {
+            let fx = 0, fy = 0, fz = 0;
+            for (let j = 0; j < n; j++) {
+              if (i === j) continue;
+              const dx = particles[j].x - particles[i].x;
+              const dy = particles[j].y - particles[i].y;
+              const dz = particles[j].z - particles[i].z;
+              const distSq = dx*dx + dy*dy + dz*dz + 0.01;
+              const dist = Math.sqrt(distSq);
+              const force = particles[i].mass * particles[j].mass / (distSq * dist);
+              fx += force * dx;
+              fy += force * dy;
+              fz += force * dz;
+            }
+            particles[i].x += fx * 0.01 / particles[i].mass;
+            particles[i].y += fy * 0.01 / particles[i].mass;
+            particles[i].z += fz * 0.01 / particles[i].mass;
+          }
+          if (step % 10 === 0) onProgress(step);
+        }
+        const finalState = `${particles[0].x.toFixed(6)}${particles[0].y.toFixed(6)}`;
+        resultData = await sha256Hex(finalState);
+      } else if (computationType === 'supernova') {
+        // Упрощённое моделирование сверхновой
+        let T = 1e9, P = 1e15, rho = 1e6;
+        for (let step = 0; step < browserWorkUnits; step++) {
+          const dT = -0.1 * T * rho / (1.0 + T/1e8);
+          const dP = -0.05 * P * T / 1e9;
+          const drho = -0.02 * rho * Math.sqrt(T/1e9);
+          T += dT * 0.001;
+          P += dP * 0.001;
+          rho += drho * 0.001;
+          T = Math.max(T, 1e7);
+          P = Math.max(P, 1e10);
+          rho = Math.max(rho, 1e3);
+          if (step % 10 === 0) onProgress(step);
+        }
+        const finalState = `${T.toExponential(6)}${P.toExponential(6)}${rho.toExponential(6)}`;
+        resultData = await sha256Hex(finalState);
+      } else if (computationType === 'mhd') {
+        // Упрощённая МГД (сетка 5x5x5 вместо 20x20x20)
+        const size = 5;
+        const Bx = [], By = [], Bz = [];
+        for (let i = 0; i < size; i++) {
+          Bx[i] = []; By[i] = []; Bz[i] = [];
+          for (let j = 0; j < size; j++) {
+            Bx[i][j] = []; By[i][j] = []; Bz[i][j] = [];
+            for (let k = 0; k < size; k++) {
+              Bx[i][j][k] = random() * 2 - 1;
+              By[i][j][k] = random() * 2 - 1;
+              Bz[i][j][k] = random() * 2 - 1;
+            }
+          }
+        }
+        for (let step = 0; step < browserWorkUnits; step++) {
+          for (let i = 1; i < size-1; i++) {
+            for (let j = 1; j < size-1; j++) {
+              for (let k = 1; k < size-1; k++) {
+                const dBx = (Bx[i+1][j][k] - Bx[i-1][j][k]) / 2.0 * 0.1;
+                const dBy = (By[i][j+1][k] - By[i][j-1][k]) / 2.0 * 0.1;
+                const dBz = (Bz[i][j][k+1] - Bz[i][j][k-1]) / 2.0 * 0.1;
+                Bx[i][j][k] += dBx * 0.001;
+                By[i][j][k] += dBy * 0.001;
+                Bz[i][j][k] += dBz * 0.001;
+              }
+            }
+          }
+          if (step % 10 === 0) onProgress(step);
+        }
+        const finalState = `${Bx[2][2][2].toFixed(6)}${By[2][2][2].toFixed(6)}${Bz[2][2][2].toFixed(6)}`;
+        resultData = await sha256Hex(finalState);
+      } else if (computationType === 'radiative') {
+        // Упрощённый радиационный перенос
+        const nAngles = 5, nFreq = 10, nPoints = 20;
+        const I = [];
+        for (let a = 0; a < nAngles; a++) {
+          I[a] = [];
+          for (let f = 0; f < nFreq; f++) {
+            I[a][f] = [];
+            for (let p = 0; p < nPoints; p++) {
+              I[a][f][p] = random();
+            }
+          }
+        }
+        for (let step = 0; step < browserWorkUnits; step++) {
+          for (let a = 0; a < nAngles; a++) {
+            const angle = a * Math.PI / nAngles;
+            const cosAngle = Math.cos(angle);
+            for (let f = 0; f < nFreq; f++) {
+              const freq = f * 0.1;
+              for (let p = 1; p < nPoints; p++) {
+                const dI = -I[a][f][p] * (1.0 + freq);
+                const source = 0.1 * Math.exp(-freq) * (1.0 + cosAngle);
+                I[a][f][p] += (dI + source) * 0.01;
+                I[a][f][p] = Math.max(0, I[a][f][p]);
+              }
+            }
+          }
+          if (step % 10 === 0) onProgress(step);
+        }
+        let total = 0;
+        for (let a = 0; a < nAngles; a++) {
+          for (let f = 0; f < nFreq; f++) {
+            for (let p = 0; p < nPoints; p++) {
+              total += I[a][f][p];
+            }
+          }
+        }
+        const finalState = total.toExponential(6);
+        resultData = await sha256Hex(finalState);
+      } else if (computationType === 'gravitational_waves') {
+        // Упрощённые гравитационные волны (сетка 10x10 вместо 30x30)
+        const size = 10;
+        let hPlus = [], hCross = [];
+        for (let i = 0; i < size; i++) {
+          hPlus[i] = []; hCross[i] = [];
+          for (let j = 0; j < size; j++) {
+            hPlus[i][j] = (random() - 0.5) * 0.02;
+            hCross[i][j] = (random() - 0.5) * 0.02;
+          }
+        }
+        const dt = 0.001, dx = 0.1;
+        for (let step = 0; step < browserWorkUnits; step++) {
+          const hPlusNew = [], hCrossNew = [];
+          for (let i = 0; i < size; i++) {
+            hPlusNew[i] = []; hCrossNew[i] = [];
+            for (let j = 0; j < size; j++) {
+              if (i > 0 && i < size-1 && j > 0 && j < size-1) {
+                const d2h_dx2_p = (hPlus[i+1][j] - 2*hPlus[i][j] + hPlus[i-1][j]) / (dx*dx);
+                const d2h_dy2_p = (hPlus[i][j+1] - 2*hPlus[i][j] + hPlus[i][j-1]) / (dx*dx);
+                const d2h_dx2_c = (hCross[i+1][j] - 2*hCross[i][j] + hCross[i-1][j]) / (dx*dx);
+                const d2h_dy2_c = (hCross[i][j+1] - 2*hCross[i][j] + hCross[i][j-1]) / (dx*dx);
+                hPlusNew[i][j] = hPlus[i][j] + dt * (d2h_dx2_p + d2h_dy2_p);
+                hCrossNew[i][j] = hCross[i][j] + dt * (d2h_dx2_c + d2h_dy2_c);
+              } else {
+                hPlusNew[i][j] = hPlus[i][j];
+                hCrossNew[i][j] = hCross[i][j];
+              }
+            }
+          }
+          hPlus = hPlusNew;
+          hCross = hCrossNew;
+          if (step % 10 === 0) onProgress(step);
+        }
+        const amplitude = Math.sqrt(hPlus[5][5]**2 + hCross[5][5]**2);
+        const finalState = amplitude.toExponential(6);
+        resultData = await sha256Hex(finalState);
+      } else {
+        // Fallback: используем простой PoW
+        return await runPoW(clientId, contractId, Math.min(workUnitsRequired, 1000), 3, onProgress);
+      }
+      
+      return { 
+        work_units_done: browserWorkUnits, 
+        result_data: resultData, 
+        nonce: String(seed) 
+      };
+    }
+
     function getApiKey() {
       const k1 = document.getElementById('input-api-key').value.trim();
       const k2 = document.getElementById('input-api-key-work').value.trim();
@@ -319,10 +527,22 @@
         if (!r.ok) throw new Error(task.error || r.status);
         currentTask = task;
         specEl.style.display = 'block';
-        bodyEl.textContent = JSON.stringify(task, null, 2);
+        // Форматируем задачу с описанием
+        const taskName = task.task_name || task.contract_id || '';
+        const taskDesc = task.task_description || '';
+        const taskCategory = task.task_category || '';
+        let html = '';
+        if (taskName) html += '<strong>Название:</strong> ' + taskName + '<br>';
+        if (taskCategory) html += '<strong>Категория:</strong> ' + taskCategory + '<br>';
+        if (taskDesc) html += '<strong>Описание:</strong> ' + taskDesc + '<br>';
+        html += '<strong>Contract ID:</strong> ' + (task.contract_id || '') + '<br>';
+        html += '<strong>Work units required:</strong> ' + (task.work_units_required ?? '') + '<br>';
+        html += '<strong>Difficulty:</strong> ' + (task.difficulty ?? '') + '<br>';
+        if (task.computation_type) html += '<strong>Тип вычислений:</strong> ' + task.computation_type;
+        bodyEl.innerHTML = html;
         runBtn.disabled = false;
         msg.className = 'msg ok';
-        msg.textContent = 'Задача получена: ' + (task.contract_id || '') + ', единиц работы: ' + (task.work_units_required ?? '');
+        msg.textContent = 'Задача получена: ' + (taskName || task.contract_id || '') + ', единиц работы: ' + (task.work_units_required ?? '');
         msg.style.display = 'block';
       } catch (e) {
         msg.className = 'msg err';
@@ -349,10 +569,39 @@
         const clientId = meData.client_id;
         const targetWork = parseInt(currentTask.work_units_required, 10) || 0;
         const difficulty = parseInt(currentTask.difficulty, 10) || 0;
-        progressEl.textContent = 'Вычисление (0 из ' + targetWork + ')…';
-        const result = await runPoW(clientId, currentTask.contract_id, targetWork, difficulty, (n) => {
-          progressEl.textContent = 'Вычисление (' + n + ' из ' + targetWork + ')…';
-        });
+        const computationType = currentTask.computation_type || 'simple_pow';
+        
+        // Выбираем тип вычислений
+        let result;
+        if (computationType === 'simple_pow') {
+          progressEl.textContent = 'Вычисление PoW (0 из ' + targetWork + ')…';
+          result = await runPoW(clientId, currentTask.contract_id, targetWork, difficulty, (n) => {
+            progressEl.textContent = 'Вычисление PoW (' + n + ' из ' + targetWork + ')…';
+          });
+        } else {
+          // Астрофизические задачи: используем упрощённые вычисления для браузера
+          const taskName = currentTask.task_name || currentTask.contract_id || '';
+          const browserWorkUnits = Math.min(targetWork, 1000); // Ограничиваем для браузера
+          progressEl.textContent = 'Вычисление: ' + taskName + ' (0 из ' + browserWorkUnits + ')…';
+          result = await runAstrophysicsComputation(clientId, currentTask.contract_id, browserWorkUnits, computationType, (n) => {
+            progressEl.textContent = 'Вычисление: ' + taskName + ' (' + n + ' из ' + browserWorkUnits + ')…';
+          });
+          // Отправляем реальный объём выполненной работы (для браузера это упрощённая версия)
+          // Примечание: для полных вычислений используйте воркер
+        }
+        
+        // Проверяем, достаточно ли работы выполнено для астрофизических задач
+        if (computationType !== 'simple_pow' && result.work_units_done < targetWork) {
+          // Для астрофизических задач в браузере выполняется упрощённая версия
+          progressEl.style.display = 'none';
+          runBtn.disabled = false;
+          resultEl.className = 'msg info';
+          resultEl.textContent = 'Выполнено ' + result.work_units_done + ' из ' + targetWork + ' единиц работы (упрощённая версия для браузера). ' +
+            'Для полных вычислений используйте воркер. Результат не отправлен (недостаточно работы для получения награды).';
+          resultEl.style.display = 'block';
+          return;
+        }
+        
         progressEl.textContent = 'Отправка результата…';
         const subRes = await fetch(base + '/submit_work', {
           method: 'POST',
@@ -416,7 +665,16 @@
           tbody.innerHTML = '';
           (list || []).forEach(c => {
             const tr = document.createElement('tr');
-            tr.innerHTML = '<td>' + (c.contract_id || '') + '</td><td>' + (c.work_units_required ?? '') + '</td><td>' + (c.difficulty ?? '') + '</td><td>' + (c.reward ?? '') + '</td>';
+            const category = c.task_category || '';
+            const name = c.task_name || c.contract_id || '';
+            const desc = c.task_description || '';
+            tr.innerHTML = 
+              '<td><strong>' + (name || '') + '</strong><br><small style="color:#888;">' + (c.contract_id || '') + '</small></td>' +
+              '<td>' + (category || '—') + '</td>' +
+              '<td>' + (desc || '—') + '</td>' +
+              '<td>' + (c.work_units_required ?? '—') + '</td>' +
+              '<td>' + (c.difficulty ?? '—') + '</td>' +
+              '<td><strong>' + (c.reward ?? '—') + '</strong></td>';
             tbody.appendChild(tr);
           });
           table.style.display = (list && list.length) ? 'table' : 'none';

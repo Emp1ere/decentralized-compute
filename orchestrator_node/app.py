@@ -471,6 +471,9 @@ def get_contracts():
             "work_units_required": spec["work_units_required"],
             "difficulty": spec["difficulty"],
             "reward": c.get_reward(),
+            "task_name": spec.get("task_name", ""),
+            "task_description": spec.get("task_description", ""),
+            "task_category": spec.get("task_category", ""),
         })
     return jsonify(out), 200
 

@@ -69,31 +69,62 @@ class ClientWorker:
             return None
 
     def perform_computation(self, task):
-        """Выполнение работы по спецификации контракта: PoW до work_units_required и до нахождения валидного хеша."""
+        """
+        Выполнение работы по спецификации контракта.
+        Использует разные типы вычислений в зависимости от типа задачи:
+        - simple_pow: простой PoW (для тестовых задач)
+        - cosmological, supernova, mhd, radiative, gravitational_waves: реалистичные астрофизические вычисления
+        """
         try:
             contract_id = task["contract_id"]
             target_work = int(task["work_units_required"])
-            difficulty = int(task["difficulty"])
+            difficulty = int(task.get("difficulty", 0))
+            computation_type = task.get("computation_type", "simple_pow")
         except (KeyError, TypeError, ValueError) as e:
             logger.error("perform_computation invalid task: %s", e)
             return 0, "", None
-        target_prefix = "0" * difficulty
-
-        work_units_done = 0
-        final_result = None  # Хеш с нужным префиксом (для отчёта)
-        solution_nonce = None  # Nonce этого хеша (для строгой проверки контрактом)
-
-        while work_units_done < target_work or solution_nonce is None:
-            work_units_done += 1
-            nonce = str(work_units_done)
-            text = f"{self.client_id}-{contract_id}-{nonce}"  # Та же формула, что в контракте при проверке
-            hash_result = hashlib.sha256(text.encode()).hexdigest()
-
-            if hash_result.startswith(target_prefix):
-                final_result = hash_result
-                solution_nonce = nonce  # Запоминаем nonce для верификации на оркестраторе
-
-        return work_units_done, final_result or "", solution_nonce
+        
+        # Импортируем модуль с типами вычислений
+        try:
+            from computation_types import COMPUTATION_TYPES
+        except ImportError:
+            logger.error("computation_types module not found, falling back to simple_pow")
+            computation_type = "simple_pow"
+            COMPUTATION_TYPES = {}
+        
+        # Выбираем функцию вычислений
+        compute_func = COMPUTATION_TYPES.get(computation_type)
+        if not compute_func:
+            logger.warning("Unknown computation_type %s, using simple_pow", computation_type)
+            from computation_types import compute_simple_pow
+            compute_func = compute_simple_pow
+        
+        logger.info("Starting computation: type=%s contract_id=%s work_units=%s", 
+                   computation_type, contract_id, target_work)
+        
+        # Выполняем вычисления
+        if computation_type == "simple_pow":
+            # Простой PoW: используем nonce как счётчик
+            result_data, solution_nonce = compute_func(
+                self.client_id, contract_id, target_work, difficulty
+            )
+            work_units_done = target_work  # Выполнили все единицы работы
+        else:
+            # Астрофизические задачи: используем seed для детерминированности
+            # Seed генерируется детерминированно из client_id и contract_id
+            # Это гарантирует, что один и тот же воркер с одной задачей получит один результат
+            seed = hash(f"{self.client_id}-{contract_id}") % (2**32)
+            result_data, computed_seed = compute_func(
+                self.client_id, contract_id, target_work, seed=seed
+            )
+            work_units_done = target_work  # Выполнили все единицы работы
+            # solution_nonce содержит seed для верификации (используем вычисленный seed)
+            solution_nonce = computed_seed if computed_seed else str(seed)
+        
+        logger.info("Computation completed: result_hash=%s... nonce=%s", 
+                   result_data[:16] if result_data else "none", solution_nonce)
+        
+        return work_units_done, result_data or "", solution_nonce
 
     def submit_work(self, task, work_done, result_data, solution_nonce=None):
         """Отправка результата оркестратору: contract_id, work_units_done, result_data, nonce (для строгой проверки контрактом)."""
