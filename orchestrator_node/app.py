@@ -32,8 +32,15 @@ blockchain = Blockchain()
 _block_creation_lock = threading.Lock()
 
 # --- Безопасность: аутентификация по API-ключу ---
-# api_key -> client_id (ключ выдаётся один раз при регистрации)
+# api_key -> client_id (ключ выдаётся при регистрации; для постоянных аккаунтов загружаем из auth_storage)
 api_key_to_client = {}
+try:
+    from auth_storage import load_all_into as auth_load_all, create_user as auth_create_user, verify_login as auth_verify_login, find_by_client_id as auth_find_by_client_id
+    n = auth_load_all(api_key_to_client)
+    if n:
+        logger.info("auth_loaded: %s persistent account(s)", n)
+except Exception as e:
+    logger.warning("auth_storage not loaded: %s", e)
 
 # --- Активные вычислители по контрактам: (contract_id, client_id) -> timestamp ---
 # Используется для отображения "количество активных вычислителей" в интерфейсе.
@@ -419,11 +426,26 @@ def submit_work():
 @app.route("/me", methods=["GET"])
 @limiter.limit("60 per minute")
 def me():
-    """Для веб-интерфейса: по API-ключу возвращает client_id (без секретов)."""
+    """По API-ключу возвращает client_id, nickname (если есть), balance и число сданных работ."""
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    return jsonify({"client_id": client_id}), 200
+    out = {"client_id": client_id}
+    try:
+        profile = auth_find_by_client_id(client_id)
+        if profile:
+            out["nickname"] = profile.get("nickname") or profile.get("login")
+            out["login"] = profile.get("login")
+    except Exception:
+        pass
+    out["balance"] = blockchain.get_balance(client_id)
+    work_count = 0
+    for block in blockchain.chain:
+        for tx in block.transactions:
+            if tx.get("type") == "work_receipt" and tx.get("client_id") == client_id:
+                work_count += 1
+    out["submissions_count"] = work_count
+    return jsonify(out), 200
 
 
 @app.route("/get_balance/<client_id>", methods=["GET"])
@@ -526,9 +548,10 @@ def get_contracts():
     return jsonify(out), 200
 
 
-def _run_worker_container(contract_id):
+def _run_worker_container(contract_id, api_key=None, client_id=None):
     """
     Запуск контейнера воркера с CONTRACT_ID (для выбранной задачи).
+    Если переданы api_key и client_id, воркер работает от этого аккаунта — награда попадёт на ваш баланс.
     Требует: доступ к Docker (сокет), env WORKER_IMAGE, ORCHESTRATOR_URL_FOR_WORKER, DOCKER_NETWORK.
     Возвращает (success: bool, message: str).
     """
@@ -539,12 +562,17 @@ def _run_worker_container(contract_id):
     docker_network = os.environ.get("DOCKER_NETWORK", "distributed-compute_default").strip()
     if not worker_image:
         return False, "WORKER_IMAGE not set (run_worker disabled)"
+    env = {"CONTRACT_ID": contract_id, "ORCHESTRATOR_URL": orchestrator_url}
+    if api_key and api_key.strip():
+        env["API_KEY"] = api_key.strip()
+    if client_id and str(client_id).strip():
+        env["CLIENT_ID"] = str(client_id).strip()
     try:
         import docker as docker_module
         client = docker_module.from_env()
         container = client.containers.run(
             image=worker_image,
-            environment={"CONTRACT_ID": contract_id, "ORCHESTRATOR_URL": orchestrator_url},
+            environment=env,
             network=docker_network,
             remove=True,
             detach=True,
@@ -552,8 +580,15 @@ def _run_worker_container(contract_id):
         logger.info("run_worker started container for contract_id=%s", contract_id)
         return True, "Worker started (one task, then container will exit)"
     except Exception as e:
+        err = str(e)
         logger.warning("run_worker failed: %s", e)
-        return False, str(e)
+        if "no such image" in err.lower() or "image not found" in err.lower() or "404" in err:
+            return False, "Image '%s' not found. In project folder run: docker-compose build client_worker_1 then docker-compose up -d" % worker_image
+        if "cannot connect" in err.lower() or "connection refused" in err.lower() or "docker.sock" in err.lower():
+            return False, "Cannot connect to Docker. Ensure Docker Desktop is running and containers were started via start.bat"
+        if "network" in err.lower() and ("not found" in err.lower() or "does not exist" in err.lower()):
+            return False, "Docker network '%s' not found. Run start.bat first to create it." % docker_network
+        return False, err
 
 
 @app.route("/run_worker", methods=["POST"])
@@ -564,14 +599,18 @@ def run_worker():
     Требуется авторизация. Тело: {"contract_id": "sc-001"}.
     Работает только если оркестратор имеет доступ к Docker (сокет смонтирован и заданы WORKER_IMAGE, DOCKER_NETWORK).
     """
-    client_id = get_client_id_from_auth()
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    api_key = auth[7:].strip()
+    client_id = api_key_to_client.get(api_key)
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     data = request.get_json(silent=True) or {}
     contract_id = (data.get("contract_id") or "").strip()
     if not contract_id:
         return jsonify({"error": "contract_id required"}), 400
-    ok, msg = _run_worker_container(contract_id)
+    ok, msg = _run_worker_container(contract_id, api_key=api_key, client_id=client_id)
     if ok:
         return jsonify({"status": "started", "message": msg, "contract_id": contract_id}), 202
     if "not set" in msg or "WORKER_IMAGE" in msg:

@@ -201,6 +201,11 @@
         <button type="button" class="primary" id="btn-start-worker">Запустить воркер автоматически</button>
         <span id="work-run-worker-msg" class="msg" style="display:none;"></span>
       </div>
+      <div id="work-worker-status-hint" style="display:none; margin-top:8px;">
+        <button type="button" class="primary" id="btn-check-balance-after-worker">Проверить баланс</button>
+        <span id="work-worker-balance-result" class="msg" style="display:none; margin-left:8px;"></span>
+        <p style="font-size:0.85em; color:var(--muted); margin:8px 0 0;">Через 10–60 сек воркер сдаст задачу. Вкладка «Задачи» — история сданных работ; «Обзор» → «Показать баланс» — начисленные токены.</p>
+      </div>
       <p style="font-size:0.9em; color:var(--muted); margin:0 0 8px;">Или вручную в каталоге проекта:</p>
       <div class="row" style="align-items:center; gap:8px;">
         <code id="work-worker-cmd" class="mono" style="flex:1; background:var(--bg); padding:8px 12px; border-radius:6px; font-size:0.85rem; word-break:break-all;"></code>
@@ -691,9 +696,20 @@
         if (r.status === 202) {
           msgEl.className = 'msg ok';
           msgEl.textContent = data.message || 'Воркер запущен. Контейнер выполнит одну задачу и завершится.';
+          document.getElementById('work-worker-status-hint').style.display = 'block';
+          document.getElementById('work-worker-balance-result').style.display = 'none';
         } else {
+          document.getElementById('work-worker-status-hint').style.display = 'none';
           msgEl.className = 'msg err';
-          msgEl.textContent = data.error || data.detail || r.status + ' ' + r.statusText;
+          var errText = data.error || '';
+          if (data.detail) errText += (errText ? ': ' : '') + data.detail;
+          if (!errText) errText = r.status + ' ' + r.statusText;
+          msgEl.textContent = errText;
+          if (data.detail && (String(data.detail).toLowerCase().indexOf('image') !== -1 || String(data.detail).indexOf('not found') !== -1)) {
+            msgEl.textContent += ' Подсказка: в папке проекта выполните docker-compose build, затем повторите.';
+          } else if (data.detail && (String(data.detail).toLowerCase().indexOf('docker') !== -1 || String(data.detail).toLowerCase().indexOf('socket') !== -1)) {
+            msgEl.textContent += ' Подсказка: убедитесь, что Docker Desktop запущен и контейнеры подняты через start.bat (docker-compose).';
+          }
         }
       } catch (e) {
         msgEl.className = 'msg err';
@@ -701,6 +717,28 @@
         msgEl.style.display = 'block';
       }
       this.disabled = false;
+    };
+
+    document.getElementById('btn-check-balance-after-worker').onclick = async function() {
+      const key = getApiKey();
+      const resultEl = document.getElementById('work-worker-balance-result');
+      resultEl.style.display = 'none';
+      if (!key) { resultEl.className = 'msg err'; resultEl.textContent = 'Выберите клиента или введите API-ключ.'; resultEl.style.display = 'block'; return; }
+      try {
+        const meRes = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
+        const meData = await meRes.json();
+        if (!meRes.ok) throw new Error(meData.error || 'Неверный ключ');
+        const balRes = await fetch(base + '/get_balance/' + encodeURIComponent(meData.client_id), { headers: { 'Authorization': 'Bearer ' + key } });
+        const balData = await balRes.json();
+        if (!balRes.ok) throw new Error(balData.error || balRes.status);
+        resultEl.className = 'msg ok';
+        resultEl.textContent = 'Баланс: ' + (balData.balance ?? 0) + ' токенов.';
+        resultEl.style.display = 'block';
+      } catch (e) {
+        resultEl.className = 'msg err';
+        resultEl.textContent = 'Ошибка: ' + e.message;
+        resultEl.style.display = 'block';
+      }
     };
 
     document.getElementById('btn-get-task').onclick = async () => {

@@ -17,19 +17,54 @@ ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator_node:
 VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() not in ("0", "false", "no")
 # Опционально: брать только задачи по указанному контракту (для запуска из интерфейса «Выполнить в воркере»)
 CONTRACT_ID = os.environ.get("CONTRACT_ID", "").strip() or None
+# Если заданы API_KEY и CLIENT_ID (при запуске из интерфейса), воркер работает от этого аккаунта — награда идёт на ваш баланс
+API_KEY_FROM_ENV = os.environ.get("API_KEY", "").strip() or None
+CLIENT_ID_FROM_ENV = os.environ.get("CLIENT_ID", "").strip() or None
 
 
 class ClientWorker:
     def __init__(self):
         self.client_id = None
         self.api_key = None  # Секрет для аутентификации (Authorization: Bearer)
-        self.register()  # Сразу регистрируемся при создании
+        if API_KEY_FROM_ENV and CLIENT_ID_FROM_ENV:
+            self.api_key = API_KEY_FROM_ENV
+            self.client_id = CLIENT_ID_FROM_ENV
+            logger.info("Using account from interface: client_id=%s...", self.client_id[:8])
+        elif API_KEY_FROM_ENV:
+            self._use_existing_key()
+        else:
+            self.register()  # Сразу регистрируемся при создании
 
     def _auth_headers(self):
         """Заголовки с API-ключом для аутентификации (и опционально для TLS — используйте https в ORCHESTRATOR_URL)."""
         if not self.api_key:
             return {}
         return {"Authorization": f"Bearer {self.api_key}"}
+
+    def _use_existing_key(self):
+        """Использовать переданный API-ключ (из интерфейса): получаем client_id через /me, награда пойдёт на этот аккаунт."""
+        self.api_key = API_KEY_FROM_ENV
+        while True:
+            try:
+                response = requests.get(
+                    f"{ORCHESTRATOR_URL}/me",
+                    headers=self._auth_headers(),
+                    verify=VERIFY_SSL,
+                    timeout=10,
+                )
+                response.raise_for_status()
+                data = response.json()
+                self.client_id = data.get("client_id")
+                if not self.client_id:
+                    raise ValueError("Missing client_id in /me response")
+                logger.info("Using existing account: client_id=%s...", self.client_id[:8])
+                return
+            except requests.RequestException as e:
+                logger.warning("Failed to get /me (retry in 5s): %s", e)
+                time.sleep(5)
+            except (KeyError, ValueError) as e:
+                logger.error("Invalid /me response: %s", e)
+                time.sleep(5)
 
     def register(self):
         """Регистрация на оркестраторе: получаем client_id и api_key для последующих запросов."""
