@@ -261,9 +261,35 @@ class Blockchain:
                 return False, f"hash mismatch at block {i}"
             # PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность
             new_chain.append(block)
-        # Если цепочка пира короче или равна нашей, не заменяем
-        if len(new_chain) <= len(self.chain):
+        # Критическое исправление: правило выбора блока при форке (одинаковая длина)
+        # Если цепочка пира короче нашей, не заменяем
+        if len(new_chain) < len(self.chain):
             return False, "chain not longer"
+        # Если цепочка пира равна нашей по длине (форк), выбираем по timestamp последнего блока
+        if len(new_chain) == len(self.chain):
+            our_last = self.chain[-1]
+            peer_last = new_chain[-1]
+            # Выбираем блок с меньшим timestamp (создан раньше)
+            if peer_last.timestamp < our_last.timestamp:
+                logger.info("Fork resolved: choosing peer chain (earlier timestamp)")
+                self.chain = new_chain
+                self.pending_transactions = []
+                self.balances = {}
+                for block in self.chain:
+                    _apply_block_transactions(block.transactions, self.balances)
+                return True, None
+            elif peer_last.timestamp == our_last.timestamp:
+                # Одинаковое время: выбираем по хешу (лексикографически меньший)
+                if peer_last.hash < our_last.hash:
+                    logger.info("Fork resolved: choosing peer chain (smaller hash)")
+                    self.chain = new_chain
+                    self.pending_transactions = []
+                    self.balances = {}
+                    for block in self.chain:
+                        _apply_block_transactions(block.transactions, self.balances)
+                    return True, None
+            # Наша цепочка остаётся (наш блок создан раньше или имеет меньший хеш)
+            return False, "chain not longer (fork resolved in favor of local chain)"
         # Проверка: все reward-транзакции в цепочке должны быть валидными
         for bi, block in enumerate(new_chain):
             for tx in block.transactions:

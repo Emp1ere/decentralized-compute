@@ -18,6 +18,8 @@ setup_logging()
 logger = get_logger("orchestrator")
 
 app = Flask(__name__)
+# Защита от DoS: ограничение размера запросов (16 MB максимум)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 
 # Счётчики для мониторинга (запросы по эндпоинтам и ошибки)
 _request_counts = {}
@@ -25,6 +27,9 @@ _error_counts = {}
 
 # Инициализируем наш блокчейн
 blockchain = Blockchain()
+
+# --- Критическое исправление: блокировка при создании блока (защита от race condition) ---
+_block_creation_lock = threading.Lock()
 
 # --- Безопасность: аутентификация по API-ключу ---
 # api_key -> client_id (ключ выдаётся один раз при регистрации)
@@ -55,9 +60,28 @@ limiter = Limiter(
 # URL второго узла для синхронизации блокчейна (децентрализация)
 PEER_URL = os.environ.get("PEER_URL", "")
 # Интервал периодической синхронизации (секунды)
-SYNC_INTERVAL = int(os.environ.get("SYNC_INTERVAL", "30"))
+# Критическое исправление: уменьшен до 10 секунд для более быстрого разрешения форков
+SYNC_INTERVAL = int(os.environ.get("SYNC_INTERVAL", "10"))
 # Секрет для запросов между узлами (receive_block, receive_chain, add_pending_tx) — опционально
 NODE_SECRET = os.environ.get("NODE_SECRET", "")
+
+# --- Решение централизации: ротация лидера между узлами ---
+# Идентификатор текущего узла (уникальный для каждого узла в сети)
+NODE_ID = os.environ.get("NODE_ID", "node-1")
+# Список всех узлов в сети (через запятую, например "node-1,node-2,node-3")
+# Если не задан, выводится из PEER_URL (для двух узлов)
+NODE_IDS_STR = os.environ.get("NODE_IDS", "")
+if NODE_IDS_STR:
+    NODE_IDS = [nid.strip() for nid in NODE_IDS_STR.split(",") if nid.strip()]
+else:
+    # Автоматически определяем список узлов для двух узлов
+    # Если есть PEER_URL, предполагаем два узла: текущий и пир
+    if PEER_URL:
+        # Извлекаем имя узла из PEER_URL (например, http://orchestrator_node_2:5000 -> node-2)
+        # Или используем простую схему: node-1 и node-2
+        NODE_IDS = ["node-1", "node-2"]
+    else:
+        NODE_IDS = [NODE_ID]  # Один узел
 
 
 @app.before_request
@@ -91,6 +115,76 @@ def require_node_secret(f):
             return jsonify({"error": "Forbidden"}), 403
         return f(*args, **kwargs)
     return wrapped
+
+
+def get_current_leader():
+    """
+    Решение централизации: определяет текущего лидера по хешу последнего блока.
+    Лидер ротируется между узлами детерминированно на основе хеша блока.
+    Это обеспечивает справедливое распределение создания блоков между узлами.
+    """
+    if not blockchain.chain:
+        return NODE_IDS[0] if NODE_IDS else NODE_ID
+    last_block_hash = blockchain.get_last_block().hash
+    # Берём первые 8 символов хеша как число и берём остаток от деления на количество узлов
+    hash_int = int(last_block_hash[:8], 16)
+    leader_index = hash_int % len(NODE_IDS)
+    return NODE_IDS[leader_index]
+
+
+def get_leader_url(leader_id):
+    """
+    Получить URL лидера по его идентификатору.
+    Для простоты используем схему: node-1 -> orchestrator_node_1:5000, node-2 -> orchestrator_node_2:5000
+    """
+    if leader_id == NODE_ID:
+        return None  # Это мы сами, не нужно отправлять запрос
+    
+    # Маппинг идентификаторов узлов на их URL в Docker-сети
+    node_url_map = {
+        "node-1": "http://orchestrator_node_1:5000",
+        "node-2": "http://orchestrator_node_2:5000",
+        "node-3": "http://orchestrator_node_3:5000",
+    }
+    
+    if leader_id in node_url_map:
+        return node_url_map[leader_id]
+    
+    # Если формат нестандартный, используем PEER_URL как fallback
+    # (предполагаем, что пир может быть лидером)
+    return PEER_URL
+
+
+def sync_pending_from_peer():
+    """
+    Критическое исправление: синхронизация pending транзакций с пиром перед созданием блока.
+    Запрашивает pending у пира и объединяет с локальным (убирает дубликаты по result_data).
+    Это предотвращает создание блоков с разными транзакциями на разных узлах.
+    """
+    if not PEER_URL:
+        return
+    try:
+        headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
+        response = requests.get(f"{PEER_URL.rstrip('/')}/pending", timeout=2, headers=headers)
+        if response.status_code == 200:
+            peer_pending = response.json()
+            # Объединяем транзакции (убираем дубликаты по result_data для work_receipt)
+            local_result_data = {tx.get("result_data") for tx in blockchain.pending_transactions if tx.get("type") == "work_receipt" and tx.get("result_data")}
+            for tx in peer_pending:
+                # Проверяем, нет ли уже такой транзакции
+                if tx.get("type") == "work_receipt" and tx.get("result_data"):
+                    if tx.get("result_data") in local_result_data:
+                        continue  # Уже есть
+                # Пытаемся добавить транзакцию (может быть отклонена из-за лимитов)
+                try:
+                    blockchain.add_transaction(tx)
+                except ValueError:
+                    pass  # Уже есть или невалидна (не критично)
+            logger.debug("sync_pending_completed: local=%s peer=%s", len(blockchain.pending_transactions), len(peer_pending))
+    except requests.RequestException as e:
+        logger.debug("sync_pending_failed: %s", e)
+    except Exception:
+        logger.debug("sync_pending_error")
 
 
 def sync_chain_from_peer():
@@ -225,12 +319,48 @@ def submit_work():
         "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
     }
     
-    # Добавляем транзакции в блокчейн
+    # Решение централизации: проверяем, является ли текущий узел лидером
+    current_leader = get_current_leader()
+    is_leader = (current_leader == NODE_ID)
+    
+    if not is_leader:
+        # Не лидер: отправляем транзакции лидеру через /add_pending_tx
+        # Лидер создаст блок при следующем submit_work или периодически
+        leader_url = get_leader_url(current_leader)
+        if leader_url:
+            try:
+                headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
+                response = requests.post(
+                    f"{leader_url.rstrip('/')}/add_pending_tx",
+                    json=[reward_tx, work_receipt_tx],
+                    timeout=5,
+                    headers=headers,
+                )
+                if response.status_code == 200:
+                    logger.info("transactions_sent_to_leader: leader=%s", current_leader)
+                    return jsonify({
+                        "status": "success",
+                        "reward_issued": reward_amount,
+                        "message": f"Transactions sent to leader {current_leader}, block will be created by leader"
+                    }), 200
+                else:
+                    logger.warning("failed_to_send_to_leader: leader=%s status=%s", current_leader, response.status_code)
+            except requests.RequestException as e:
+                logger.warning("send_to_leader_failed: leader=%s error=%s", current_leader, e)
+        # Если не удалось отправить лидеру, продолжаем как обычно (fallback)
+        logger.warning("leader_unreachable: continuing_as_fallback leader=%s", current_leader)
+    
+    # Лидер или fallback: добавляем транзакции локально и создаём блок
     blockchain.add_transaction(reward_tx)
     blockchain.add_transaction(work_receipt_tx)
 
-    # PoUW: создаём блок сразу (без mining_loop, блок создаётся при полезной работе)
-    new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
+    # Критическое исправление: блокировка + синхронизация pending перед созданием блока
+    # Это предотвращает race condition и расхождение pending между узлами
+    with _block_creation_lock:
+        # Синхронизируем pending с пиром перед созданием блока (предотвращает разные блоки с разными tx)
+        sync_pending_from_peer()
+        # PoUW: создаём блок сразу (без mining_loop, блок создаётся при полезной работе)
+        new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
 
     # Синхронизация с пиром: отправляем готовый блок
     if new_block and PEER_URL:
@@ -290,6 +420,13 @@ def metrics():
         chain_len = len(blockchain.chain)
         num_clients = len(blockchain.balances)
         pending = len(blockchain.pending_transactions)
+        
+        # Решение централизации: метрика распределения блоков между узлами
+        # Подсчитываем, сколько блоков создал каждый узел (по timestamp или другим признакам)
+        # Для простоты считаем блоки, созданные на этом узле (по NODE_ID в логах или метаданным)
+        # В реальной системе можно добавить поле creator_node_id в блок
+        current_leader = get_current_leader()
+        is_current_leader = (current_leader == NODE_ID)
     except Exception as e:
         logger.exception("metrics_error")
         return jsonify({"error": "metrics failed"}), 500
@@ -299,6 +436,10 @@ def metrics():
         "pending_transactions": pending,
         "request_counts": _request_counts,
         "error_counts": _error_counts,
+        "node_id": NODE_ID,
+        "current_leader": current_leader,
+        "is_leader": is_current_leader,
+        "all_node_ids": NODE_IDS,
     }
     return jsonify(body), 200
 
@@ -307,6 +448,15 @@ def metrics():
 def get_chain():
     """Посмотреть весь блокчейн (для синхронизации и просмотра)."""
     return jsonify(blockchain.get_chain_json()), 200
+
+@app.route("/pending", methods=["GET"])
+@require_node_secret
+def get_pending():
+    """
+    Критическое исправление: эндпоинт для синхронизации pending транзакций между узлами.
+    Возвращает список pending транзакций (для синхронизации перед созданием блока).
+    """
+    return jsonify(blockchain.pending_transactions), 200
 
 
 @app.route("/contracts", methods=["GET"])

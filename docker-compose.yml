@@ -15,6 +15,9 @@ services:
       - SYNC_INTERVAL=30
       # Секрет для запросов между узлами (receive_block, receive_chain) — задайте свой в продакшене
       - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+      # Решение централизации: идентификатор узла для ротации лидера
+      - NODE_ID=node-1
+      - NODE_IDS=node-1,node-2
     # Для TLS задайте TLS_CERT_FILE, TLS_KEY_FILE и смонтируйте сертификаты
     # restart: unless-stopped
 
@@ -29,6 +32,9 @@ services:
       - PEER_URL=http://orchestrator_node_1:5000
       - SYNC_INTERVAL=30
       - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+      # Решение централизации: идентификатор узла для ротации лидера
+      - NODE_ID=node-2
+      - NODE_IDS=node-1,node-2
     depends_on:
       - orchestrator_node_1
     # restart: unless-stopped
