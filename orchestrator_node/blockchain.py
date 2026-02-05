@@ -326,3 +326,25 @@ class Blockchain:
     def get_chain_json(self):
         """Получить всю цепочку в формате JSON (для синхронизации и просмотра)."""
         return [block.__dict__ for block in self.chain]
+
+    def get_contract_stats(self):
+        """
+        Агрегация по контрактам: общий объём выполненной работы и число завершённых заданий.
+        Возвращает dict: contract_id -> {"total_work_done": int, "jobs_count": int}.
+        """
+        stats = {}
+        for block in self.chain:
+            for tx in block.transactions:
+                if tx.get("type") != "work_receipt":
+                    continue
+                cid = tx.get("contract_id")
+                if not cid:
+                    continue
+                wu = tx.get("work_units", 0)
+                if not isinstance(wu, (int, float)) or wu < 0:
+                    continue
+                if cid not in stats:
+                    stats[cid] = {"total_work_done": 0, "jobs_count": 0}
+                stats[cid]["total_work_done"] += int(wu)
+                stats[cid]["jobs_count"] += 1
+        return stats

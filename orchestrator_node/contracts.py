@@ -12,6 +12,8 @@ class BaseContract:
     task_description = ""  # Описание задачи (для интерфейса)
     task_category = ""  # Категория задачи (например, "Астрофизика")
     computation_type = "simple_pow"  # Тип вычислений: cosmological, supernova, mhd, radiative, gravitational_waves, simple_pow
+    # Опционально: целевой объём работы по контракту для отображения % выполнения (если None — считается от work_units_required * 10)
+    target_total_work_units = None
 
     def get_task_spec(self):
         """Минимальные данные для вычислителя: что сделать и сколько нужно единиц работы."""

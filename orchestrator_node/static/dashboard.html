@@ -117,6 +117,10 @@
       font-size: 0.9em;
       color: var(--muted);
     }
+    #table-contracts td .progress-pct { font-weight: 600; }
+    #table-contracts .btn-take-task { font-size: 0.85rem; padding: 6px 12px; }
+    .saved-client-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.9rem; }
+    .saved-client-row button { padding: 4px 10px; font-size: 0.85rem; }
     .mono { font-family: ui-monospace, monospace; font-size: 0.85em; }
     .hash { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
     .msg { margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 0.9rem; }
@@ -126,6 +130,7 @@
     .node-links { margin-bottom: 16px; font-size: 0.9rem; color: var(--muted); }
     .node-links a { color: var(--accent); margin-right: 12px; }
     .loading { color: var(--muted); }
+    .muted { color: var(--muted); }
     .progress-bar {
       height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-top: 8px; max-width: 300px;
     }
@@ -154,7 +159,18 @@
       <div class="card"><div class="label">Клиентов</div><div id="ov-clients" class="value">—</div></div>
       <div class="card"><div class="label">В очереди (pending)</div><div id="ov-pending" class="value">—</div></div>
     </div>
-    <div class="row">
+    <p class="label">Работа от имени нескольких клиентов</p>
+    <div class="row" style="align-items: flex-start;">
+      <div>
+        <label>Текущий клиент:</label>
+        <select id="select-client" style="margin-left:8px; min-width:200px; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
+          <option value="">— Ввести ключ вручную —</option>
+        </select>
+      </div>
+      <button type="button" class="primary" id="btn-add-client">Добавить текущий ключ</button>
+    </div>
+    <div id="saved-clients-list" class="card" style="margin-top:12px; max-height:120px; overflow:auto;"></div>
+    <div class="row" style="margin-top:16px;">
       <button type="button" class="primary" id="btn-register">Зарегистрироваться</button>
       <span id="reg-msg" class="msg" style="display:none;"></span>
     </div>
@@ -179,6 +195,19 @@
       <div class="label">Текущая задача</div>
       <div class="mono" id="work-task-body"></div>
     </div>
+    <div id="work-run-in-worker" class="card" style="display:none; margin-bottom: 16px;">
+      <div class="label">Выполнить эту задачу в воркере</div>
+      <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
+        <button type="button" class="primary" id="btn-start-worker">Запустить воркер автоматически</button>
+        <span id="work-run-worker-msg" class="msg" style="display:none;"></span>
+      </div>
+      <p style="font-size:0.9em; color:var(--muted); margin:0 0 8px;">Или вручную в каталоге проекта:</p>
+      <div class="row" style="align-items:center; gap:8px;">
+        <code id="work-worker-cmd" class="mono" style="flex:1; background:var(--bg); padding:8px 12px; border-radius:6px; font-size:0.85rem; word-break:break-all;"></code>
+        <button type="button" class="primary" id="btn-copy-worker-cmd">Копировать</button>
+      </div>
+      <p style="font-size:0.8em; color:var(--muted); margin:8px 0 0;">В Windows (CMD): <code>set CONTRACT_ID=<span id="work-worker-cid"></span> &amp;&amp; docker-compose run --rm client_worker_1</code></p>
+    </div>
     <div class="row">
       <button type="button" class="primary" id="btn-run-work" disabled>Выполнить в браузере</button>
       <span id="work-progress" class="msg info" style="display:none;"></span>
@@ -194,7 +223,7 @@
   <div id="panel-contracts" class="panel">
     <p class="loading" id="contracts-load">Загрузка…</p>
     <table id="table-contracts" style="display:none;">
-      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Единиц работы</th><th>Сложность</th><th>Награда</th></tr></thead>
+      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Единиц работы</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Свободный объём</th><th>Награда</th><th>Действие</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -292,6 +321,77 @@
     };
 
     let currentTask = null;
+
+    const STORAGE_KEY_CLIENTS = 'dc_clients';
+    function getSavedClients() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_CLIENTS);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) { return []; }
+    }
+    function setSavedClients(list) {
+      localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(list));
+    }
+    function refreshClientSelect() {
+      const list = getSavedClients();
+      const sel = document.getElementById('select-client');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">— Ввести ключ вручную —</option>';
+      list.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = (c.label || 'Клиент') + ' (' + (c.apiKey || '').slice(0, 8) + '…)';
+        sel.appendChild(opt);
+      });
+      if (cur && list.some(c => c.id === cur)) sel.value = cur;
+    }
+    function refreshSavedClientsList() {
+      const list = getSavedClients();
+      const container = document.getElementById('saved-clients-list');
+      container.innerHTML = '';
+      if (!list.length) { container.innerHTML = '<span class="muted">Сохранённых клиентов нет. Добавьте ключ и нажмите «Добавить текущий ключ».</span>'; return; }
+      list.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'saved-client-row';
+        row.innerHTML = '<span>' + (c.label || c.id) + '</span>' +
+          '<button type="button" class="primary" data-use="' + c.id + '">Использовать</button>' +
+          '<button type="button" data-remove="' + c.id + '">Удалить</button>';
+        row.querySelector('[data-use]').onclick = () => {
+          document.getElementById('input-api-key').value = c.apiKey || '';
+          document.getElementById('input-api-key-work').value = c.apiKey || '';
+          document.getElementById('select-client').value = c.id;
+        };
+        row.querySelector('[data-remove]').onclick = () => {
+          setSavedClients(list.filter(x => x.id !== c.id));
+          refreshClientSelect();
+          refreshSavedClientsList();
+        };
+        container.appendChild(row);
+      });
+    }
+    document.getElementById('select-client').onchange = function() {
+      const id = this.value;
+      const list = getSavedClients();
+      const c = list.find(x => x.id === id);
+      if (c && c.apiKey) {
+        document.getElementById('input-api-key').value = c.apiKey;
+        document.getElementById('input-api-key-work').value = c.apiKey;
+      }
+      if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
+    };
+    document.getElementById('btn-add-client').onclick = function() {
+      const key = document.getElementById('input-api-key').value.trim();
+      if (!key) { alert('Введите API-ключ в поле выше.'); return; }
+      const list = getSavedClients();
+      const id = 'c' + Date.now();
+      list.push({ id, label: 'Клиент ' + (list.length + 1), apiKey: key });
+      setSavedClients(list);
+      refreshClientSelect();
+      refreshSavedClientsList();
+      document.getElementById('select-client').value = id;
+    };
+    refreshClientSelect();
+    refreshSavedClientsList();
 
     async function sha256Hex(str) {
       const buf = new TextEncoder().encode(str);
@@ -509,41 +609,110 @@
     }
 
     function getApiKey() {
+      const sel = document.getElementById('select-client').value;
+      if (sel) {
+        const c = getSavedClients().find(x => x.id === sel);
+        if (c && c.apiKey) return c.apiKey;
+      }
       const k1 = document.getElementById('input-api-key').value.trim();
       const k2 = document.getElementById('input-api-key-work').value.trim();
       return k2 || k1;
     }
-    document.getElementById('btn-get-task').onclick = async () => {
-      const key = getApiKey();
-      const msg = document.getElementById('work-task-msg');
+
+    function setCurrentTask(task) {
+      currentTask = task;
       const specEl = document.getElementById('work-task-spec');
       const bodyEl = document.getElementById('work-task-body');
       const runBtn = document.getElementById('btn-run-work');
+      const msg = document.getElementById('work-task-msg');
+      specEl.style.display = 'block';
+      const taskName = task.task_name || task.contract_id || '';
+      const taskDesc = task.task_description || '';
+      const taskCategory = task.task_category || '';
+      let html = '';
+      if (taskName) html += '<strong>Название:</strong> ' + taskName + '<br>';
+      if (taskCategory) html += '<strong>Категория:</strong> ' + taskCategory + '<br>';
+      if (taskDesc) html += '<strong>Описание:</strong> ' + taskDesc + '<br>';
+      html += '<strong>Contract ID:</strong> ' + (task.contract_id || '') + '<br>';
+      html += '<strong>Work units required:</strong> ' + (task.work_units_required ?? '') + '<br>';
+      html += '<strong>Difficulty:</strong> ' + (task.difficulty ?? '') + '<br>';
+      if (task.computation_type) html += '<strong>Тип вычислений:</strong> ' + task.computation_type;
+      bodyEl.innerHTML = html;
+      runBtn.disabled = false;
+      msg.className = 'msg ok';
+      msg.textContent = 'Задача: ' + (taskName || task.contract_id || '') + ', единиц работы: ' + (task.work_units_required ?? '');
+      msg.style.display = 'block';
+      // Блок «Выполнить в воркере»: команда с CONTRACT_ID
+      const cid = task.contract_id || '';
+      const workerBlock = document.getElementById('work-run-in-worker');
+      const cmdEl = document.getElementById('work-worker-cmd');
+      const cidEl = document.getElementById('work-worker-cid');
+      if (cid && workerBlock && cmdEl && cidEl) {
+        workerBlock.style.display = 'block';
+        const cmd = 'CONTRACT_ID=' + cid + ' docker-compose run --rm client_worker_1';
+        cmdEl.textContent = cmd;
+        cidEl.textContent = cid;
+      } else if (workerBlock) {
+        workerBlock.style.display = 'none';
+      }
+    }
+
+    document.getElementById('btn-copy-worker-cmd').onclick = function() {
+      const cmdEl = document.getElementById('work-worker-cmd');
+      if (!cmdEl || !cmdEl.textContent) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmdEl.textContent).then(() => { this.textContent = 'Скопировано'; setTimeout(() => { this.textContent = 'Копировать'; }, 1500); }).catch(() => {});
+      } else {
+        const sel = window.getSelection();
+        const r = document.createRange();
+        r.selectNodeContents(cmdEl);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        try { document.execCommand('copy'); this.textContent = 'Скопировано'; setTimeout(() => { this.textContent = 'Копировать'; }, 1500); } catch (e) {}
+        sel.removeAllRanges();
+      }
+    };
+
+    document.getElementById('btn-start-worker').onclick = async function() {
+      const key = getApiKey();
+      const msgEl = document.getElementById('work-run-worker-msg');
+      msgEl.style.display = 'none';
+      if (!key) { msgEl.className = 'msg err'; msgEl.textContent = 'Выберите клиента или введите API-ключ.'; msgEl.style.display = 'block'; return; }
+      if (!currentTask || !currentTask.contract_id) { msgEl.className = 'msg err'; msgEl.textContent = 'Сначала получите или выберите задачу.'; msgEl.style.display = 'block'; return; }
+      this.disabled = true;
+      try {
+        const r = await fetch(base + '/run_worker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+          body: JSON.stringify({ contract_id: currentTask.contract_id })
+        });
+        const data = await r.json().catch(() => ({}));
+        msgEl.style.display = 'block';
+        if (r.status === 202) {
+          msgEl.className = 'msg ok';
+          msgEl.textContent = data.message || 'Воркер запущен. Контейнер выполнит одну задачу и завершится.';
+        } else {
+          msgEl.className = 'msg err';
+          msgEl.textContent = data.error || data.detail || r.status + ' ' + r.statusText;
+        }
+      } catch (e) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Ошибка: ' + e.message;
+        msgEl.style.display = 'block';
+      }
+      this.disabled = false;
+    };
+
+    document.getElementById('btn-get-task').onclick = async () => {
+      const key = getApiKey();
+      const msg = document.getElementById('work-task-msg');
       msg.style.display = 'none';
-      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите API-ключ (вкладка Обзор или поле выше).'; msg.style.display = 'block'; return; }
+      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите API-ключ (вкладка Обзор или выберите клиента).'; msg.style.display = 'block'; return; }
       try {
         const r = await fetch(base + '/get_task', { headers: { 'Authorization': 'Bearer ' + key } });
         const task = await r.json();
         if (!r.ok) throw new Error(task.error || r.status);
-        currentTask = task;
-        specEl.style.display = 'block';
-        // Форматируем задачу с описанием
-        const taskName = task.task_name || task.contract_id || '';
-        const taskDesc = task.task_description || '';
-        const taskCategory = task.task_category || '';
-        let html = '';
-        if (taskName) html += '<strong>Название:</strong> ' + taskName + '<br>';
-        if (taskCategory) html += '<strong>Категория:</strong> ' + taskCategory + '<br>';
-        if (taskDesc) html += '<strong>Описание:</strong> ' + taskDesc + '<br>';
-        html += '<strong>Contract ID:</strong> ' + (task.contract_id || '') + '<br>';
-        html += '<strong>Work units required:</strong> ' + (task.work_units_required ?? '') + '<br>';
-        html += '<strong>Difficulty:</strong> ' + (task.difficulty ?? '') + '<br>';
-        if (task.computation_type) html += '<strong>Тип вычислений:</strong> ' + task.computation_type;
-        bodyEl.innerHTML = html;
-        runBtn.disabled = false;
-        msg.className = 'msg ok';
-        msg.textContent = 'Задача получена: ' + (taskName || task.contract_id || '') + ', единиц работы: ' + (task.work_units_required ?? '');
-        msg.style.display = 'block';
+        setCurrentTask(task);
       } catch (e) {
         msg.className = 'msg err';
         msg.textContent = 'Ошибка: ' + e.message;
@@ -663,19 +832,46 @@
           load.style.display = 'none';
           const tbody = table.querySelector('tbody');
           tbody.innerHTML = '';
+          const key = getApiKey();
           (list || []).forEach(c => {
             const tr = document.createElement('tr');
             const category = c.task_category || '';
             const name = c.task_name || c.contract_id || '';
             const desc = c.task_description || '';
-            tr.innerHTML = 
+            const pct = c.completion_pct != null ? c.completion_pct : '—';
+            const active = c.active_workers != null ? c.active_workers : '—';
+            const freeVol = c.free_volume != null ? c.free_volume : (c.work_units_required ?? '—');
+            const reward = c.reward_per_task != null ? c.reward_per_task : (c.reward ?? '—');
+            const takeBtn = key
+              ? '<button type="button" class="primary btn-take-task" data-contract-id="' + (c.contract_id || '') + '">Взять задачу</button>'
+              : '<span class="muted">Войдите</span>';
+            tr.innerHTML =
               '<td><strong>' + (name || '') + '</strong><br><small style="color:#888;">' + (c.contract_id || '') + '</small></td>' +
               '<td>' + (category || '—') + '</td>' +
               '<td>' + (desc || '—') + '</td>' +
               '<td>' + (c.work_units_required ?? '—') + '</td>' +
-              '<td>' + (c.difficulty ?? '—') + '</td>' +
-              '<td><strong>' + (c.reward ?? '—') + '</strong></td>';
+              '<td><span class="progress-pct">' + pct + '%</span></td>' +
+              '<td>' + active + '</td>' +
+              '<td>' + freeVol + '</td>' +
+              '<td><strong>' + reward + '</strong></td>' +
+              '<td>' + takeBtn + '</td>';
             tbody.appendChild(tr);
+            const btn = tr.querySelector('.btn-take-task');
+            if (btn) {
+              btn.onclick = async () => {
+                const apiKey = getApiKey();
+                if (!apiKey) { alert('Выберите клиента или введите API-ключ.'); return; }
+                try {
+                  const r = await fetch(base + '/get_task?contract_id=' + encodeURIComponent(c.contract_id), { headers: { 'Authorization': 'Bearer ' + apiKey } });
+                  const task = await r.json();
+                  if (!r.ok) throw new Error(task.error || r.status);
+                  setCurrentTask(task);
+                  showPanel('work');
+                } catch (e) {
+                  alert('Ошибка: ' + e.message);
+                }
+              };
+            }
           });
           table.style.display = (list && list.length) ? 'table' : 'none';
         })

@@ -15,6 +15,8 @@ logger = logging.getLogger("worker")
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator_node:5000")
 # Для самоподписанных сертификатов (TLS) можно задать VERIFY_SSL=false
 VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() not in ("0", "false", "no")
+# Опционально: брать только задачи по указанному контракту (для запуска из интерфейса «Выполнить в воркере»)
+CONTRACT_ID = os.environ.get("CONTRACT_ID", "").strip() or None
 
 
 class ClientWorker:
@@ -52,8 +54,11 @@ class ClientWorker:
     def fetch_task(self):
         """Запрос задачи: оркестратор возвращает минимальную спецификацию (contract_id, work_units_required, difficulty)."""
         try:
+            url = f"{ORCHESTRATOR_URL}/get_task"
+            if CONTRACT_ID:
+                url += f"?contract_id={requests.utils.quote(CONTRACT_ID)}"
             response = requests.get(
-                f"{ORCHESTRATOR_URL}/get_task",
+                url,
                 headers=self._auth_headers(),
                 verify=VERIFY_SSL,
                 timeout=10,

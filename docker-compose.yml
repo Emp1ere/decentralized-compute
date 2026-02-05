@@ -10,6 +10,9 @@ services:
     ports:
       - "5000:5000"
     container_name: orchestrator_node_1
+    volumes:
+      # Для автозапуска воркера из интерфейса (POST /run_worker)
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PEER_URL=http://orchestrator_node_2:5000
       - SYNC_INTERVAL=30
@@ -18,6 +21,10 @@ services:
       # Решение централизации: идентификатор узла для ротации лидера
       - NODE_ID=node-1
       - NODE_IDS=node-1,node-2
+      # Автозапуск воркера из интерфейса (имя образа и сеть — при другом имени проекта измените)
+      - WORKER_IMAGE=${WORKER_IMAGE:-distributed-compute_client_worker_1}
+      - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_1:5000
+      - DOCKER_NETWORK=${DOCKER_NETWORK:-distributed-compute_default}
     # Для TLS задайте TLS_CERT_FILE, TLS_KEY_FILE и смонтируйте сертификаты
     # restart: unless-stopped
 
@@ -61,6 +68,8 @@ services:
     container_name: client_worker_1
     environment:
       - ORCHESTRATOR_URL=http://orchestrator_node_1:5000
+      # Опционально: только задачи по контракту (из интерфейса «Выполнить в воркере»)
+      - CONTRACT_ID=${CONTRACT_ID:-}
     depends_on:
       - orchestrator_node_1
     # restart: unless-stopped
@@ -72,6 +81,7 @@ services:
     container_name: client_worker_2
     environment:
       - ORCHESTRATOR_URL=http://orchestrator_node_2:5000
+      - CONTRACT_ID=${CONTRACT_ID:-}
     depends_on:
       - orchestrator_node_2
     # restart: unless-stopped

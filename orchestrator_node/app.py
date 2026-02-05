@@ -35,6 +35,12 @@ _block_creation_lock = threading.Lock()
 # api_key -> client_id (ключ выдаётся один раз при регистрации)
 api_key_to_client = {}
 
+# --- Активные вычислители по контрактам: (contract_id, client_id) -> timestamp ---
+# Используется для отображения "количество активных вычислителей" в интерфейсе.
+# Записи старше ACTIVE_WORKER_TTL секунд не учитываются.
+_active_task_takers = {}  # (contract_id, client_id) -> timestamp
+ACTIVE_WORKER_TTL = 900  # 15 минут
+
 def get_client_id_from_auth():
     """Из заголовка Authorization: Bearer <api_key> возвращаем client_id или None."""
     auth = request.headers.get("Authorization")
@@ -238,16 +244,41 @@ def register_client():
     logger.info("client_registered: %s...", client_id[:8])
     return jsonify({"client_id": client_id, "api_key": api_key}), 200
 
+def _active_workers_count(contract_id):
+    """Число активных вычислителей по контракту (получили задачу и не сдали за ACTIVE_WORKER_TTL сек)."""
+    now = time.time()
+    cutoff = now - ACTIVE_WORKER_TTL
+    seen = set()
+    to_del = []
+    for (cid, clid), ts in list(_active_task_takers.items()):
+        if ts < cutoff:
+            to_del.append((cid, clid))
+        elif cid == contract_id:
+            seen.add(clid)
+    for k in to_del:
+        _active_task_takers.pop(k, None)
+    return len(seen)
+
+
 @app.route("/get_task", methods=["GET"])
 @limiter.limit("60 per minute")  # Защита от DDoS: не более 60 запросов задач в минуту на ключ
 def get_task():
     """
     Клиент запрашивает задачу (смарт-контракт). Требуется аутентификация: Authorization: Bearer <api_key>.
+    Опциональный query-параметр contract_id — выдать задачу по указанному контракту (для выбора из блока «Контракты»).
     """
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    contract = random.choice(list(CONTRACTS.values()))
+    contract_id = request.args.get("contract_id")
+    if contract_id:
+        contract = CONTRACTS.get(contract_id)
+        if not contract:
+            return jsonify({"error": "Unknown contract_id"}), 400
+    else:
+        contract = random.choice(list(CONTRACTS.values()))
+    # Учитываем активного вычислителя по этому контракту
+    _active_task_takers[(contract.contract_id, client_id)] = time.time()
     logger.info("task_issued: contract_id=%s client_id=%s...", contract.contract_id, client_id[:8])
     return jsonify(contract.get_task_spec()), 200
 
@@ -462,20 +493,90 @@ def get_pending():
 @app.route("/contracts", methods=["GET"])
 @limiter.limit("60 per minute")
 def get_contracts():
-    """Список контрактов для веб-интерфейса (вкладка Контракты, по аналогии с BOINC Projects)."""
+    """
+    Список контрактов для веб-интерфейса с расширенной статистикой:
+    общий % выполнения, активные вычислители, свободный объём, вознаграждение за задачу.
+    """
+    chain_stats = blockchain.get_contract_stats()
     out = []
     for cid, c in CONTRACTS.items():
         spec = c.get_task_spec()
+        wu_required = spec["work_units_required"]
+        total_done = chain_stats.get(cid, {}).get("total_work_done", 0)
+        jobs_count = chain_stats.get(cid, {}).get("jobs_count", 0)
+        target = getattr(c, "target_total_work_units", None) or (10 * wu_required)
+        completion_pct = min(100.0, (total_done / target * 100)) if target else 0.0
+        active_workers = _active_workers_count(cid)
         out.append({
             "contract_id": cid,
-            "work_units_required": spec["work_units_required"],
+            "work_units_required": wu_required,
             "difficulty": spec["difficulty"],
             "reward": c.get_reward(),
             "task_name": spec.get("task_name", ""),
             "task_description": spec.get("task_description", ""),
             "task_category": spec.get("task_category", ""),
+            "computation_type": spec.get("computation_type", "simple_pow"),
+            "total_work_done": total_done,
+            "jobs_count": jobs_count,
+            "completion_pct": round(completion_pct, 1),
+            "active_workers": active_workers,
+            "free_volume": wu_required,  # объём одной задачи, который можно взять
+            "reward_per_task": c.get_reward(),
         })
     return jsonify(out), 200
+
+
+def _run_worker_container(contract_id):
+    """
+    Запуск контейнера воркера с CONTRACT_ID (для выбранной задачи).
+    Требует: доступ к Docker (сокет), env WORKER_IMAGE, ORCHESTRATOR_URL_FOR_WORKER, DOCKER_NETWORK.
+    Возвращает (success: bool, message: str).
+    """
+    if contract_id not in CONTRACTS:
+        return False, "Unknown contract_id"
+    worker_image = os.environ.get("WORKER_IMAGE", "").strip()
+    orchestrator_url = os.environ.get("ORCHESTRATOR_URL_FOR_WORKER", "http://orchestrator_node_1:5000").strip()
+    docker_network = os.environ.get("DOCKER_NETWORK", "distributed-compute_default").strip()
+    if not worker_image:
+        return False, "WORKER_IMAGE not set (run_worker disabled)"
+    try:
+        import docker as docker_module
+        client = docker_module.from_env()
+        container = client.containers.run(
+            image=worker_image,
+            environment={"CONTRACT_ID": contract_id, "ORCHESTRATOR_URL": orchestrator_url},
+            network=docker_network,
+            remove=True,
+            detach=True,
+        )
+        logger.info("run_worker started container for contract_id=%s", contract_id)
+        return True, "Worker started (one task, then container will exit)"
+    except Exception as e:
+        logger.warning("run_worker failed: %s", e)
+        return False, str(e)
+
+
+@app.route("/run_worker", methods=["POST"])
+@limiter.limit("5 per minute")  # Защита от злоупотребления
+def run_worker():
+    """
+    Запуск воркера в Docker для выполнения выбранной задачи (контракта).
+    Требуется авторизация. Тело: {"contract_id": "sc-001"}.
+    Работает только если оркестратор имеет доступ к Docker (сокет смонтирован и заданы WORKER_IMAGE, DOCKER_NETWORK).
+    """
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    contract_id = (data.get("contract_id") or "").strip()
+    if not contract_id:
+        return jsonify({"error": "contract_id required"}), 400
+    ok, msg = _run_worker_container(contract_id)
+    if ok:
+        return jsonify({"status": "started", "message": msg, "contract_id": contract_id}), 202
+    if "not set" in msg or "WORKER_IMAGE" in msg:
+        return jsonify({"error": "Worker auto-start disabled (WORKER_IMAGE not set)", "detail": msg}), 503
+    return jsonify({"error": "Failed to start worker", "detail": msg}), 500
 
 
 @app.route("/")

@@ -1,5 +1,6 @@
 # Интеграционные тесты API оркестратора (Flask test client)
 import hashlib
+import random
 import sys
 import os
 
@@ -7,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import pytest
 from app import app, blockchain
+from contracts import CONTRACTS
 
 
 @pytest.fixture
@@ -53,7 +55,17 @@ def test_get_task_success(client, auth_headers):
     assert "contract_id" in data
     assert "work_units_required" in data
     assert "difficulty" in data
-    assert data["contract_id"] in ("sc-001", "sc-002")
+    assert data["contract_id"] in list(CONTRACTS.keys())
+
+
+def test_get_task_by_contract_id(client, auth_headers):
+    headers, _ = auth_headers
+    r = client.get("/get_task", headers=headers, query_string={"contract_id": "sc-001"})
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["contract_id"] == "sc-001"
+    r2 = client.get("/get_task", headers=headers, query_string={"contract_id": "unknown"})
+    assert r2.status_code == 400
 
 
 def test_submit_work_requires_auth(client):
@@ -62,25 +74,30 @@ def test_submit_work_requires_auth(client):
 
 
 def test_submit_work_success(client, auth_headers):
+    """Проверяем сдачу работы для любой задачи с simple_pow (sc-001, sc-002)."""
     headers, client_id = auth_headers
-    # Получаем задачу
-    r = client.get("/get_task", headers=headers)
+    # Берём случайную задачу только среди simple_pow, чтобы не зависать на астрофизических (difficulty 5)
+    simple_pow_ids = [cid for cid, c in CONTRACTS.items() if getattr(c, "computation_type", "") == "simple_pow"]
+    assert simple_pow_ids, "Need at least one simple_pow contract"
+    contract_id = random.choice(simple_pow_ids)
+    r = client.get("/get_task", headers=headers, query_string={"contract_id": contract_id})
     assert r.status_code == 200
     task = r.get_json()
-    contract_id = task["contract_id"]
+    assert task["contract_id"] == contract_id
     difficulty = task["difficulty"]
     target_work = task["work_units_required"]
-    # Находим валидный nonce (для difficulty 4 нужно до ~65536 попыток)
+    # Находим валидный nonce (difficulty 3 — ~4k попыток, difficulty 4 — до ~65k)
     result_data = None
     solution_nonce = None
-    for n in range(1, 100_000):
+    max_iter = 200_000  # с запасом для difficulty 4
+    for n in range(1, max_iter):
         text = f"{client_id}-{contract_id}-{n}"
         h = hashlib.sha256(text.encode()).hexdigest()
         if h.startswith("0" * difficulty):
             result_data = h
             solution_nonce = str(n)
             break
-    assert result_data is not None, "Need valid hash for contract"
+    assert result_data is not None, f"Valid hash not found for {contract_id} (difficulty {difficulty}) after {max_iter} tries"
     r = client.post(
         "/submit_work",
         headers=headers,
@@ -125,3 +142,19 @@ def test_chain(client):
     assert isinstance(chain, list)
     assert len(chain) >= 1
     assert chain[0]["index"] == 0
+
+
+def test_contracts_with_stats(client):
+    r = client.get("/contracts")
+    assert r.status_code == 200
+    list_ = r.get_json()
+    assert isinstance(list_, list)
+    assert len(list_) >= 1
+    c = list_[0]
+    assert "contract_id" in c
+    assert "total_work_done" in c
+    assert "jobs_count" in c
+    assert "completion_pct" in c
+    assert "active_workers" in c
+    assert "free_volume" in c
+    assert "reward_per_task" in c
