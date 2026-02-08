@@ -421,48 +421,24 @@ def submit_work():
         "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
     }
     
-    # Решение централизации: проверяем, является ли текущий узел лидером
-    current_leader = get_current_leader()
-    is_leader = (current_leader == NODE_ID)
+    # Критическое исправление: узел, принявший submit_work, всегда создаёт блок сам.
+    # Раньше при "не лидер" транзакции отправлялись лидеру через add_pending_tx, но лидер никогда
+    # не вызывал mine_pending_transactions (блок создаётся только при submit_work на этом узле),
+    # поэтому награда не попадала в цепочку и баланс оставался 0. Теперь блок создаём здесь и пушим пиру.
     
-    if not is_leader:
-        # Не лидер: отправляем транзакции лидеру через /add_pending_tx
-        # Лидер создаст блок при следующем submit_work или периодически
-        leader_url = get_leader_url(current_leader)
-        if leader_url:
-            try:
-                headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
-                response = requests.post(
-                    f"{leader_url.rstrip('/')}/add_pending_tx",
-                    json=[reward_tx, work_receipt_tx],
-                    timeout=5,
-                    headers=headers,
-                )
-                if response.status_code == 200:
-                    logger.info("transactions_sent_to_leader: leader=%s", current_leader)
-                    return jsonify({
-                        "status": "success",
-                        "reward_issued": reward_amount,
-                        "message": f"Transactions sent to leader {current_leader}, block will be created by leader"
-                    }), 200
-                else:
-                    logger.warning("failed_to_send_to_leader: leader=%s status=%s", current_leader, response.status_code)
-            except requests.RequestException as e:
-                logger.warning("send_to_leader_failed: leader=%s error=%s", current_leader, e)
-        # Если не удалось отправить лидеру, продолжаем как обычно (fallback)
-        logger.warning("leader_unreachable: continuing_as_fallback leader=%s", current_leader)
-    
-    # Лидер или fallback: добавляем транзакции локально и создаём блок
+    # Добавляем транзакции локально и создаём блок
     blockchain.add_transaction(reward_tx)
     blockchain.add_transaction(work_receipt_tx)
 
     # Критическое исправление: блокировка + синхронизация pending перед созданием блока
-    # Это предотвращает race condition и расхождение pending между узлами
     with _block_creation_lock:
-        # Синхронизируем pending с пиром перед созданием блока (предотвращает разные блоки с разными tx)
         sync_pending_from_peer()
-        # PoUW: создаём блок сразу (без mining_loop, блок создаётся при полезной работе)
         new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
+
+    if new_block:
+        new_balance = blockchain.get_balance(client_id)
+        logger.info("block_created: client_id=%s... reward=%s new_balance=%s block_index=%s",
+                    client_id[:8], reward_amount, new_balance, new_block.index)
 
     # Синхронизация с пиром: отправляем готовый блок
     if new_block and PEER_URL:
@@ -592,6 +568,7 @@ def get_contracts():
         jobs_count = chain_stats.get(cid, {}).get("jobs_count", 0)
         target = getattr(c, "target_total_work_units", None) or (10 * wu_required)
         completion_pct = min(100.0, (total_done / target * 100)) if target else 0.0
+        remaining_volume = max(0, target - total_done)  # оставшийся объём для распределённых вычислителей
         active_workers = _active_workers_count(cid)
         out.append({
             "contract_id": cid,
@@ -606,7 +583,9 @@ def get_contracts():
             "jobs_count": jobs_count,
             "completion_pct": round(completion_pct, 1),
             "active_workers": active_workers,
-            "free_volume": wu_required,  # объём одной задачи, который можно взять
+            "target_total": target,
+            "remaining_volume": remaining_volume,
+            "free_volume": remaining_volume,  # для совместимости: свободный объём = оставшаяся работа
             "reward_per_task": c.get_reward(),
         })
     return jsonify(out), 200
@@ -631,6 +610,8 @@ def _run_worker_container(contract_id, api_key=None, client_id=None):
         env["API_KEY"] = api_key.strip()
     if client_id and str(client_id).strip():
         env["CLIENT_ID"] = str(client_id).strip()
+    logger.info("run_worker starting container contract_id=%s client_id=%s... has_api_key=%s",
+                contract_id, (client_id or "")[:8] if client_id else None, bool(env.get("API_KEY")))
     try:
         import docker as docker_module
         client = docker_module.from_env()
@@ -641,7 +622,8 @@ def _run_worker_container(contract_id, api_key=None, client_id=None):
             remove=True,
             detach=True,
         )
-        logger.info("run_worker started container for contract_id=%s", contract_id)
+        logger.info("run_worker started container for contract_id=%s (reward will go to client_id=%s...)",
+                    contract_id, (client_id or "")[:8] if client_id else None)
         return True, "Worker started (one task, then container will exit)"
     except Exception as e:
         err = str(e)

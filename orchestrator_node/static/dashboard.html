@@ -156,56 +156,53 @@
     <div class="overview-grid">
       <div class="card"><div class="label">Состояние</div><div id="ov-status" class="value">—</div></div>
       <div class="card"><div class="label">Длина цепочки</div><div id="ov-chain" class="value">—</div></div>
-      <div class="card"><div class="label">Клиентов</div><div id="ov-clients" class="value">—</div></div>
+      <div class="card"><div class="label">Вычислителей</div><div id="ov-clients" class="value">—</div></div>
       <div class="card"><div class="label">В очереди (pending)</div><div id="ov-pending" class="value">—</div></div>
     </div>
     <div class="card" style="margin-bottom:20px;">
-      <div class="label">Постоянный аккаунт (логин и пароль)</div>
+      <div class="label">Вычислители</div>
+      <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Каждый контракт выполняется распределённо несколькими вычислителями. Добавьте вычислителей (личный аккаунт или по ключу) — прогресс сохраняется для каждого.</p>
+      <div class="row" style="align-items:center; margin-bottom:12px;">
+        <label>Текущий вычислитель:</label>
+        <select id="select-client" style="margin-left:8px; min-width:220px; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
+          <option value="">— Ввести ключ вручную —</option>
+        </select>
+        <button type="button" class="primary" id="btn-sync-workers">Обновить данные</button>
+      </div>
+      <div id="saved-clients-list" class="card" style="margin-bottom:16px; max-height:200px; overflow:auto;"></div>
+      <p class="label" style="margin-bottom:8px;">Добавить вычислителя</p>
       <div id="auth-forms">
-        <div class="row" style="margin-bottom:12px;">
-          <input type="text" id="auth-login" placeholder="Логин" style="min-width:140px;">
-          <input type="password" id="auth-password" placeholder="Пароль" style="min-width:140px;">
+        <div class="row" style="margin-bottom:8px;">
+          <input type="text" id="auth-login" placeholder="Логин" style="min-width:120px;">
+          <input type="password" id="auth-password" placeholder="Пароль" style="min-width:120px;">
+          <input type="text" id="auth-reg-nickname" placeholder="Никнейм (при регистрации)" style="min-width:140px;">
           <button type="button" class="primary" id="btn-auth-login">Войти</button>
+          <button type="button" class="primary" id="btn-auth-register">Зарегистрироваться</button>
         </div>
         <div class="row">
-          <input type="text" id="auth-reg-nickname" placeholder="Никнейм (необязательно)" style="min-width:180px;">
-          <button type="button" class="primary" id="btn-auth-register">Зарегистрироваться</button>
+          <span class="muted" style="margin-right:8px;">или по API-ключу:</span>
+          <input type="text" id="input-api-key" placeholder="Вставьте api_key" style="min-width:180px;">
+          <button type="button" class="primary" id="btn-add-client">Добавить</button>
         </div>
         <span id="auth-msg" class="msg" style="display:none;"></span>
       </div>
       <div id="auth-profile" style="display:none;">
         <p><strong>Вы вошли как</strong> <span id="profile-nickname">—</span> <span id="profile-login" class="muted" style="font-size:0.9em;"></span></p>
         <p>Баланс: <strong id="profile-balance">0</strong> токенов · Сдано работ: <strong id="profile-submissions">0</strong></p>
+        <p class="muted" style="font-size:0.85em; margin-top:8px;">Прогресс сохраняется на сервере. Данные по всем вычислителям обновляются по кнопке «Обновить данные».</p>
         <button type="button" id="btn-auth-logout">Выйти</button>
       </div>
-    </div>
-    <p class="label">Работа от имени нескольких клиентов</p>
-    <div class="row" style="align-items: flex-start;">
-      <div>
-        <label>Текущий клиент:</label>
-        <select id="select-client" style="margin-left:8px; min-width:200px; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
-          <option value="">— Ввести ключ вручную —</option>
-        </select>
+      <div class="row" style="margin-top:12px;">
+        <button type="button" class="primary" id="btn-balance">Показать баланс текущего</button>
+        <span id="balance-msg" class="msg" style="display:none;"></span>
       </div>
-      <button type="button" class="primary" id="btn-add-client">Добавить текущий ключ</button>
-    </div>
-    <div id="saved-clients-list" class="card" style="margin-top:12px; max-height:120px; overflow:auto;"></div>
-    <div class="row" style="margin-top:16px;">
-      <button type="button" class="primary" id="btn-register">Зарегистрироваться</button>
-      <span id="reg-msg" class="msg" style="display:none;"></span>
-    </div>
-    <div class="row">
-      <label>API-ключ (если уже есть):</label>
-      <input type="text" id="input-api-key" placeholder="Вставьте api_key">
-      <button type="button" class="primary" id="btn-balance">Показать баланс</button>
-      <span id="balance-msg" class="msg" style="display:none;"></span>
     </div>
   </div>
 
   <div id="panel-work" class="panel">
-    <p class="label">API-ключ (тот же, что на вкладке «Обзор»)</p>
+    <p class="label">Текущий вычислитель (выберите на вкладке «Обзор» или вставьте API-ключ)</p>
     <div class="row">
-      <input type="text" id="input-api-key-work" placeholder="Вставьте api_key">
+      <input type="text" id="input-api-key-work" placeholder="API-ключ вычислителя">
     </div>
     <div class="row">
       <button type="button" class="primary" id="btn-get-task">Получить задачу</button>
@@ -246,18 +243,20 @@
   </div>
 
   <div id="panel-contracts" class="panel">
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты выполняются распределённо: несколько вычислителей вносят свой объём работы. «Осталось» — объём работы до целевого значения контракта.</p>
     <p class="loading" id="contracts-load">Загрузка…</p>
     <table id="table-contracts" style="display:none;">
-      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Единиц работы</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Свободный объём</th><th>Награда</th><th>Действие</th></tr></thead>
+      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Ед. на задачу</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Осталось (ед. работы)</th><th>Награда</th><th>Действие</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
 
   <div id="panel-tasks" class="panel">
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">История сданных работ по вычислителям (каждый внёс свой объём в контракт).</p>
     <p class="loading" id="tasks-load">Загрузка…</p>
     <p id="tasks-empty" style="display:none; color: var(--muted);">Нет сданных работ в последних блоках.</p>
     <table id="table-tasks" style="display:none;">
-      <thead><tr><th>Блок</th><th>Клиент</th><th>Контракт</th><th>Единицы</th></tr></thead>
+      <thead><tr><th>Блок</th><th>Вычислитель</th><th>Контракт</th><th>Единицы</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -273,7 +272,7 @@
   <div id="panel-stats" class="panel">
     <div class="overview-grid" style="margin-bottom: 20px;">
       <div class="card"><div class="label">Длина цепочки</div><div id="st-chain" class="value">—</div></div>
-      <div class="card"><div class="label">Клиентов</div><div id="st-clients" class="value">—</div></div>
+      <div class="card"><div class="label">Вычислителей</div><div id="st-clients" class="value">—</div></div>
       <div class="card"><div class="label">Pending</div><div id="st-pending" class="value">—</div></div>
     </div>
     <p class="label">Запросы по путям</p>
@@ -326,25 +325,6 @@
         });
     }
 
-    document.getElementById('btn-register').onclick = async () => {
-      const msg = document.getElementById('reg-msg');
-      msg.style.display = 'none';
-      try {
-        const d = await api('/register');
-        msg.className = 'msg ok';
-        msg.textContent = 'Зарегистрирован. client_id: ' + (d.client_id || '').slice(0, 8) + '…  api_key: ' + (d.api_key || '').slice(0, 12) + '… (сохраните ключ)';
-        msg.style.display = 'block';
-        if (d.api_key) {
-          document.getElementById('input-api-key').value = d.api_key;
-          document.getElementById('input-api-key-work').value = d.api_key;
-        }
-      } catch (e) {
-        msg.className = 'msg err';
-        msg.textContent = 'Ошибка: ' + e.message;
-        msg.style.display = 'block';
-      }
-    };
-
     let currentTask = null;
 
     const STORAGE_KEY_CLIENTS = 'dc_clients';
@@ -365,26 +345,59 @@
       list.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = (c.label || 'Клиент') + ' (' + (c.apiKey || '').slice(0, 8) + '…)';
+        const bal = c.balance != null ? c.balance : '—';
+        const sub = c.submissions_count != null ? c.submissions_count : '—';
+        opt.textContent = (c.label || 'Вычислитель') + ' · баланс: ' + bal + ' · сдано: ' + sub;
         sel.appendChild(opt);
       });
       if (cur && list.some(c => c.id === cur)) sel.value = cur;
     }
+    async function syncWorkerData(c) {
+      if (!c.apiKey) return c;
+      try {
+        const r = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + c.apiKey } });
+        if (!r.ok) return c;
+        const d = await r.json();
+        return { ...c, balance: d.balance ?? 0, submissions_count: d.submissions_count ?? 0 };
+      } catch (e) { return c; }
+    }
+    document.getElementById('btn-sync-workers').onclick = async function() {
+      const list = getSavedClients();
+      if (!list.length) return;
+      this.disabled = true;
+      for (let i = 0; i < list.length; i++) {
+        list[i] = await syncWorkerData(list[i]);
+      }
+      setSavedClients(list);
+      refreshClientSelect();
+      refreshSavedClientsList();
+      this.disabled = false;
+    };
     function refreshSavedClientsList() {
       const list = getSavedClients();
       const container = document.getElementById('saved-clients-list');
       container.innerHTML = '';
-      if (!list.length) { container.innerHTML = '<span class="muted">Сохранённых клиентов нет. Добавьте ключ и нажмите «Добавить текущий ключ».</span>'; return; }
+      if (!list.length) { container.innerHTML = '<span class="muted">Нет вычислителей. Войдите, зарегистрируйтесь или добавьте по API-ключу.</span>'; return; }
       list.forEach(c => {
         const row = document.createElement('div');
         row.className = 'saved-client-row';
-        row.innerHTML = '<span>' + (c.label || c.id) + '</span>' +
+        const bal = c.balance != null ? c.balance : '—';
+        const sub = c.submissions_count != null ? c.submissions_count : '—';
+        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> — баланс: ' + bal + ' токенов, сдано работ: ' + sub + '</span>' +
           '<button type="button" class="primary" data-use="' + c.id + '">Использовать</button>' +
+          '<button type="button" class="primary" data-sync-one="' + c.id + '">Обновить</button>' +
           '<button type="button" data-remove="' + c.id + '">Удалить</button>';
         row.querySelector('[data-use]').onclick = () => {
           document.getElementById('input-api-key').value = c.apiKey || '';
           document.getElementById('input-api-key-work').value = c.apiKey || '';
           document.getElementById('select-client').value = c.id;
+        };
+        row.querySelector('[data-sync-one]').onclick = async () => {
+          const updated = await syncWorkerData(c);
+          const newList = list.map(x => x.id === c.id ? updated : x);
+          setSavedClients(newList);
+          refreshClientSelect();
+          refreshSavedClientsList();
         };
         row.querySelector('[data-remove]').onclick = () => {
           setSavedClients(list.filter(x => x.id !== c.id));
@@ -406,14 +419,15 @@
     };
     document.getElementById('btn-add-client').onclick = function() {
       const key = document.getElementById('input-api-key').value.trim();
-      if (!key) { alert('Введите API-ключ в поле выше.'); return; }
+      if (!key) { document.getElementById('auth-msg').className = 'msg err'; document.getElementById('auth-msg').textContent = 'Введите API-ключ.'; document.getElementById('auth-msg').style.display = 'block'; return; }
       const list = getSavedClients();
       const id = 'c' + Date.now();
-      list.push({ id, label: 'Клиент ' + (list.length + 1), apiKey: key });
+      list.push({ id, label: 'Вычислитель ' + (list.length + 1), apiKey: key });
       setSavedClients(list);
       refreshClientSelect();
       refreshSavedClientsList();
       document.getElementById('select-client').value = id;
+      document.getElementById('auth-msg').style.display = 'none';
     };
     refreshClientSelect();
     refreshSavedClientsList();
@@ -443,7 +457,7 @@
         document.getElementById('profile-submissions').textContent = d.submissions_count ?? 0;
       } catch (e) {}
     }
-    function applyAuthSession(apiKey, nickname, login) {
+    async function applyAuthSession(apiKey, nickname, login) {
       localStorage.setItem(AUTH_API_KEY, apiKey);
       if (nickname) localStorage.setItem(AUTH_NICKNAME, nickname);
       if (login) localStorage.setItem(AUTH_LOGIN, login);
@@ -452,7 +466,9 @@
       const list = getSavedClients();
       const existing = list.find(c => c.apiKey === apiKey);
       if (!existing) {
-        list.push({ id: 'auth-' + Date.now(), label: nickname || login || 'Аккаунт', apiKey: apiKey });
+        const newItem = { id: 'auth-' + Date.now(), label: nickname || login || 'Вычислитель', apiKey: apiKey };
+        const withStats = await syncWorkerData(newItem);
+        list.push(withStats);
         setSavedClients(list);
         refreshClientSelect();
         refreshSavedClientsList();
@@ -470,7 +486,7 @@
         const r = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, password: password }) });
         const d = await r.json();
         if (!r.ok) { msg.className = 'msg err'; msg.textContent = d.error || r.status; msg.style.display = 'block'; return; }
-        applyAuthSession(d.api_key, d.nickname, d.login);
+        await applyAuthSession(d.api_key, d.nickname, d.login);
       } catch (e) { msg.className = 'msg err'; msg.textContent = 'Ошибка: ' + e.message; msg.style.display = 'block'; }
     };
     document.getElementById('btn-auth-register').onclick = async function() {
@@ -484,7 +500,7 @@
         const r = await fetch(base + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: login, password: password, nickname: nickname || login }) });
         const d = await r.json();
         if (!r.ok) { msg.className = 'msg err'; msg.textContent = d.error || r.status; msg.style.display = 'block'; return; }
-        applyAuthSession(d.api_key, d.nickname, d.login);
+        await applyAuthSession(d.api_key, d.nickname, d.login);
       } catch (e) { msg.className = 'msg err'; msg.textContent = 'Ошибка: ' + e.message; msg.style.display = 'block'; }
     };
     document.getElementById('btn-auth-logout').onclick = function() {
@@ -790,7 +806,7 @@
       const key = getApiKey();
       const msgEl = document.getElementById('work-run-worker-msg');
       msgEl.style.display = 'none';
-      if (!key) { msgEl.className = 'msg err'; msgEl.textContent = 'Выберите клиента или введите API-ключ.'; msgEl.style.display = 'block'; return; }
+      if (!key) { msgEl.className = 'msg err'; msgEl.textContent = 'Выберите вычислителя или введите API-ключ.'; msgEl.style.display = 'block'; return; }
       if (!currentTask || !currentTask.contract_id) { msgEl.className = 'msg err'; msgEl.textContent = 'Сначала получите или выберите задачу.'; msgEl.style.display = 'block'; return; }
       this.disabled = true;
       try {
@@ -831,7 +847,7 @@
       const key = getApiKey();
       const resultEl = document.getElementById('work-worker-balance-result');
       resultEl.style.display = 'none';
-      if (!key) { resultEl.className = 'msg err'; resultEl.textContent = 'Выберите клиента или введите API-ключ.'; resultEl.style.display = 'block'; return; }
+      if (!key) { resultEl.className = 'msg err'; resultEl.textContent = 'Выберите вычислителя или введите API-ключ.'; resultEl.style.display = 'block'; return; }
       try {
         const meRes = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
         const meData = await meRes.json();
@@ -840,7 +856,9 @@
         const balData = await balRes.json();
         if (!balRes.ok) throw new Error(balData.error || balRes.status);
         resultEl.className = 'msg ok';
-        resultEl.textContent = 'Баланс: ' + (balData.balance ?? 0) + ' токенов.';
+        const bal = balData.balance ?? 0;
+        resultEl.textContent = 'Баланс: ' + bal + ' токенов.';
+        if (bal === 0) resultEl.textContent += ' Если воркер уже сдал задачу — подождите 30–60 сек и нажмите снова. Диагностика: docker logs orchestrator_node_1';
         resultEl.style.display = 'block';
       } catch (e) {
         resultEl.className = 'msg err';
@@ -853,7 +871,7 @@
       const key = getApiKey();
       const msg = document.getElementById('work-task-msg');
       msg.style.display = 'none';
-      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите API-ключ (вкладка Обзор или выберите клиента).'; msg.style.display = 'block'; return; }
+      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите API-ключ (вкладка Обзор или выберите вычислителя).'; msg.style.display = 'block'; return; }
       try {
         const r = await fetch(base + '/get_task', { headers: { 'Authorization': 'Bearer ' + key } });
         const task = await r.json();
@@ -986,7 +1004,7 @@
             const desc = c.task_description || '';
             const pct = c.completion_pct != null ? c.completion_pct : '—';
             const active = c.active_workers != null ? c.active_workers : '—';
-            const freeVol = c.free_volume != null ? c.free_volume : (c.work_units_required ?? '—');
+            const freeVol = (c.remaining_volume != null ? c.remaining_volume : c.free_volume) ?? (c.work_units_required ?? '—');
             const reward = c.reward_per_task != null ? c.reward_per_task : (c.reward ?? '—');
             const takeBtn = key
               ? '<button type="button" class="primary btn-take-task" data-contract-id="' + (c.contract_id || '') + '">Взять задачу</button>'
@@ -1006,7 +1024,7 @@
             if (btn) {
               btn.onclick = async () => {
                 const apiKey = getApiKey();
-                if (!apiKey) { alert('Выберите клиента или введите API-ключ.'); return; }
+                if (!apiKey) { alert('Выберите вычислителя или введите API-ключ.'); return; }
                 try {
                   const r = await fetch(base + '/get_task?contract_id=' + encodeURIComponent(c.contract_id), { headers: { 'Authorization': 'Bearer ' + apiKey } });
                   const task = await r.json();

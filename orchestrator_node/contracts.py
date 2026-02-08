@@ -55,81 +55,52 @@ class BaseContract:
                 return False
             return True
         
-        # Для астрофизических задач проверяем детерминированность результата
-        # Результат должен быть хешем от вычислений с заданным seed (nonce используется как seed)
+        # Астрофизические задачи: строгая верификация через общий модуль shared.computation_types
+        # (одинаковый код и детерминированный seed по nonce). Fallback на приём по формату, если shared недоступен.
+        if self.computation_type in ("cosmological", "supernova", "mhd", "radiative", "gravitational_waves"):
+            if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
+                return False
+            try:
+                int(result_data, 16)
+            except ValueError:
+                return False
+            if nonce is None or nonce == "":
+                return False
+            # Валидация nonce: только число в допустимом диапазоне (защита от DoS и переполнения)
+            try:
+                seed_val = int(nonce)
+            except (ValueError, TypeError):
+                return False
+            try:
+                from shared.computation_types import (
+                    COMPUTATION_TYPES,
+                    SEED_MIN,
+                    SEED_MAX,
+                )
+            except ImportError:
+                # Старые образы без shared: принимаем по формату (fallback без потери работоспособности)
+                return True
+
+            if not (SEED_MIN <= seed_val <= SEED_MAX):
+                return False
+            compute_func = COMPUTATION_TYPES.get(self.computation_type)
+            if not compute_func:
+                return False
+            try:
+                expected_result, _ = compute_func(
+                    client_id, contract_id, self.work_units_required, seed=seed_val
+                )
+                return expected_result == result_data
+            except Exception:
+                return False
+        
         if nonce is None or nonce == "":
             return False
         
-        # Проверяем, что результат является валидным хешем (64 символа hex)
         if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
             return False
         
-        # Для астрофизических задач проверяем детерминированность:
-        # Результат должен быть получен из вычислений с seed=nonce
-        # Пересчитываем результат для проверки (детерминированность гарантирует совпадение)
-        try:
-            # Импортируем функции вычислений (копируем код из воркера для проверки)
-            # В реальной системе можно было бы использовать общий модуль
-            import sys
-            import os
-            
-            # Импортируем computation_types для проверки результата
-            try:
-                from computation_types import COMPUTATION_TYPES
-                compute_func = COMPUTATION_TYPES.get(self.computation_type)
-                
-                if compute_func:
-                    # Пересчитываем результат с тем же seed для проверки
-                    # Seed определяется из nonce (детерминированно)
-                    # В воркере seed = hash(f"{client_id}-{contract_id}") % (2**32), nonce = str(seed)
-                    # Пробуем разные варианты seed для совместимости
-                    seed_variants = []
-                    try:
-                        # Вариант 1: nonce это число (seed напрямую, как возвращает compute_func)
-                        seed_variants.append(int(nonce))
-                    except (ValueError, TypeError):
-                        pass
-                    # Вариант 2: seed вычисляется из client_id-contract_id (как в воркере при генерации)
-                    seed_variants.append(hash(f"{client_id}-{contract_id}") % (2**32))
-                    # Вариант 3: seed вычисляется из nonce как хеш (fallback)
-                    seed_variants.append(hash(nonce) % (2**32))
-                    
-                    for seed in seed_variants:
-                        try:
-                            if self.computation_type == "simple_pow":
-                                # Для simple_pow difficulty обязателен
-                                expected_result, _ = compute_func(client_id, contract_id, self.work_units_required, self._difficulty(), seed=seed)
-                            else:
-                                # Для астрофизических задач передаём только seed
-                                expected_result, _ = compute_func(client_id, contract_id, self.work_units_required, seed=seed)
-                            
-                            # Результат должен совпадать (детерминированность гарантирует это)
-                            if expected_result == result_data:
-                                return True
-                        except Exception:
-                            continue
-            except ImportError:
-                # Если модуль недоступен, проверяем только формат результата
-                pass
-            except Exception as e:
-                # Логируем ошибку, но продолжаем проверку формата
-                import logging
-                logger = logging.getLogger("blockchain")
-                logger.debug("Computation verification error: %s", e)
-            
-            # Fallback: проверяем, что результат является валидным hex-хешем
-            if self.computation_type in ("cosmological", "supernova", "mhd", "radiative", "gravitational_waves"):
-                try:
-                    int(result_data, 16)  # Проверка, что это hex
-                    # Для астрофизических задач принимаем результат, если он валидный hex
-                    # (полная перепроверка может быть дорогой, поэтому проверяем только формат)
-                    return True
-                except ValueError:
-                    return False
-        except Exception:
-            return False
-        
-        return False  # Неизвестный тип вычислений
+        return False
 
     def get_reward(self):
         """Размер вознаграждения за выполнение контракта."""

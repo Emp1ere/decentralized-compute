@@ -4,13 +4,22 @@
 #
 # Экономическая модель: токены создаются наградой за верифицированную работу; комиссия за квитанцию
 # сжигается (уменьшает эффективное предложение). Защита от спама: лимит pending по клиенту и общий.
+#
+# Персистентность: цепочка и балансы сохраняются на диск (data/chain.json), чтобы прогресс
+# пользователей (баланс, сданные задачи) сохранялся после перезапуска сервера и выхода из аккаунта.
 import hashlib
 import time
 import json
 import logging
 import os
+import threading
 
 logger = logging.getLogger("blockchain")
+
+# Каталог для данных блокчейна (тот же, что для пользователей, или по умолчанию data рядом с модулем)
+BLOCKCHAIN_DATA_DIR = os.environ.get("AUTH_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
+CHAIN_FILE = os.path.join(BLOCKCHAIN_DATA_DIR, "chain.json")
+_chain_file_lock = threading.Lock()
 
 # --- Экономическая модель и защита от спама ---
 # Комиссия за квитанцию о работе (списывается с клиента в блоке, «сжигается»)
@@ -107,13 +116,79 @@ class Block:
         logger.debug("Block completed: hash=%s", self.hash[:16] + "...")
 
 
+def _block_from_dict(block_dict):
+    """Восстановить объект Block из словаря (для загрузки с диска)."""
+    return Block(
+        block_dict["index"],
+        block_dict["timestamp"],
+        block_dict["transactions"],
+        block_dict["previous_hash"],
+        block_dict.get("nonce", 0),
+    )
+
+
+def _load_chain_from_disk():
+    """
+    Загрузить цепочку из файла. Возвращает (chain, balances) или (None, None) при ошибке/отсутствии файла.
+    """
+    if not os.path.isfile(CHAIN_FILE):
+        return None, None
+    try:
+        with _chain_file_lock:
+            with open(CHAIN_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        chain_list = data if isinstance(data, list) else data.get("chain", [])
+        if not chain_list:
+            return None, None
+        # Проверка genesis
+        if chain_list[0].get("index") != 0 or chain_list[0].get("previous_hash") != "0":
+            return None, None
+        chain = []
+        for i, block_dict in enumerate(chain_list):
+            if block_dict.get("index") != i:
+                return None, None
+            block = _block_from_dict(block_dict)
+            if i > 0 and block_dict.get("previous_hash") != chain[-1].hash:
+                return None, None
+            if block.hash != block_dict.get("hash"):
+                return None, None
+            chain.append(block)
+        balances = {}
+        for block in chain:
+            _apply_block_transactions(block.transactions, balances)
+        logger.info("blockchain_loaded_from_disk: blocks=%s", len(chain))
+        return chain, balances
+    except (json.JSONDecodeError, IOError, KeyError, TypeError) as e:
+        logger.warning("blockchain_load_failed: %s", e)
+        return None, None
+
+
+def _save_chain_to_disk(chain):
+    """Сохранить цепочку на диск (список блоков в формате __dict__)."""
+    try:
+        os.makedirs(BLOCKCHAIN_DATA_DIR, exist_ok=True)
+        chain_json = [b.__dict__ for b in chain]
+        with _chain_file_lock:
+            with open(CHAIN_FILE, "w", encoding="utf-8") as f:
+                json.dump(chain_json, f, ensure_ascii=False, indent=2)
+        logger.debug("blockchain_saved_to_disk: blocks=%s", len(chain))
+    except IOError as e:
+        logger.warning("blockchain_save_failed: %s", e)
+
+
 class Blockchain:
-    """Блокчейн с консенсусом Proof-of-Useful-Work (PoUW)."""
+    """Блокчейн с консенсусом Proof-of-Useful-Work (PoUW). Цепочка и балансы сохраняются на диск."""
     def __init__(self):
-        self.chain = [self.create_genesis_block()]
+        chain, balances = _load_chain_from_disk()
+        if chain and balances is not None:
+            self.chain = chain
+            self.balances = balances
+        else:
+            self.chain = [self.create_genesis_block()]
+            self.balances = {}
+            _save_chain_to_disk(self.chain)  # сохранить genesis при первом запуске
         self.pending_transactions = []  # Очередь транзакций для упаковки в блок
         self.difficulty = 0  # PoUW: не используется для валидации (блок создаётся при полезной работе)
-        self.balances = {}  # Балансы клиентов (пересчитываются из транзакций reward)
 
     def create_genesis_block(self):
         """Создание genesis-блока с фиксированным временем (чтобы у всех узлов был одинаковый genesis)."""
@@ -187,6 +262,7 @@ class Blockchain:
         _apply_block_transactions(self.pending_transactions, self.balances)
 
         self.pending_transactions = []
+        _save_chain_to_disk(self.chain)
         return new_block
 
     def add_block_from_peer(self, block_dict):
@@ -226,6 +302,7 @@ class Blockchain:
                 return False, "invalid reward transaction in block"
         self.chain.append(block)
         _apply_block_transactions(block.transactions, self.balances)
+        _save_chain_to_disk(self.chain)
         logger.info("Sync added block index=%s from peer", block.index)
         return True, None
 
@@ -277,6 +354,7 @@ class Blockchain:
                 self.balances = {}
                 for block in self.chain:
                     _apply_block_transactions(block.transactions, self.balances)
+                _save_chain_to_disk(self.chain)
                 return True, None
             elif peer_last.timestamp == our_last.timestamp:
                 # Одинаковое время: выбираем по хешу (лексикографически меньший)
@@ -287,6 +365,7 @@ class Blockchain:
                     self.balances = {}
                     for block in self.chain:
                         _apply_block_transactions(block.transactions, self.balances)
+                    _save_chain_to_disk(self.chain)
                     return True, None
             # Наша цепочка остаётся (наш блок создан раньше или имеет меньший хеш)
             return False, "chain not longer (fork resolved in favor of local chain)"
@@ -300,6 +379,7 @@ class Blockchain:
         self.balances = {}
         for block in self.chain:
             _apply_block_transactions(block.transactions, self.balances)
+        _save_chain_to_disk(self.chain)
         logger.info("Sync replaced chain: %s blocks", len(self.chain))
         return True, None
 

@@ -124,41 +124,44 @@ class ClientWorker:
             logger.error("perform_computation invalid task: %s", e)
             return 0, "", None
         
-        # Импортируем модуль с типами вычислений
+        # Общий модуль shared (тот же код, что у оркестратора) — детерминированный seed по SHA256
         try:
-            from computation_types import COMPUTATION_TYPES
+            from shared.computation_types import COMPUTATION_TYPES, deterministic_seed
         except ImportError:
-            logger.error("computation_types module not found, falling back to simple_pow")
-            computation_type = "simple_pow"
             COMPUTATION_TYPES = {}
-        
-        # Выбираем функцию вычислений
+            deterministic_seed = None
+            try:
+                from computation_types import COMPUTATION_TYPES as _LOCAL
+                COMPUTATION_TYPES = _LOCAL
+            except ImportError:
+                pass
+
         compute_func = COMPUTATION_TYPES.get(computation_type)
         if not compute_func:
             logger.warning("Unknown computation_type %s, using simple_pow", computation_type)
-            from computation_types import compute_simple_pow
+            try:
+                from shared.computation_types import compute_simple_pow
+            except ImportError:
+                from computation_types import compute_simple_pow
             compute_func = compute_simple_pow
-        
-        logger.info("Starting computation: type=%s contract_id=%s work_units=%s", 
+
+        logger.info("Starting computation: type=%s contract_id=%s work_units=%s",
                    computation_type, contract_id, target_work)
-        
-        # Выполняем вычисления
+
         if computation_type == "simple_pow":
-            # Простой PoW: используем nonce как счётчик
             result_data, solution_nonce = compute_func(
                 self.client_id, contract_id, target_work, difficulty
             )
-            work_units_done = target_work  # Выполнили все единицы работы
+            work_units_done = target_work
         else:
-            # Астрофизические задачи: используем seed для детерминированности
-            # Seed генерируется детерминированно из client_id и contract_id
-            # Это гарантирует, что один и тот же воркер с одной задачей получит один результат
-            seed = hash(f"{self.client_id}-{contract_id}") % (2**32)
+            # Детерминированный seed (SHA256) — одинаковый у воркера и оркестратора для строгой верификации
+            seed = deterministic_seed(self.client_id, contract_id) if deterministic_seed else (
+                hash(f"{self.client_id}-{contract_id}") % (2**32)
+            )
             result_data, computed_seed = compute_func(
                 self.client_id, contract_id, target_work, seed=seed
             )
-            work_units_done = target_work  # Выполнили все единицы работы
-            # solution_nonce содержит seed для верификации (используем вычисленный seed)
+            work_units_done = target_work
             solution_nonce = computed_seed if computed_seed else str(seed)
         
         logger.info("Computation completed: result_hash=%s... nonce=%s", 
@@ -181,14 +184,16 @@ class ClientWorker:
                 json=payload,
                 headers=self._auth_headers(),
                 verify=VERIFY_SSL,
-                timeout=30,
+                timeout=120,
             )
             response.raise_for_status()
-            logger.info("submit_work success: reward=%s", response.json().get("reward_issued"))
+            data = response.json()
+            logger.info("submit_work success: reward_issued=%s", data.get("reward_issued"))
         except requests.RequestException as e:
-            logger.warning("submit_work failed: %s", e)
-            if hasattr(e, "response") and e.response is not None and e.response.text:
-                logger.debug("response body: %s", e.response.text[:300])
+            body = ""
+            if hasattr(e, "response") and e.response is not None:
+                body = (e.response.text or "")[:500]
+            logger.warning("submit_work failed: %s response=%s", e, body)
 
     def check_balance(self):
         """Запрос текущего баланса по client_id (требуется аутентификация)."""

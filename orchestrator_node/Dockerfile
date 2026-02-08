@@ -1,14 +1,17 @@
+# Сборка из корня репозитория: docker-compose с context: . и dockerfile: orchestrator_node/Dockerfile
 FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Общий модуль вычислений (один источник правды для верификации)
+COPY shared /app/shared
+# Модуль оркестратора
+COPY orchestrator_node/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+COPY orchestrator_node/ .
 
-COPY . .
+# Импорт shared.computation_types из /app
+ENV PYTHONPATH=/app
 
-# Порт, на котором слушает Flask
 EXPOSE 5000
-
-# Запускаем наш сервер-оркестратор
 CMD ["python", "app.py"]

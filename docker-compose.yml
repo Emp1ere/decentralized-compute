@@ -8,7 +8,8 @@ services:
   # 1. Узел 1 (децентрализованный оркестратор)
   orchestrator_node_1:
     build:
-      context: ./orchestrator_node
+      context: .
+      dockerfile: orchestrator_node/Dockerfile
     ports:
       - "5000:5000"
     container_name: orchestrator_node_1
@@ -27,6 +28,7 @@ services:
       - NODE_IDS=node-1,node-2
       # Автозапуск воркера из интерфейса (имя образа: у Docker Compose v2 может быть дефис project-service)
       - WORKER_IMAGE=distributed-compute-client_worker_1
+      # Воркер всегда отправляет задачи на node_1 — так баланс и награды видны при проверке через балансировщик
       - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_1:5000
       - DOCKER_NETWORK=distributed-compute_default
     # Для TLS задайте TLS_CERT_FILE, TLS_KEY_FILE и смонтируйте сертификаты
@@ -35,7 +37,8 @@ services:
   # 2. Узел 2 (децентрализованный оркестратор, равноправный с узлом 1)
   orchestrator_node_2:
     build:
-      context: ./orchestrator_node
+      context: .
+      dockerfile: orchestrator_node/Dockerfile
     ports:
       - "5001:5000"
     container_name: orchestrator_node_2
@@ -49,7 +52,8 @@ services:
       - NODE_ID=node-2
       - NODE_IDS=node-1,node-2
       - WORKER_IMAGE=distributed-compute-client_worker_1
-      - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_2:5000
+      # Воркер всегда на node_1, чтобы награды и баланс были на одном узле (см. nginx: /me, /get_balance → node_1)
+      - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_1:5000
       - DOCKER_NETWORK=distributed-compute_default
     depends_on:
       - orchestrator_node_1
@@ -73,7 +77,8 @@ services:
   # 3. Клиент-вычислитель 1 (подключается к узлу 1)
   client_worker_1:
     build:
-      context: ./client_worker
+      context: .
+      dockerfile: client_worker/Dockerfile
     container_name: client_worker_1
     environment:
       - ORCHESTRATOR_URL=http://orchestrator_node_1:5000
@@ -86,7 +91,8 @@ services:
   # 4. Клиент-вычислитель 2 (подключается к узлу 2)
   client_worker_2:
     build:
-      context: ./client_worker
+      context: .
+      dockerfile: client_worker/Dockerfile
     container_name: client_worker_2
     environment:
       - ORCHESTRATOR_URL=http://orchestrator_node_2:5000
