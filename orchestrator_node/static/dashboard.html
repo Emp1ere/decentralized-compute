@@ -85,7 +85,7 @@
     }
     button.primary:hover { filter: brightness(1.1); }
     button.primary:disabled { opacity: 0.6; cursor: not-allowed; }
-    input[type="text"] {
+    input[type="text"], input[type="number"], input[type="password"] {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
@@ -150,6 +150,7 @@
     <button type="button" data-tab="tasks">Задачи</button>
     <button type="button" data-tab="chain">Блокчейн</button>
     <button type="button" data-tab="stats">Статистика</button>
+    <button type="button" data-tab="profile">Профиль</button>
   </div>
 
   <div id="panel-overview" class="panel active">
@@ -284,6 +285,44 @@
     <pre id="st-errors" class="mono" style="background:var(--bg); padding:12px; border-radius:6px; overflow:auto;"></pre>
   </div>
 
+  <div id="panel-profile" class="panel">
+    <p id="profile-login-required" class="msg info" style="display:none;">Войдите или выберите вычислителя с API-ключом на вкладке «Обзор», чтобы видеть профиль и вывод средств.</p>
+    <div id="profile-content" style="display:none;">
+      <div class="card" style="margin-bottom:20px;">
+        <div class="label">Данные профиля</div>
+        <div class="overview-grid" style="margin-top:12px;">
+          <div class="card"><div class="label">Никнейм</div><div id="profile-nickname-full" class="value">-</div></div>
+          <div class="card"><div class="label">Логин</div><div id="profile-login-full" class="value">-</div></div>
+          <div class="card"><div class="label">ID вычислителя</div><div id="profile-client-id" class="value mono" style="font-size:0.9rem; word-break:break-all;">-</div></div>
+          <div class="card"><div class="label">Баланс (токенов)</div><div id="profile-balance-full" class="value">-</div></div>
+          <div class="card"><div class="label">Сдано работ</div><div id="profile-submissions-full" class="value">-</div></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="label">Вывод средств (симуляция)</div>
+        <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Конвертация токенов в рубли и вывод на карту. Это демонстрационный режим: реальные платежи не выполняются.</p>
+        <div class="row" style="align-items:center; gap:16px; margin-bottom:12px;">
+          <span class="muted">Курс:</span>
+          <strong id="profile-rate">1 токен = 10 ₽</strong>
+        </div>
+        <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
+          <label for="profile-withdraw-tokens">Сумма (токенов):</label>
+          <input type="number" id="profile-withdraw-tokens" min="1" step="1" placeholder="0" style="min-width:120px;">
+          <span class="muted">=</span>
+          <span id="profile-withdraw-rub">0</span> <span>₽</span>
+        </div>
+        <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
+          <label for="profile-withdraw-card">Номер карты:</label>
+          <input type="text" id="profile-withdraw-card" placeholder="0000 0000 0000 0000" maxlength="19" style="min-width:200px;">
+        </div>
+        <div class="row">
+          <button type="button" class="primary" id="btn-profile-withdraw">Вывести на карту</button>
+          <span id="profile-withdraw-msg" class="msg" style="display:none; margin-left:12px;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const base = window.location.origin;
     document.getElementById('current-node').textContent = base;
@@ -301,6 +340,7 @@
       if (id === 'tasks') loadTasks();
       if (id === 'chain') loadChain();
       if (id === 'stats') loadStats();
+      if (id === 'profile') loadProfile();
     }
     document.querySelectorAll('.tabs button').forEach(b => {
       b.addEventListener('click', () => showPanel(b.dataset.tab));
@@ -1106,6 +1146,92 @@
           document.getElementById('st-requests').textContent = 'Ошибка загрузки';
         });
     }
+
+    const PROFILE_TOKEN_RATE_RUB = 10;
+    let profileData = null;
+
+    function loadProfile() {
+      const key = getApiKey();
+      const loginRequired = document.getElementById('profile-login-required');
+      const content = document.getElementById('profile-content');
+      const msg = document.getElementById('profile-withdraw-msg');
+      msg.style.display = 'none';
+      if (!key) {
+        loginRequired.style.display = 'block';
+        content.style.display = 'none';
+        return;
+      }
+      loginRequired.style.display = 'none';
+      content.style.display = 'block';
+      fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } })
+        .then(r => {
+          if (!r.ok) throw new Error('Неверный API-ключ');
+          return r.json();
+        })
+        .then(d => {
+          profileData = d;
+          document.getElementById('profile-nickname-full').textContent = d.nickname || d.login || d.client_id?.slice(0, 8) + '…' || '-';
+          document.getElementById('profile-login-full').textContent = d.login || '-';
+          document.getElementById('profile-client-id').textContent = d.client_id || '-';
+          document.getElementById('profile-client-id').title = d.client_id || '';
+          document.getElementById('profile-balance-full').textContent = d.balance ?? 0;
+          document.getElementById('profile-submissions-full').textContent = d.submissions_count ?? 0;
+          updateProfileWithdrawRub();
+        })
+        .catch(() => {
+          loginRequired.style.display = 'block';
+          content.style.display = 'none';
+        });
+    }
+
+    function updateProfileWithdrawRub() {
+      const el = document.getElementById('profile-withdraw-tokens');
+      const rubEl = document.getElementById('profile-withdraw-rub');
+      if (!el || !rubEl) return;
+      const tokens = parseInt(el.value, 10) || 0;
+      rubEl.textContent = (tokens * PROFILE_TOKEN_RATE_RUB).toLocaleString('ru-RU');
+    }
+
+    document.getElementById('profile-withdraw-tokens').addEventListener('input', updateProfileWithdrawRub);
+
+    document.getElementById('btn-profile-withdraw').onclick = function() {
+      const key = getApiKey();
+      const msgEl = document.getElementById('profile-withdraw-msg');
+      msgEl.style.display = 'none';
+      if (!key || !profileData) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Загрузите профиль (откройте вкладку ещё раз).';
+        msgEl.style.display = 'block';
+        return;
+      }
+      const tokens = parseInt(document.getElementById('profile-withdraw-tokens').value, 10);
+      const card = (document.getElementById('profile-withdraw-card').value || '').replace(/\s/g, '');
+      if (!tokens || tokens < 1) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Укажите сумму в токенах (не менее 1).';
+        msgEl.style.display = 'block';
+        return;
+      }
+      if (tokens > (profileData.balance || 0)) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Недостаточно токенов на балансе.';
+        msgEl.style.display = 'block';
+        return;
+      }
+      if (card.length < 12) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Введите номер карты (минимум 12 цифр).';
+        msgEl.style.display = 'block';
+        return;
+      }
+      const rub = tokens * PROFILE_TOKEN_RATE_RUB;
+      msgEl.className = 'msg ok';
+      msgEl.textContent = 'Заявка на вывод принята (симуляция). ' + tokens + ' токенов = ' + rub + ' ₽ на карту ****' + card.slice(-4) + '. В реальной системе средства поступили бы в течение 1-3 рабочих дней.';
+      msgEl.style.display = 'block';
+      document.getElementById('profile-withdraw-tokens').value = '';
+      document.getElementById('profile-withdraw-card').value = '';
+      updateProfileWithdrawRub();
+    };
 
     loadOverview();
   </script>
