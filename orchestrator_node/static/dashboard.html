@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Distributed Compute — Узел</title>
+  <title>Distributed Compute - Узел</title>
   <style>
     :root {
       --bg: #1a1d23;
@@ -138,7 +138,7 @@
   </style>
 </head>
 <body>
-  <h1>Distributed Compute — Узел оркестратора</h1>
+  <h1>Distributed Compute - Узел оркестратора</h1>
   <div class="node-links">
     Узел: <span id="current-node">текущий</span>
     <a href="/dashboard">Обновить</a>
@@ -154,24 +154,25 @@
 
   <div id="panel-overview" class="panel active">
     <div class="overview-grid">
-      <div class="card"><div class="label">Состояние</div><div id="ov-status" class="value">—</div></div>
-      <div class="card"><div class="label">Длина цепочки</div><div id="ov-chain" class="value">—</div></div>
-      <div class="card"><div class="label">Вычислителей</div><div id="ov-clients" class="value">—</div></div>
-      <div class="card"><div class="label">В очереди (pending)</div><div id="ov-pending" class="value">—</div></div>
+      <div class="card"><div class="label">Состояние узла</div><div id="ov-status" class="value">-</div></div>
+      <div class="card"><div class="label">Длина цепочки</div><div id="ov-chain" class="value">-</div></div>
+      <div class="card"><div class="label">Вычислителей</div><div id="ov-clients" class="value">-</div></div>
+      <div class="card"><div class="label">Транзакций в очереди</div><div id="ov-pending" class="value">-</div></div>
     </div>
     <div class="card" style="margin-bottom:20px;">
       <div class="label">Вычислители</div>
-      <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Каждый контракт выполняется распределённо несколькими вычислителями. Добавьте вычислителей (личный аккаунт или по ключу) — прогресс сохраняется для каждого.</p>
+      <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты выполняются распределённо: вычислители получают задания, выполняют работу и сдают результат. Награды начисляются на баланс того вычислителя, с чьим API-ключом получена задача и сдана работа. Добавьте вычислителей (вход/регистрация или API-ключ) - прогресс и баланс сохраняются для каждого.</p>
       <div class="row" style="align-items:center; margin-bottom:12px;">
         <label>Текущий вычислитель:</label>
         <select id="select-client" style="margin-left:8px; min-width:220px; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
-          <option value="">— Ввести ключ вручную —</option>
+          <option value="">- Ввести ключ вручную -</option>
         </select>
         <button type="button" class="primary" id="btn-sync-workers">Обновить данные</button>
       </div>
       <div id="saved-clients-list" class="card" style="margin-bottom:16px; max-height:200px; overflow:auto;"></div>
-      <p class="label" style="margin-bottom:8px;">Добавить вычислителя</p>
-      <div id="auth-forms">
+    <p class="label" style="margin-bottom:8px;">Добавить вычислителя</p>
+    <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Вход или регистрация создают вычислителя в списке; награды будут начисляться на его баланс. Либо добавьте уже имеющийся API-ключ.</p>
+    <div id="auth-forms">
         <div class="row" style="margin-bottom:8px;">
           <input type="text" id="auth-login" placeholder="Логин" style="min-width:120px;">
           <input type="password" id="auth-password" placeholder="Пароль" style="min-width:120px;">
@@ -180,16 +181,16 @@
           <button type="button" class="primary" id="btn-auth-register">Зарегистрироваться</button>
         </div>
         <div class="row">
-          <span class="muted" style="margin-right:8px;">или по API-ключу:</span>
+          <span class="muted" style="margin-right:8px;">или вставить API-ключ:</span>
           <input type="text" id="input-api-key" placeholder="Вставьте api_key" style="min-width:180px;">
           <button type="button" class="primary" id="btn-add-client">Добавить</button>
         </div>
         <span id="auth-msg" class="msg" style="display:none;"></span>
       </div>
       <div id="auth-profile" style="display:none;">
-        <p><strong>Вы вошли как</strong> <span id="profile-nickname">—</span> <span id="profile-login" class="muted" style="font-size:0.9em;"></span></p>
+        <p><strong>Вы вошли как</strong> <span id="profile-nickname">-</span> <span id="profile-login" class="muted" style="font-size:0.9em;"></span></p>
         <p>Баланс: <strong id="profile-balance">0</strong> токенов · Сдано работ: <strong id="profile-submissions">0</strong></p>
-        <p class="muted" style="font-size:0.85em; margin-top:8px;">Прогресс сохраняется на сервере. Данные по всем вычислителям обновляются по кнопке «Обновить данные».</p>
+        <p class="muted" style="font-size:0.85em; margin-top:8px;">Баланс и сданные работы хранятся в блокчейне узла. Данные по всем вычислителям обновляются по кнопке «Обновить данные».</p>
         <button type="button" id="btn-auth-logout">Выйти</button>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -200,7 +201,8 @@
   </div>
 
   <div id="panel-work" class="panel">
-    <p class="label">Текущий вычислитель (выберите на вкладке «Обзор» или вставьте API-ключ)</p>
+    <p class="label">Текущий вычислитель</p>
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Выберите вычислителя на вкладке «Обзор» или вставьте его API-ключ. Награда за сданную работу начисляется на баланс этого вычислителя.</p>
     <div class="row">
       <input type="text" id="input-api-key-work" placeholder="API-ключ вычислителя">
     </div>
@@ -212,8 +214,9 @@
       <div class="label">Текущая задача</div>
       <div class="mono" id="work-task-body"></div>
     </div>
-    <div id="work-run-in-worker" class="card" style="display:none; margin-bottom: 16px;">
-      <div class="label">Выполнить эту задачу в воркере</div>
+      <div id="work-run-in-worker" class="card" style="display:none; margin-bottom: 16px;">
+      <div class="label">Выполнить задачу в воркере</div>
+      <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Воркер возьмёт задачу с тем же API-ключом, что выбран выше - награда попадёт на баланс этого вычислителя.</p>
       <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
         <button type="button" class="primary" id="btn-start-worker">Запустить воркер автоматически</button>
         <span id="work-run-worker-msg" class="msg" style="display:none;"></span>
@@ -221,7 +224,7 @@
       <div id="work-worker-status-hint" style="display:none; margin-top:8px;">
         <button type="button" class="primary" id="btn-check-balance-after-worker">Проверить баланс</button>
         <span id="work-worker-balance-result" class="msg" style="display:none; margin-left:8px;"></span>
-        <p style="font-size:0.85em; color:var(--muted); margin:8px 0 0;">Через 10–60 сек воркер сдаст задачу. Вкладка «Задачи» — история сданных работ; «Обзор» → «Показать баланс» — начисленные токены.</p>
+        <p style="font-size:0.85em; color:var(--muted); margin:8px 0 0;">Через 10–60 сек воркер сдаст задачу. Вкладка «Задачи» - история сданных работ; «Обзор» → «Показать баланс» - начисленные токены.</p>
       </div>
       <p style="font-size:0.9em; color:var(--muted); margin:0 0 8px;">Или вручную в каталоге проекта:</p>
       <div class="row" style="align-items:center; gap:8px;">
@@ -235,7 +238,7 @@
       <span id="work-progress" class="msg info" style="display:none;"></span>
       <p style="font-size:0.85em; color:var(--muted); margin-top:8px;">
         <strong>Примечание:</strong> Для астрофизических задач в браузере выполняется упрощённая версия (до 1000 единиц работы для скорости).
-        Для получения награды требуется выполнить полный объём работы — используйте воркеры для полных вычислений.
+        Для получения награды требуется выполнить полный объём работы - используйте воркеры для полных вычислений.
         Простые задачи (sc-001, sc-002) можно выполнять полностью в браузере.
       </p>
     </div>
@@ -243,20 +246,20 @@
   </div>
 
   <div id="panel-contracts" class="panel">
-    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты выполняются распределённо: несколько вычислителей вносят свой объём работы. «Осталось» — объём работы до целевого значения контракта.</p>
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты - типы заданий с наградой за сдачу. Вычислители берут задачу по контракту, выполняют требуемый объём работы и сдают результат. «Выполнено %» - доля от целевого объёма контракта; «Осталось» - сколько единиц работы ещё не выполнено; «Активных вычислителей» - кто недавно запрашивал задачу по этому контракту.</p>
     <p class="loading" id="contracts-load">Загрузка…</p>
     <table id="table-contracts" style="display:none;">
-      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Ед. на задачу</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Осталось (ед. работы)</th><th>Награда</th><th>Действие</th></tr></thead>
+      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Ед. на сдачу</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Осталось (ед. работы)</th><th>Награда за сдачу</th><th>Действие</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
 
   <div id="panel-tasks" class="panel">
-    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">История сданных работ по вычислителям (каждый внёс свой объём в контракт).</p>
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Сданные работы (work_receipt) из блокчейна: вычислитель, контракт и количество единиц работы. Отображаются последние записи.</p>
     <p class="loading" id="tasks-load">Загрузка…</p>
     <p id="tasks-empty" style="display:none; color: var(--muted);">Нет сданных работ в последних блоках.</p>
     <table id="table-tasks" style="display:none;">
-      <thead><tr><th>Блок</th><th>Вычислитель</th><th>Контракт</th><th>Единицы</th></tr></thead>
+      <thead><tr><th>Блок</th><th>Вычислитель</th><th>Контракт</th><th>Ед. работы</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -271,9 +274,9 @@
 
   <div id="panel-stats" class="panel">
     <div class="overview-grid" style="margin-bottom: 20px;">
-      <div class="card"><div class="label">Длина цепочки</div><div id="st-chain" class="value">—</div></div>
-      <div class="card"><div class="label">Вычислителей</div><div id="st-clients" class="value">—</div></div>
-      <div class="card"><div class="label">Pending</div><div id="st-pending" class="value">—</div></div>
+      <div class="card"><div class="label">Длина цепочки</div><div id="st-chain" class="value">-</div></div>
+      <div class="card"><div class="label">Вычислителей (зарегистрировано)</div><div id="st-clients" class="value">-</div></div>
+      <div class="card"><div class="label">Транзакций в очереди (pending)</div><div id="st-pending" class="value">-</div></div>
     </div>
     <p class="label">Запросы по путям</p>
     <pre id="st-requests" class="mono" style="background:var(--bg); padding:12px; border-radius:6px; overflow:auto; max-height:200px;"></pre>
@@ -312,16 +315,16 @@
     function loadOverview() {
       Promise.all([fetch(base + '/health').then(r => r.json()), api('/metrics')])
         .then(([health, m]) => {
-          document.getElementById('ov-status').textContent = health.status === 'ok' ? 'OK' : health.status || '—';
-          document.getElementById('ov-chain').textContent = m.chain_length ?? '—';
-          document.getElementById('ov-clients').textContent = m.clients_count ?? '—';
-          document.getElementById('ov-pending').textContent = m.pending_transactions ?? '—';
+          document.getElementById('ov-status').textContent = health.status === 'ok' ? 'OK' : health.status || '-';
+          document.getElementById('ov-chain').textContent = m.chain_length ?? '-';
+          document.getElementById('ov-clients').textContent = m.clients_count ?? '-';
+          document.getElementById('ov-pending').textContent = m.pending_transactions ?? '-';
         })
         .catch(() => {
           document.getElementById('ov-status').textContent = 'Ошибка';
-          document.getElementById('ov-chain').textContent = '—';
-          document.getElementById('ov-clients').textContent = '—';
-          document.getElementById('ov-pending').textContent = '—';
+          document.getElementById('ov-chain').textContent = '-';
+          document.getElementById('ov-clients').textContent = '-';
+          document.getElementById('ov-pending').textContent = '-';
         });
     }
 
@@ -341,12 +344,12 @@
       const list = getSavedClients();
       const sel = document.getElementById('select-client');
       const cur = sel.value;
-      sel.innerHTML = '<option value="">— Ввести ключ вручную —</option>';
+      sel.innerHTML = '<option value="">- Ввести ключ вручную -</option>';
       list.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        const bal = c.balance != null ? c.balance : '—';
-        const sub = c.submissions_count != null ? c.submissions_count : '—';
+        const bal = c.balance != null ? c.balance : '-';
+        const sub = c.submissions_count != null ? c.submissions_count : '-';
         opt.textContent = (c.label || 'Вычислитель') + ' · баланс: ' + bal + ' · сдано: ' + sub;
         sel.appendChild(opt);
       });
@@ -381,9 +384,9 @@
       list.forEach(c => {
         const row = document.createElement('div');
         row.className = 'saved-client-row';
-        const bal = c.balance != null ? c.balance : '—';
-        const sub = c.submissions_count != null ? c.submissions_count : '—';
-        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> — баланс: ' + bal + ' токенов, сдано работ: ' + sub + '</span>' +
+        const bal = c.balance != null ? c.balance : '-';
+        const sub = c.submissions_count != null ? c.submissions_count : '-';
+        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> - баланс: ' + bal + ' токенов, сдано работ: ' + sub + '</span>' +
           '<button type="button" class="primary" data-use="' + c.id + '">Использовать</button>' +
           '<button type="button" class="primary" data-sync-one="' + c.id + '">Обновить</button>' +
           '<button type="button" data-remove="' + c.id + '">Удалить</button>';
@@ -858,7 +861,7 @@
         resultEl.className = 'msg ok';
         const bal = balData.balance ?? 0;
         resultEl.textContent = 'Баланс: ' + bal + ' токенов.';
-        if (bal === 0) resultEl.textContent += ' Если воркер уже сдал задачу — подождите 30–60 сек и нажмите снова. Диагностика: docker logs orchestrator_node_1';
+        if (bal === 0) resultEl.textContent += ' Если воркер уже сдал задачу - подождите 30–60 сек и нажмите снова. Диагностика: docker logs orchestrator_node_1';
         resultEl.style.display = 'block';
       } catch (e) {
         resultEl.className = 'msg err';
@@ -1002,18 +1005,18 @@
             const category = c.task_category || '';
             const name = c.task_name || c.contract_id || '';
             const desc = c.task_description || '';
-            const pct = c.completion_pct != null ? c.completion_pct : '—';
-            const active = c.active_workers != null ? c.active_workers : '—';
-            const freeVol = (c.remaining_volume != null ? c.remaining_volume : c.free_volume) ?? (c.work_units_required ?? '—');
-            const reward = c.reward_per_task != null ? c.reward_per_task : (c.reward ?? '—');
+            const pct = c.completion_pct != null ? c.completion_pct : '-';
+            const active = c.active_workers != null ? c.active_workers : '-';
+            const freeVol = (c.remaining_volume != null ? c.remaining_volume : c.free_volume) ?? (c.work_units_required ?? '-');
+            const reward = c.reward_per_task != null ? c.reward_per_task : (c.reward ?? '-');
             const takeBtn = key
               ? '<button type="button" class="primary btn-take-task" data-contract-id="' + (c.contract_id || '') + '">Взять задачу</button>'
               : '<span class="muted">Войдите</span>';
             tr.innerHTML =
               '<td><strong>' + (name || '') + '</strong><br><small style="color:#888;">' + (c.contract_id || '') + '</small></td>' +
-              '<td>' + (category || '—') + '</td>' +
-              '<td>' + (desc || '—') + '</td>' +
-              '<td>' + (c.work_units_required ?? '—') + '</td>' +
+              '<td>' + (category || '-') + '</td>' +
+              '<td>' + (desc || '-') + '</td>' +
+              '<td>' + (c.work_units_required ?? '-') + '</td>' +
               '<td><span class="progress-pct">' + pct + '%</span></td>' +
               '<td>' + active + '</td>' +
               '<td>' + freeVol + '</td>' +
@@ -1081,7 +1084,7 @@
           tbody.innerHTML = '';
           list.forEach(b => {
             const tr = document.createElement('tr');
-            const ts = b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : '—';
+            const ts = b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : '-';
             tr.innerHTML = '<td>' + b.index + '</td><td class="mono hash" title="' + (b.hash || '') + '">' + (b.hash || '') + '</td><td>' + (b.transactions && b.transactions.length) + '</td><td>' + ts + '</td>';
             tbody.appendChild(tr);
           });
@@ -1093,9 +1096,9 @@
     function loadStats() {
       api('/metrics')
         .then(m => {
-          document.getElementById('st-chain').textContent = m.chain_length ?? '—';
-          document.getElementById('st-clients').textContent = m.clients_count ?? '—';
-          document.getElementById('st-pending').textContent = m.pending_transactions ?? '—';
+          document.getElementById('st-chain').textContent = m.chain_length ?? '-';
+          document.getElementById('st-clients').textContent = m.clients_count ?? '-';
+          document.getElementById('st-pending').textContent = m.pending_transactions ?? '-';
           document.getElementById('st-requests').textContent = JSON.stringify(m.request_counts || {}, null, 2);
           document.getElementById('st-errors').textContent = JSON.stringify(m.error_counts || {}, null, 2);
         })
