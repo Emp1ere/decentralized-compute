@@ -72,6 +72,8 @@ limiter = Limiter(
 
 # URL второго узла для синхронизации блокчейна (децентрализация)
 PEER_URL = os.environ.get("PEER_URL", "")
+# Таймаут HTTP-запросов к пиру (секунды); при медленной сети увеличьте (например, 15 или 30)
+PEER_REQUEST_TIMEOUT = int(os.environ.get("PEER_REQUEST_TIMEOUT", "15"))
 # Интервал периодической синхронизации (секунды)
 # Критическое исправление: уменьшен до 10 секунд для более быстрого разрешения форков
 SYNC_INTERVAL = int(os.environ.get("SYNC_INTERVAL", "10"))
@@ -178,7 +180,7 @@ def sync_pending_from_peer():
         return
     try:
         headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
-        response = requests.get(f"{PEER_URL.rstrip('/')}/pending", timeout=2, headers=headers)
+        response = requests.get(f"{PEER_URL.rstrip('/')}/pending", timeout=PEER_REQUEST_TIMEOUT, headers=headers)
         if response.status_code == 200:
             peer_pending = response.json()
             # Объединяем транзакции (убираем дубликаты по result_data для work_receipt)
@@ -207,7 +209,7 @@ def sync_chain_from_peer():
     try:
         # Запрашиваем цепочку у пира
         headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
-        response = requests.get(f"{PEER_URL.rstrip('/')}/chain", timeout=5, headers=headers)
+        response = requests.get(f"{PEER_URL.rstrip('/')}/chain", timeout=PEER_REQUEST_TIMEOUT, headers=headers)
         if response.status_code == 200:
             peer_chain = response.json()
             # Пытаемся заменить локальную цепочку на цепочку пира (longest valid chain)
@@ -451,7 +453,7 @@ def submit_work():
             response = requests.post(
                 f"{PEER_URL.rstrip('/')}/receive_block",
                 json=new_block.__dict__,
-                timeout=5,
+                timeout=PEER_REQUEST_TIMEOUT,
                 headers=headers,
             )
             if response.status_code == 200 and response.json().get("accepted"):
@@ -646,8 +648,9 @@ def _run_worker_container(contract_id, api_key=None, client_id=None):
 def run_worker():
     """
     Запуск воркера в Docker для выполнения выбранной задачи (контракта).
-    Требуется авторизация. Тело: {"contract_id": "sc-001"}.
-    Работает только если оркестратор имеет доступ к Docker (сокет смонтирован и заданы WORKER_IMAGE, DOCKER_NETWORK).
+    Требуется авторизация. Тело: {"contract_id": "sc-001", "client_id": "опционально для проверки"}.
+    Награда начисляется на client_id, соответствующий api_key. Если передан client_id в теле,
+    он должен совпадать с ключом — иначе 400 (защита от неверного выбора вычислителя в интерфейсе).
     """
     auth = request.headers.get("Authorization")
     if not auth or not auth.startswith("Bearer "):
@@ -660,9 +663,13 @@ def run_worker():
     contract_id = (data.get("contract_id") or "").strip()
     if not contract_id:
         return jsonify({"error": "contract_id required"}), 400
+    body_client_id = (data.get("client_id") or "").strip() or None
+    if body_client_id and body_client_id != client_id:
+        logger.warning("run_worker client_id mismatch: body=%s... key_resolves_to=%s...", body_client_id[:8], client_id[:8])
+        return jsonify({"error": "client_id does not match this API key (select the correct calculator in Overview)"}), 400
     ok, msg = _run_worker_container(contract_id, api_key=api_key, client_id=client_id)
     if ok:
-        return jsonify({"status": "started", "message": msg, "contract_id": contract_id}), 202
+        return jsonify({"status": "started", "message": msg, "contract_id": contract_id, "client_id": client_id}), 202
     if "not set" in msg or "WORKER_IMAGE" in msg:
         return jsonify({"error": "Worker auto-start disabled (WORKER_IMAGE not set)", "detail": msg}), 503
     return jsonify({"error": "Failed to start worker", "detail": msg}), 500
@@ -675,6 +682,7 @@ def dashboard():
     return send_from_directory(app.static_folder or "static", "dashboard.html")
 
 @app.route("/receive_block", methods=["POST"])
+@limiter.limit("120 per minute")  # Синхронизация узлов: больше лимит, чтобы не было 429 при активном обмене блоками
 @require_node_secret
 def receive_block():
     """
@@ -692,7 +700,7 @@ def receive_block():
                 requests.post(
                     f"{PEER_URL.rstrip('/')}/receive_block",
                     json=data,
-                    timeout=5,
+                    timeout=PEER_REQUEST_TIMEOUT,
                     headers=headers,
                 )
             except requests.RequestException as e:

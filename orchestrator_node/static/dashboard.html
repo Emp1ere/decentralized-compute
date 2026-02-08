@@ -217,7 +217,8 @@
     </div>
       <div id="work-run-in-worker" class="card" style="display:none; margin-bottom: 16px;">
       <div class="label">Выполнить задачу в воркере</div>
-      <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Воркер возьмёт задачу с тем же API-ключом, что выбран выше - награда попадёт на баланс этого вычислителя.</p>
+      <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Воркер запускается с API-ключом выбранного вычислителя (вкладка «Обзор») и <strong>только для контракта текущей задачи</strong> (см. блок «Текущая задача» выше). Награда начислится на этого вычислителя. Перед запуском нажмите «Использовать» для нужного вычислителя и при необходимости «Обновить данные».</p>
+      <p class="muted" style="font-size:0.8em; margin-bottom:8px;">Если на баланс уже начислялись токены за другие контракты — вероятно, работал ещё один воркер (другой контейнер или запуск без выбора задачи). Остановите все контейнеры воркеров (<code>docker ps</code>, затем <code>docker stop &lt;id&gt;</code>), затем запустите только один раз с нужной задачей (сначала «Получить задачу» или «Взять задачу» по astro-002).</p>
       <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
         <button type="button" class="primary" id="btn-start-worker">Запустить воркер автоматически</button>
         <span id="work-run-worker-msg" class="msg" style="display:none;"></span>
@@ -256,7 +257,7 @@
   </div>
 
   <div id="panel-tasks" class="panel">
-    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Сданные работы (work_receipt) из блокчейна: вычислитель, контракт и количество единиц работы. Отображаются последние записи.</p>
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Сданные работы (work_receipt) из блокчейна: вычислитель, контракт и количество единиц работы. Показаны последние 100 записей из последних 100 блоков (если сдачи по нужному контракту нет — она могла быть в более старом блоке).</p>
     <p class="loading" id="tasks-load">Загрузка…</p>
     <p id="tasks-empty" style="display:none; color: var(--muted);">Нет сданных работ в последних блоках.</p>
     <table id="table-tasks" style="display:none;">
@@ -401,7 +402,7 @@
         const r = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + c.apiKey } });
         if (!r.ok) return c;
         const d = await r.json();
-        return { ...c, balance: d.balance ?? 0, submissions_count: d.submissions_count ?? 0 };
+        return { ...c, balance: d.balance ?? 0, submissions_count: d.submissions_count ?? 0, client_id: d.client_id || c.client_id };
       } catch (e) { return c; }
     }
     document.getElementById('btn-sync-workers').onclick = async function() {
@@ -851,18 +852,25 @@
       msgEl.style.display = 'none';
       if (!key) { msgEl.className = 'msg err'; msgEl.textContent = 'Выберите вычислителя или введите API-ключ.'; msgEl.style.display = 'block'; return; }
       if (!currentTask || !currentTask.contract_id) { msgEl.className = 'msg err'; msgEl.textContent = 'Сначала получите или выберите задачу.'; msgEl.style.display = 'block'; return; }
+      const sel = document.getElementById('select-client').value;
+      const list = getSavedClients();
+      const selectedClient = list.find(function(c) { return c.id === sel; });
+      const body = { contract_id: currentTask.contract_id };
+      if (selectedClient && selectedClient.client_id) body.client_id = selectedClient.client_id;
       this.disabled = true;
       try {
         const r = await fetch(base + '/run_worker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-          body: JSON.stringify({ contract_id: currentTask.contract_id })
+          body: JSON.stringify(body)
         });
         const data = await r.json().catch(() => ({}));
         msgEl.style.display = 'block';
         if (r.status === 202) {
           msgEl.className = 'msg ok';
-          msgEl.textContent = data.message || 'Воркер запущен. Контейнер выполнит одну задачу и завершится.';
+          var who = (selectedClient && selectedClient.label) ? selectedClient.label : 'вычислитель';
+          if (data.client_id) who += ' (ID: ' + (data.client_id.length > 8 ? data.client_id.slice(0, 8) + '…' : data.client_id) + ')';
+          msgEl.textContent = (data.message || 'Воркер запущен. ') + ' Награда будет начислена на: ' + who + '.';
           document.getElementById('work-worker-status-hint').style.display = 'block';
           document.getElementById('work-worker-balance-result').style.display = 'none';
         } else {
@@ -1093,7 +1101,7 @@
         .then(chain => {
           load.style.display = 'none';
           const rows = [];
-          (chain || []).slice(-20).forEach(block => {
+          (chain || []).slice(-100).forEach(block => {
             (block.transactions || []).forEach(tx => {
               if (tx.type === 'work_receipt')
                 rows.push({ block: block.index, client: (tx.client_id || '').slice(0, 8) + '…', contract: tx.contract_id || '', units: tx.work_units ?? '' });
@@ -1102,7 +1110,7 @@
           rows.reverse();
           const tbody = table.querySelector('tbody');
           tbody.innerHTML = '';
-          rows.slice(0, 50).forEach(r => {
+          rows.slice(0, 100).forEach(r => {
             const tr = document.createElement('tr');
             tr.innerHTML = '<td>' + r.block + '</td><td class="mono">' + r.client + '</td><td>' + r.contract + '</td><td>' + r.units + '</td>';
             tbody.appendChild(tr);

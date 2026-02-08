@@ -769,5 +769,245 @@
     "previous_hash": "a0c4f7f5c10aadd9e0e34ddcbb0f07f125c15bd61d96e3585126523d9b770158",
     "nonce": 0,
     "hash": "51eaae4e02dad3826d498e18500ff341ffc22c58f0921bc45680574f4aa6c22f"
+  },
+  {
+    "index": 31,
+    "timestamp": 1770575107.987297,
+    "transactions": [
+      {
+        "amount": 750,
+        "contract_id": "astro-005",
+        "from": "system_contract",
+        "to": "75140ed1-1946-4df1-9583-e419cca4ced8",
+        "type": "reward"
+      },
+      {
+        "client_id": "75140ed1-1946-4df1-9583-e419cca4ced8",
+        "contract_id": "astro-005",
+        "fee": 1,
+        "result_data": "51b8e0790081018060344251358ffda9a2e5db24f742c4f338f84f55dee6faac",
+        "type": "work_receipt",
+        "work_units": 150000
+      }
+    ],
+    "previous_hash": "51eaae4e02dad3826d498e18500ff341ffc22c58f0921bc45680574f4aa6c22f",
+    "nonce": 0,
+    "hash": "549ee32a39bbf79b5965b2e01fee14f4ab93365f5ba680857648d45c40cde361"
+  },
+  {
+    "index": 32,
+    "timestamp": 1770576317.9837453,
+    "transactions": [
+      {
+        "amount": 10,
+        "contract_id": "sc-001",
+        "from": "system_contract",
+        "to": "07523f2e-4101-460a-bbde-a36df36eaca5",
+        "type": "reward"
+      },
+      {
+        "client_id": "07523f2e-4101-460a-bbde-a36df36eaca5",
+        "contract_id": "sc-001",
+        "fee": 1,
+        "result_data": "000d50fc282b690383b146fdcb163fd7d723ca0e73deef6fdf251930b0f10fd8",
+        "type": "work_receipt",
+        "work_units": 1000
+      }
+    ],
+    "previous_hash": "549ee32a39bbf79b5965b2e01fee14f4ab93365f5ba680857648d45c40cde361",
+    "nonce": 0,
+    "hash": "9eb821251d6fa6df38e8eac3ddff65ddd29fc4f539068510dc3a64a97f386274"
+  },
+  {
+    "index": 33,
+    "timestamp": 1770576824.6943307,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "amount": 10,
+        "contract_id": "sc-001"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "contract_id": "sc-001",
+        "work_units": 1000,
+        "result_data": "00026188c35bfb4b1891acbb6d1de0e29b26b8f1a838247d81f8ec7a773de045",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "9eb821251d6fa6df38e8eac3ddff65ddd29fc4f539068510dc3a64a97f386274",
+    "nonce": 0,
+    "hash": "05a4ecbd1dfbeaab95f0e8777e252dee2b7a8ca59b93c548f5cb56366b379615"
+  },
+  {
+    "index": 34,
+    "timestamp": 1770578486.9812326,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "bd45287d-64e0-411c-bf67-ceed7367862d",
+        "amount": 750,
+        "contract_id": "astro-005"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "bd45287d-64e0-411c-bf67-ceed7367862d",
+        "contract_id": "astro-005",
+        "work_units": 150000,
+        "result_data": "63c4f78f245e0bfa51722c3b81bbfbc7c8016f3e682d0c4d7cc1490606973f1a",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "05a4ecbd1dfbeaab95f0e8777e252dee2b7a8ca59b93c548f5cb56366b379615",
+    "nonce": 0,
+    "hash": "c868a714faf9527a546d2a945b2982b835a1c448d36f23c534acb040234201b9"
+  },
+  {
+    "index": 35,
+    "timestamp": 1770578580.6393867,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "bd45287d-64e0-411c-bf67-ceed7367862d",
+        "amount": 350,
+        "contract_id": "astro-004"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "bd45287d-64e0-411c-bf67-ceed7367862d",
+        "contract_id": "astro-004",
+        "work_units": 70000,
+        "result_data": "ae4a709bc41c19160974abc8388b5d6f9642667f961c5494304237d38ea70552",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "c868a714faf9527a546d2a945b2982b835a1c448d36f23c534acb040234201b9",
+    "nonce": 0,
+    "hash": "8b322f406078dfe13c54eeef6f8547ddfa3353d585c98162c11ac8fb6ae4ac4f"
+  },
+  {
+    "index": 36,
+    "timestamp": 1770578817.033383,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "5c4fd466-bbc3-4209-894f-b29388259c96",
+        "amount": 500,
+        "contract_id": "astro-001"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "5c4fd466-bbc3-4209-894f-b29388259c96",
+        "contract_id": "astro-001",
+        "work_units": 100000,
+        "result_data": "cf15c4861229eccd1afdf718ae0a2df08c41351f588c388265ac2ef9c45ba6f2",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "8b322f406078dfe13c54eeef6f8547ddfa3353d585c98162c11ac8fb6ae4ac4f",
+    "nonce": 0,
+    "hash": "8cb3c16c9b455461fb2187085c49d83b6f1e293c2ac957c98c09d156e06c05f4"
+  },
+  {
+    "index": 37,
+    "timestamp": 1770579598.8714192,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "amount": 50,
+        "contract_id": "sc-002"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "contract_id": "sc-002",
+        "work_units": 5000,
+        "result_data": "0000cd0ebbf4ae6536c763495b727cd58059298eed2c075dcbe797a10efb06fc",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "8cb3c16c9b455461fb2187085c49d83b6f1e293c2ac957c98c09d156e06c05f4",
+    "nonce": 0,
+    "hash": "d6aefe3e962d72db4a807e0ffb2c49dd964fc118ccae49857a61953675602e42"
+  },
+  {
+    "index": 38,
+    "timestamp": 1770580999.0565178,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "amount": 500,
+        "contract_id": "astro-001"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "contract_id": "astro-001",
+        "work_units": 100000,
+        "result_data": "d7a837aff6242eaadc8f3e508feee4ccd5fe77756aabed102c1a41fcd6c499cf",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "d6aefe3e962d72db4a807e0ffb2c49dd964fc118ccae49857a61953675602e42",
+    "nonce": 0,
+    "hash": "21f4bdedea9330a17da6f289573731ca70f4d7c66c64e38887ae7e8ec24bc1ab"
+  },
+  {
+    "index": 39,
+    "timestamp": 1770581631.8770967,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "5c4fd466-bbc3-4209-894f-b29388259c96",
+        "amount": 500,
+        "contract_id": "astro-001"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "5c4fd466-bbc3-4209-894f-b29388259c96",
+        "contract_id": "astro-001",
+        "work_units": 100000,
+        "result_data": "cf15c4861229eccd1afdf718ae0a2df08c41351f588c388265ac2ef9c45ba6f2",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "21f4bdedea9330a17da6f289573731ca70f4d7c66c64e38887ae7e8ec24bc1ab",
+    "nonce": 0,
+    "hash": "14e6be447d76e1ad18efa7dd06b87b8c5f6e668c98ae30fb9e0a2a85acd8a8c9"
+  },
+  {
+    "index": 40,
+    "timestamp": 1770582202.9833362,
+    "transactions": [
+      {
+        "type": "reward",
+        "from": "system_contract",
+        "to": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "amount": 500,
+        "contract_id": "astro-001"
+      },
+      {
+        "type": "work_receipt",
+        "client_id": "87a37b1e-d6e6-4a37-b252-f008c0179aae",
+        "contract_id": "astro-001",
+        "work_units": 100000,
+        "result_data": "d7a837aff6242eaadc8f3e508feee4ccd5fe77756aabed102c1a41fcd6c499cf",
+        "fee": 1
+      }
+    ],
+    "previous_hash": "14e6be447d76e1ad18efa7dd06b87b8c5f6e668c98ae30fb9e0a2a85acd8a8c9",
+    "nonce": 0,
+    "hash": "900668948d118ea93a45026b156049b75a37212a9b388a22626d928978c7b321"
   }
 ]

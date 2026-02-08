@@ -74,22 +74,27 @@ services:
   #     - orchestrator_node_1
   #   # restart: unless-stopped
 
-  # 3. Клиент-вычислитель 1 (подключается к узлу 1)
+  # 3. Клиент-вычислитель 1 (подключается к узлу 1).
+  # Профиль "workers": не стартует при обычном docker-compose up -d, только при docker-compose --profile workers up -d.
+  # Рекомендуется запускать воркеры из интерфейса («Запустить воркер») — тогда будет один контракт и нужный вычислитель.
   client_worker_1:
+    profiles:
+      - workers
     build:
       context: .
       dockerfile: client_worker/Dockerfile
     container_name: client_worker_1
     environment:
       - ORCHESTRATOR_URL=http://orchestrator_node_1:5000
-      # Опционально: только задачи по контракту (из интерфейса «Выполнить в воркере»)
       - CONTRACT_ID=${CONTRACT_ID:-}
     depends_on:
       - orchestrator_node_1
     # restart: unless-stopped
 
-  # 4. Клиент-вычислитель 2 (подключается к узлу 2)
+  # 4. Клиент-вычислитель 2 (подключается к узлу 2). То же: профиль workers, не стартует по умолчанию.
   client_worker_2:
+    profiles:
+      - workers
     build:
       context: .
       dockerfile: client_worker/Dockerfile

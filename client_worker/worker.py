@@ -15,7 +15,8 @@ logger = logging.getLogger("worker")
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://orchestrator_node:5000")
 # Для самоподписанных сертификатов (TLS) можно задать VERIFY_SSL=false
 VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() not in ("0", "false", "no")
-# Опционально: брать только задачи по указанному контракту (для запуска из интерфейса «Выполнить в воркере»)
+# Опционально: брать только задачи по указанному контракту (для запуска из интерфейса «Выполнить в воркере»).
+# Если не задан, воркер запрашивает случайный контракт каждый раз — награды могут идти за любые контракты.
 CONTRACT_ID = os.environ.get("CONTRACT_ID", "").strip() or None
 # Если заданы API_KEY и CLIENT_ID (при запуске из интерфейса), воркер работает от этого аккаунта — награда идёт на ваш баланс
 API_KEY_FROM_ENV = os.environ.get("API_KEY", "").strip() or None
@@ -29,7 +30,7 @@ class ClientWorker:
         if API_KEY_FROM_ENV and CLIENT_ID_FROM_ENV:
             self.api_key = API_KEY_FROM_ENV
             self.client_id = CLIENT_ID_FROM_ENV
-            logger.info("Using account from interface: client_id=%s...", self.client_id[:8])
+            logger.info("Using account from interface: client_id=%s... (rewards will be credited to this ID)", self.client_id[:8])
         elif API_KEY_FROM_ENV:
             self._use_existing_key()
         else:
@@ -57,7 +58,7 @@ class ClientWorker:
                 self.client_id = data.get("client_id")
                 if not self.client_id:
                     raise ValueError("Missing client_id in /me response")
-                logger.info("Using existing account: client_id=%s...", self.client_id[:8])
+                logger.info("Using existing account: client_id=%s... (rewards will be credited to this ID)", self.client_id[:8])
                 return
             except requests.RequestException as e:
                 logger.warning("Failed to get /me (retry in 5s): %s", e)
@@ -207,5 +208,11 @@ class ClientWorker:
 
 
 if __name__ == "__main__":
+    if CONTRACT_ID:
+        logger.info("Contract filter: only tasks for contract_id=%s (other contracts will NOT be requested)", CONTRACT_ID)
+    else:
+        logger.warning("No CONTRACT_ID set: worker will request random contracts (rewards may be for any contract)")
     worker = ClientWorker()
+    if worker.client_id:
+        logger.info("Worker started. Rewards will go to client_id=%s...", worker.client_id[:8])
     worker.run()
