@@ -337,6 +337,8 @@ def get_task():
     """
     Клиент запрашивает задачу (смарт-контракт). Требуется аутентификация: Authorization: Bearer <api_key>.
     Опциональный query-параметр contract_id — выдать задачу по указанному контракту (для выбора из блока «Контракты»).
+    В терминах BOINC: выдача одной единицы работы (one result/workunit per request); при необходимости можно
+    расширить API (например, max_tasks или duration_sec) по образцу Work Distribution BOINC.
     """
     client_id = get_client_id_from_auth()
     if client_id is None:
@@ -393,8 +395,10 @@ def submit_work():
     if not contract:
         return jsonify({"error": "Invalid contract ID"}), 400
 
-    # Верификация работы через исполняемый контракт (с nonce — строгая проверка хеша)
+    # BOINC: validator определяет корректность результата; assimilator обрабатывает верифицированные результаты.
+    # У нас: validator = contract.verify(); assimilator = создание блока с reward + work_receipt ниже.
     if not contract.verify(client_id, contract_id, work_units_done, result_data, nonce):
+        logger.warning("submit_work_verification_failed: client_id=%s... contract_id=%s (balance not updated)", client_id[:8], contract_id)
         return jsonify({"error": "Work verification failed"}), 400
 
     reward_amount = contract.get_reward()
@@ -411,7 +415,7 @@ def submit_work():
         "contract_id": contract_id
     }
     
-    # Создаём "квитанцию" о работе (result_data для replay; fee — комиссия, сжигается в блоке)
+    # Assimilator (BOINC): учёт верифицированного результата — запись в блокчейн (reward + work_receipt; result_data для replay, fee сжигается).
     work_receipt_tx = {
         "type": "work_receipt",
         "client_id": client_id,

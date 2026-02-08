@@ -6,6 +6,13 @@
       "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
       "api_key": "Xq5ZcDDQgaiCAZwwL5CAsrz34o_xuEmND1mJDvoMzcM",
       "nickname": "Empire"
+    },
+    {
+      "login": "blackgold",
+      "password_hash": "pbkdf2:sha256:1000000$yZNndEJcXPQE4dDv$755fcacb445cb7c25f371e5a5017dbb811b0bd1649a638d4d3334875b92bd23e",
+      "client_id": "5c4fd466-bbc3-4209-894f-b29388259c96",
+      "api_key": "3bDgDAeGz69txD9IRDNusg8Gm8XuilF07AhRnooMr0o",
+      "nickname": "Blackgold"
     }
   ]
 }

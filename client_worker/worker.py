@@ -124,25 +124,12 @@ class ClientWorker:
             logger.error("perform_computation invalid task: %s", e)
             return 0, "", None
         
-        # Общий модуль shared (тот же код, что у оркестратора) — детерминированный seed по SHA256
-        try:
-            from shared.computation_types import COMPUTATION_TYPES, deterministic_seed
-        except ImportError:
-            COMPUTATION_TYPES = {}
-            deterministic_seed = None
-            try:
-                from computation_types import COMPUTATION_TYPES as _LOCAL
-                COMPUTATION_TYPES = _LOCAL
-            except ImportError:
-                pass
+        # Единый модуль shared (тот же код, что у оркестратора) — детерминированный seed по SHA256
+        from shared.computation_types import COMPUTATION_TYPES, deterministic_seed, compute_simple_pow
 
         compute_func = COMPUTATION_TYPES.get(computation_type)
         if not compute_func:
             logger.warning("Unknown computation_type %s, using simple_pow", computation_type)
-            try:
-                from shared.computation_types import compute_simple_pow
-            except ImportError:
-                from computation_types import compute_simple_pow
             compute_func = compute_simple_pow
 
         logger.info("Starting computation: type=%s contract_id=%s work_units=%s",
@@ -154,10 +141,7 @@ class ClientWorker:
             )
             work_units_done = target_work
         else:
-            # Детерминированный seed (SHA256) — одинаковый у воркера и оркестратора для строгой верификации
-            seed = deterministic_seed(self.client_id, contract_id) if deterministic_seed else (
-                hash(f"{self.client_id}-{contract_id}") % (2**32)
-            )
+            seed = deterministic_seed(self.client_id, contract_id)
             result_data, computed_seed = compute_func(
                 self.client_id, contract_id, target_work, seed=seed
             )
