@@ -18,6 +18,8 @@ VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() not in ("0", "false", 
 # Опционально: брать только задачи по указанному контракту (для запуска из интерфейса «Выполнить в воркере»).
 # Если не задан, воркер запрашивает случайный контракт каждый раз — награды могут идти за любые контракты.
 CONTRACT_ID = os.environ.get("CONTRACT_ID", "").strip() or None
+# RUN_ONCE=1: выполнить одну задачу и выйти (иначе — цикл по образцу BOINC: много задач до остановки).
+RUN_ONCE = os.environ.get("RUN_ONCE", "").strip().lower() in ("1", "true", "yes")
 # Если заданы API_KEY и CLIENT_ID (при запуске из интерфейса), воркер работает от этого аккаунта — награда идёт на ваш баланс
 API_KEY_FROM_ENV = os.environ.get("API_KEY", "").strip() or None
 CLIENT_ID_FROM_ENV = os.environ.get("CLIENT_ID", "").strip() or None
@@ -135,16 +137,34 @@ class ClientWorker:
 
         logger.info("Starting computation: type=%s contract_id=%s work_units=%s",
                    computation_type, contract_id, target_work)
+        if target_work >= 10000 and computation_type != "simple_pow":
+            logger.info("Large task (%s units): computation may take 10-60 minutes; progress will be logged every 10000 steps.",
+                        target_work)
 
         if computation_type == "simple_pow":
+            task_seed = task.get("task_seed")
             result_data, solution_nonce = compute_func(
-                self.client_id, contract_id, target_work, difficulty
+                self.client_id, contract_id, target_work, difficulty, seed=task_seed
             )
             work_units_done = target_work
         else:
-            seed = deterministic_seed(self.client_id, contract_id)
+            # Уникальный task_seed от оркестратора при каждой выдаче — чтобы повторные задачи по тому же
+            # контракту давали разный результат и не отклонялись как "Proof already used".
+            task_seed = task.get("task_seed")
+            if task_seed is not None:
+                try:
+                    seed = int(task_seed)
+                except (TypeError, ValueError):
+                    seed = deterministic_seed(self.client_id, contract_id)
+            else:
+                seed = deterministic_seed(self.client_id, contract_id)
+            def _progress(cur, total):
+                pct = 100.0 * cur / total if total else 0
+                logger.info("Progress: %s / %s (%.0f%%)", cur, total, pct)
+                self._report_progress(contract_id, cur, total)
             result_data, computed_seed = compute_func(
-                self.client_id, contract_id, target_work, seed=seed
+                self.client_id, contract_id, target_work, seed=seed,
+                progress_callback=_progress
             )
             work_units_done = target_work
             solution_nonce = computed_seed if computed_seed else str(seed)
@@ -155,30 +175,55 @@ class ClientWorker:
         return work_units_done, result_data or "", solution_nonce
 
     def submit_work(self, task, work_done, result_data, solution_nonce=None):
-        """Отправка результата оркестратору: contract_id, work_units_done, result_data, nonce (для строгой проверки контрактом)."""
+        """Отправка результата оркестратору. Повторные попытки при сбое — чтобы не терять выполненную работу."""
         payload = {
             "client_id": self.client_id,
             "contract_id": task["contract_id"],
             "work_units_done": work_done,
             "result_data": result_data,
-            "nonce": solution_nonce,  # Контракт пересчитает хеш и сравнит с result_data
+            "nonce": solution_nonce,
         }
+        max_attempts = 4
+        # Оркестратор заново выполняет полную верификацию (те же 60k/70k шагов) — может занять 10–15 мин
+        submit_timeout = 900  # 15 минут
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info("Submitting result to %s/submit_work (attempt %s/%s, timeout %ss)",
+                            ORCHESTRATOR_URL, attempt, max_attempts, submit_timeout)
+                response = requests.post(
+                    f"{ORCHESTRATOR_URL}/submit_work",
+                    json=payload,
+                    headers=self._auth_headers(),
+                    verify=VERIFY_SSL,
+                    timeout=submit_timeout,
+                )
+                response.raise_for_status()
+                data = response.json()
+                logger.info("submit_work success: reward_issued=%s", data.get("reward_issued"))
+                return
+            except requests.RequestException as e:
+                body = ""
+                if hasattr(e, "response") and e.response is not None:
+                    body = (e.response.text or "")[:500]
+                logger.warning("submit_work attempt %s/%s failed: %s response=%s", attempt, max_attempts, e, body)
+                if attempt < max_attempts:
+                    delay = 5 * attempt
+                    logger.info("Retrying submit_work in %s seconds...", delay)
+                    time.sleep(delay)
+        logger.error("submit_work failed after %s attempts; result not submitted, reward not issued.", max_attempts)
+
+    def _report_progress(self, contract_id, step, total):
+        """Отправить прогресс в оркестратор для отображения в интерфейсе."""
         try:
-            response = requests.post(
-                f"{ORCHESTRATOR_URL}/submit_work",
-                json=payload,
+            requests.post(
+                f"{ORCHESTRATOR_URL}/worker_progress",
+                json={"contract_id": contract_id, "step": step, "total": total},
                 headers=self._auth_headers(),
                 verify=VERIFY_SSL,
-                timeout=120,
+                timeout=3,
             )
-            response.raise_for_status()
-            data = response.json()
-            logger.info("submit_work success: reward_issued=%s", data.get("reward_issued"))
-        except requests.RequestException as e:
-            body = ""
-            if hasattr(e, "response") and e.response is not None:
-                body = (e.response.text or "")[:500]
-            logger.warning("submit_work failed: %s response=%s", e, body)
+        except requests.RequestException:
+            pass
 
     def check_balance(self):
         """Запрос текущего баланса по client_id (требуется аутентификация)."""
@@ -195,15 +240,22 @@ class ClientWorker:
             logger.warning("check_balance failed: %s", e)
 
     def run(self):
-        """Цикл: запрос задачи → вычисление → отправка результата → проверка баланса."""
+        """Запрос задачи → вычисление → отправка результата → проверка баланса. При RUN_ONCE — один проход и выход."""
         if not self.client_id:
             return
         while True:
             task = self.fetch_task()
             if task:
                 work_done, result, solution_nonce = self.perform_computation(task)
+                self._report_progress(task["contract_id"], work_done, work_done)
                 self.submit_work(task, work_done, result, solution_nonce)
                 self.check_balance()
+                if RUN_ONCE:
+                    logger.info("RUN_ONCE: one task done, exiting.")
+                    return
+            if RUN_ONCE:
+                logger.warning("RUN_ONCE: no task received, exiting.")
+                return
             time.sleep(10)  # Пауза перед следующей задачей
 
 

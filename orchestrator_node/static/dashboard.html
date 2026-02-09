@@ -219,6 +219,17 @@
       <div class="label">Выполнить задачу в воркере</div>
       <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Воркер запускается с API-ключом выбранного вычислителя (вкладка «Обзор») и <strong>только для контракта текущей задачи</strong> (см. блок «Текущая задача» выше). Награда начислится на этого вычислителя. Перед запуском нажмите «Использовать» для нужного вычислителя и при необходимости «Обновить данные».</p>
       <p class="muted" style="font-size:0.8em; margin-bottom:8px;">Если на баланс уже начислялись токены за другие контракты — вероятно, работал ещё один воркер (другой контейнер или запуск без выбора задачи). Остановите все контейнеры воркеров (<code>docker ps</code>, затем <code>docker stop &lt;id&gt;</code>), затем запустите только один раз с нужной задачей (сначала «Получить задачу» или «Взять задачу» по astro-002).</p>
+      <div class="row" style="align-items:center; gap:16px; margin-bottom:12px; flex-wrap:wrap;">
+        <span class="muted" style="font-size:0.9em;">Режим воркера:</span>
+        <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="work-worker-mode" id="work-worker-mode-loop" value="loop" checked>
+          <span>Брать следующую задачу автоматически (цикл до остановки)</span>
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="work-worker-mode" id="work-worker-mode-once" value="once">
+          <span>Выполнить одну задачу и остановиться</span>
+        </label>
+      </div>
       <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
         <button type="button" class="primary" id="btn-start-worker">Запустить воркер автоматически</button>
         <span id="work-run-worker-msg" class="msg" style="display:none;"></span>
@@ -233,7 +244,7 @@
         <code id="work-worker-cmd" class="mono" style="flex:1; background:var(--bg); padding:8px 12px; border-radius:6px; font-size:0.85rem; word-break:break-all;"></code>
         <button type="button" class="primary" id="btn-copy-worker-cmd">Копировать</button>
       </div>
-      <p style="font-size:0.8em; color:var(--muted); margin:8px 0 0;">В Windows (CMD): <code>set CONTRACT_ID=<span id="work-worker-cid"></span> &amp;&amp; docker-compose run --rm client_worker_1</code></p>
+      <p style="font-size:0.8em; color:var(--muted); margin:8px 0 0;">В Windows (CMD): <code>set CONTRACT_ID=<span id="work-worker-cid"></span><span id="work-worker-win-once"></span> &amp;&amp; docker-compose run --rm client_worker_1</code></p>
     </div>
     <div class="row">
       <button type="button" class="primary" id="btn-run-work" disabled>Выполнить в браузере</button>
@@ -299,6 +310,13 @@
           <div class="card"><div class="label">Сдано работ</div><div id="profile-submissions-full" class="value">-</div></div>
         </div>
       </div>
+      <div id="profile-worker-progress-card" class="card" style="display:none; margin-bottom:20px;">
+        <div class="label">Активные задачи и прогресс воркера</div>
+        <p class="muted" style="font-size:0.9em; margin-bottom:8px;">Текущая задача, которую выполняет воркер под этим аккаунтом (если запущен), и прогресс вычисления.</p>
+        <p id="profile-worker-progress-text" class="muted" style="margin:8px 0 4px 0;">Вычисление…</p>
+        <progress id="profile-worker-progress-bar" value="0" max="100" style="width:100%; height:12px; border-radius:6px;"></progress>
+        <p id="profile-worker-no-task" class="muted" style="display:none; margin-top:8px;">Нет активной задачи. Запустите воркер на вкладке «Работа».</p>
+      </div>
       <div class="card" style="margin-bottom:20px;">
         <div class="label">Вывод средств (симуляция)</div>
         <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Конвертация токенов в рубли и вывод на карту. Это демонстрационный режим: реальные платежи не выполняются.</p>
@@ -336,7 +354,8 @@
       if (panel) panel.classList.add('active');
       if (btn) btn.classList.add('active');
       if (id === 'overview') loadOverview();
-      if (id === 'work') { /* состояние задачи уже на панели */ }
+      if (id === 'profile') { startWorkerProgressPolling(); }
+      else { stopWorkerProgressPolling(); }
       if (id === 'contracts') loadContracts();
       if (id === 'tasks') loadTasks();
       if (id === 'chain') loadChain();
@@ -370,6 +389,8 @@
     }
 
     let currentTask = null;
+    /** ID вычислителя, для которого сейчас отображается задача на вкладке «Работа». При смене аккаунта сбрасываем панель. */
+    let workPanelAccountId = null;
 
     const STORAGE_KEY_CLIENTS = 'dc_clients';
     function getSavedClients() {
@@ -435,6 +456,8 @@
           document.getElementById('input-api-key').value = c.apiKey || '';
           document.getElementById('input-api-key-work').value = c.apiKey || '';
           document.getElementById('select-client').value = c.id;
+          if (getSelectedClientId() !== workPanelAccountId) clearWorkPanelForNewAccount();
+          workPanelAccountId = getSelectedClientId();
         };
         row.querySelector('[data-sync-one]').onclick = async () => {
           const updated = await syncWorkerData(c);
@@ -459,6 +482,8 @@
         document.getElementById('input-api-key').value = c.apiKey;
         document.getElementById('input-api-key-work').value = c.apiKey;
       }
+      if (getSelectedClientId() !== workPanelAccountId) clearWorkPanelForNewAccount();
+      workPanelAccountId = getSelectedClientId();
       if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
     };
     document.getElementById('btn-add-client').onclick = function() {
@@ -791,9 +816,43 @@
       const k2 = document.getElementById('input-api-key-work').value.trim();
       return k2 || k1;
     }
+    function getSelectedClientId() {
+      const v = document.getElementById('select-client').value;
+      return v || null;
+    }
+    /** Сброс вкладки «Работа» при смене вычислителя: задача и блок воркера скрыты, подсказка — получить задачу заново. */
+    function clearWorkPanelForNewAccount() {
+      currentTask = null;
+      workPanelAccountId = null;
+      const specEl = document.getElementById('work-task-spec');
+      const bodyEl = document.getElementById('work-task-body');
+      const workerBlock = document.getElementById('work-run-in-worker');
+      const msg = document.getElementById('work-task-msg');
+      const runBtn = document.getElementById('btn-run-work');
+      if (specEl) specEl.style.display = 'none';
+      if (bodyEl) bodyEl.innerHTML = '';
+      if (workerBlock) workerBlock.style.display = 'none';
+      if (msg) {
+        msg.className = 'msg info';
+        msg.textContent = 'Вычислитель сменён. Нажмите «Получить задачу» для текущего вычислителя.';
+        msg.style.display = 'block';
+      }
+      if (runBtn) runBtn.disabled = true;
+      const resultEl = document.getElementById('work-result');
+      const progressEl = document.getElementById('work-progress');
+      if (resultEl) { resultEl.style.display = 'none'; resultEl.textContent = ''; }
+      if (progressEl) progressEl.style.display = 'none';
+      const runWorkerMsg = document.getElementById('work-run-worker-msg');
+      const statusHint = document.getElementById('work-worker-status-hint');
+      const balanceResult = document.getElementById('work-worker-balance-result');
+      if (runWorkerMsg) { runWorkerMsg.style.display = 'none'; runWorkerMsg.textContent = ''; }
+      if (statusHint) statusHint.style.display = 'none';
+      if (balanceResult) { balanceResult.style.display = 'none'; balanceResult.textContent = ''; }
+    }
 
     function setCurrentTask(task) {
       currentTask = task;
+      workPanelAccountId = getSelectedClientId();
       const specEl = document.getElementById('work-task-spec');
       const bodyEl = document.getElementById('work-task-body');
       const runBtn = document.getElementById('btn-run-work');
@@ -822,12 +881,77 @@
       const cidEl = document.getElementById('work-worker-cid');
       if (cid && workerBlock && cmdEl && cidEl) {
         workerBlock.style.display = 'block';
-        const cmd = 'CONTRACT_ID=' + cid + ' docker-compose run --rm client_worker_1';
-        cmdEl.textContent = cmd;
+        updateWorkerCmd();
         cidEl.textContent = cid;
       } else if (workerBlock) {
         workerBlock.style.display = 'none';
       }
+    }
+
+    function updateWorkerCmd() {
+      const cmdEl = document.getElementById('work-worker-cmd');
+      const winOnceEl = document.getElementById('work-worker-win-once');
+      const cid = (currentTask && currentTask.contract_id) ? currentTask.contract_id : '';
+      const runOnce = document.getElementById('work-worker-mode-once') && document.getElementById('work-worker-mode-once').checked;
+      if (!cmdEl || !cid) return;
+      let cmd = 'CONTRACT_ID=' + cid;
+      if (runOnce) cmd += ' RUN_ONCE=1';
+      cmd += ' docker-compose run --rm client_worker_1';
+      cmdEl.textContent = cmd;
+      if (winOnceEl) winOnceEl.textContent = runOnce ? ' && set RUN_ONCE=1' : '';
+    }
+
+    (function() {
+      const onceRadio = document.getElementById('work-worker-mode-once');
+      const loopRadio = document.getElementById('work-worker-mode-loop');
+      if (onceRadio) onceRadio.addEventListener('change', updateWorkerCmd);
+      if (loopRadio) loopRadio.addEventListener('change', updateWorkerCmd);
+    })();
+
+    let workProgressIntervalId = null;
+    async function fetchWorkerProgress() {
+      const key = getApiKey();
+      const card = document.getElementById('profile-worker-progress-card');
+      const textEl = document.getElementById('profile-worker-progress-text');
+      const bar = document.getElementById('profile-worker-progress-bar');
+      const noTaskEl = document.getElementById('profile-worker-no-task');
+      if (!card || !textEl || !bar) return;
+      if (!key) { card.style.display = 'none'; if (noTaskEl) noTaskEl.style.display = 'none'; return; }
+      try {
+        const r = await fetch(base + '/worker_progress', { headers: { 'Authorization': 'Bearer ' + key } });
+        const data = await r.json().catch(() => ({}));
+        const p = data.progress;
+        if (!p || p.total <= 0) {
+          card.style.display = 'block';
+          if (noTaskEl) { noTaskEl.style.display = 'block'; }
+          textEl.style.display = 'none';
+          bar.style.display = 'none';
+          return;
+        }
+        if (noTaskEl) noTaskEl.style.display = 'none';
+        textEl.style.display = 'block';
+        bar.style.display = 'block';
+        const pct = Math.min(100, Math.round(100.0 * p.step / p.total));
+        bar.value = pct;
+        bar.max = 100;
+        if (p.step >= p.total) {
+          textEl.textContent = 'Задача выполнена (100%) — контракт ' + (p.contract_id || '') + '. Сдача результата или ожидание следующей задачи.';
+        } else {
+          textEl.textContent = 'Активная задача: контракт ' + (p.contract_id || '') + ' — ' + pct + '% (' + p.step + ' / ' + p.total + ' ед. работы).';
+        }
+        card.style.display = 'block';
+      } catch (e) {
+        card.style.display = 'none';
+        if (noTaskEl) noTaskEl.style.display = 'none';
+      }
+    }
+    function startWorkerProgressPolling() {
+      stopWorkerProgressPolling();
+      fetchWorkerProgress();
+      workProgressIntervalId = setInterval(fetchWorkerProgress, 2000);
+    }
+    function stopWorkerProgressPolling() {
+      if (workProgressIntervalId) { clearInterval(workProgressIntervalId); workProgressIntervalId = null; }
     }
 
     document.getElementById('btn-copy-worker-cmd').onclick = function() {
@@ -855,7 +979,8 @@
       const sel = document.getElementById('select-client').value;
       const list = getSavedClients();
       const selectedClient = list.find(function(c) { return c.id === sel; });
-      const body = { contract_id: currentTask.contract_id };
+      const runOnce = document.getElementById('work-worker-mode-once') && document.getElementById('work-worker-mode-once').checked;
+      const body = { contract_id: currentTask.contract_id, run_once: runOnce };
       if (selectedClient && selectedClient.client_id) body.client_id = selectedClient.client_id;
       this.disabled = true;
       try {

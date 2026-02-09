@@ -354,8 +354,12 @@ def get_task():
         contract = random.choice(list(CONTRACTS.values()))
     # Учитываем активного вычислителя по этому контракту
     _active_task_takers[(contract.contract_id, client_id)] = time.time()
+    spec = contract.get_task_spec()
+    # Уникальный task_seed при каждой выдаче — чтобы разный результат и не было "Proof already used".
+    # Для всех типов вычислений (в т.ч. simple_pow и астро).
+    spec["task_seed"] = uuid.uuid4().int & (2**32 - 1)  # уникальный при каждом вызове, без повторов
     logger.info("task_issued: contract_id=%s client_id=%s...", contract.contract_id, client_id[:8])
-    return jsonify(contract.get_task_spec()), 200
+    return jsonify(spec), 200
 
 @app.route("/submit_work", methods=["POST"])
 @limiter.limit("30 per minute")  # Защита от DDoS: не более 30 сдач в минуту на ключ
@@ -364,8 +368,10 @@ def submit_work():
     Клиент отправляет результат своей работы. Требуется аутентификация: Authorization: Bearer <api_key>.
     client_id в теле должен совпадать с владельцем api_key.
     """
+    logger.info("submit_work request received")
     client_id_from_key = get_client_id_from_auth()
     if client_id_from_key is None:
+        logger.warning("submit_work: unauthorized (missing or invalid Bearer)")
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     try:
         data = request.get_json(silent=True) or {}
@@ -374,6 +380,7 @@ def submit_work():
         return jsonify({"error": "Invalid JSON"}), 400
     client_id = data.get("client_id")
     if client_id != client_id_from_key:
+        logger.warning("submit_work: rejected client_id mismatch (body=%s... auth=%s...)", (client_id or "")[:8], (client_id_from_key or "")[:8])
         return jsonify({"error": "client_id does not match authenticated client"}), 403
     contract_id = data.get("contract_id")
     work_units_done = data.get("work_units_done")
@@ -381,27 +388,34 @@ def submit_work():
     nonce = data.get("nonce")  # Nonce для строгой проверки контрактом
 
     if not all([client_id, contract_id, work_units_done is not None]):
+        logger.warning("submit_work: missing data (client_id=%s contract_id=%s work_units_done=%s)", bool(client_id), contract_id, work_units_done)
         return jsonify({"error": "Missing data"}), 400
 
     # Защита от мошенничества: обязателен nonce для строгой верификации (невозможно подделать результат)
     if nonce is None or nonce == "":
+        logger.warning("submit_work: nonce required")
         return jsonify({"error": "nonce required for verification"}), 400
 
     # Защита от повторной сдачи (replay): одно и то же доказательство нельзя использовать дважды
     used_proofs = blockchain.get_used_proof_ids()
     if result_data and result_data in used_proofs:
+        logger.warning("submit_work: proof already used (replay)")
         return jsonify({"error": "Proof already used (replay attack rejected)"}), 400
 
     # Находим контракт по contract_id
     contract = CONTRACTS.get(contract_id)
     if not contract:
+        logger.warning("submit_work: invalid contract_id=%s", contract_id)
         return jsonify({"error": "Invalid contract ID"}), 400
 
-    # BOINC: validator определяет корректность результата; assimilator обрабатывает верифицированные результаты.
-    # У нас: validator = contract.verify(); assimilator = создание блока с reward + work_receipt ниже.
+    # BOINC: validator определяет корректность результата. У нас для астро-контрактов verify() заново
+    # выполняет полное вычисление (60k–70k шагов) — может занять 10–15 мин; воркер должен ждать (timeout 900s).
+    logger.info("submit_work: starting verification for client_id=%s... contract_id=%s (may take several minutes for large tasks)",
+                client_id[:8], contract_id)
     if not contract.verify(client_id, contract_id, work_units_done, result_data, nonce):
         logger.warning("submit_work_verification_failed: client_id=%s... contract_id=%s (balance not updated)", client_id[:8], contract_id)
         return jsonify({"error": "Work verification failed"}), 400
+    logger.info("submit_work: verification passed for client_id=%s... contract_id=%s", client_id[:8], contract_id)
 
     reward_amount = contract.get_reward()
     if reward_amount < FEE_PER_WORK_RECEIPT:
@@ -597,10 +611,11 @@ def get_contracts():
     return jsonify(out), 200
 
 
-def _run_worker_container(contract_id, api_key=None, client_id=None):
+def _run_worker_container(contract_id, api_key=None, client_id=None, run_once=False):
     """
     Запуск контейнера воркера с CONTRACT_ID (для выбранной задачи).
     Если переданы api_key и client_id, воркер работает от этого аккаунта — награда попадёт на ваш баланс.
+    run_once: если True, воркер выполнит одну задачу и выйдет; иначе — цикл до остановки (как в BOINC).
     Требует: доступ к Docker (сокет), env WORKER_IMAGE, ORCHESTRATOR_URL_FOR_WORKER, DOCKER_NETWORK.
     Возвращает (success: bool, message: str).
     """
@@ -612,12 +627,14 @@ def _run_worker_container(contract_id, api_key=None, client_id=None):
     if not worker_image:
         return False, "WORKER_IMAGE not set (run_worker disabled)"
     env = {"CONTRACT_ID": contract_id, "ORCHESTRATOR_URL": orchestrator_url}
+    if run_once:
+        env["RUN_ONCE"] = "1"
     if api_key and api_key.strip():
         env["API_KEY"] = api_key.strip()
     if client_id and str(client_id).strip():
         env["CLIENT_ID"] = str(client_id).strip()
-    logger.info("run_worker starting container contract_id=%s client_id=%s... has_api_key=%s",
-                contract_id, (client_id or "")[:8] if client_id else None, bool(env.get("API_KEY")))
+    logger.info("run_worker starting container contract_id=%s client_id=%s... run_once=%s has_api_key=%s",
+                contract_id, (client_id or "")[:8] if client_id else None, run_once, bool(env.get("API_KEY")))
     try:
         import docker as docker_module
         client = docker_module.from_env()
@@ -630,7 +647,9 @@ def _run_worker_container(contract_id, api_key=None, client_id=None):
         )
         logger.info("run_worker started container for contract_id=%s (reward will go to client_id=%s...)",
                     contract_id, (client_id or "")[:8] if client_id else None)
-        return True, "Worker started (one task, then container will exit)"
+        if run_once:
+            return True, "Воркер запущен: выполнит одну задачу и остановится."
+        return True, "Воркер запущен: будет брать следующие задачи автоматически до остановки контейнера."
     except Exception as e:
         err = str(e)
         logger.warning("run_worker failed: %s", e)
@@ -667,12 +686,69 @@ def run_worker():
     if body_client_id and body_client_id != client_id:
         logger.warning("run_worker client_id mismatch: body=%s... key_resolves_to=%s...", body_client_id[:8], client_id[:8])
         return jsonify({"error": "client_id does not match this API key (select the correct calculator in Overview)"}), 400
-    ok, msg = _run_worker_container(contract_id, api_key=api_key, client_id=client_id)
+    run_once = data.get("run_once") in (True, "true", "1", 1)
+    ok, msg = _run_worker_container(contract_id, api_key=api_key, client_id=client_id, run_once=run_once)
     if ok:
         return jsonify({"status": "started", "message": msg, "contract_id": contract_id, "client_id": client_id}), 202
     if "not set" in msg or "WORKER_IMAGE" in msg:
         return jsonify({"error": "Worker auto-start disabled (WORKER_IMAGE not set)", "detail": msg}), 503
     return jsonify({"error": "Failed to start worker", "detail": msg}), 500
+
+
+# --- Прогресс воркера для отображения в интерфейсе: client_id -> { contract_id, step, total, updated_at }
+_worker_progress = {}
+WORKER_PROGRESS_TTL = 300  # 5 минут — считаем прогресс устаревшим, если дольше нет обновлений
+
+
+@app.route("/worker_progress", methods=["GET", "POST"])
+@limiter.limit("60 per minute")
+def worker_progress():
+    """
+    GET: прогресс воркера для текущего вычислителя (по API-ключу). Для отображения в интерфейсе.
+    POST: воркер отправляет прогресс (contract_id, step, total). Требуется Authorization.
+    """
+    if request.method == "POST":
+        auth = request.headers.get("Authorization")
+        if not auth or not auth.startswith("Bearer "):
+            return jsonify({"error": "Missing or invalid Authorization"}), 401
+        client_id = api_key_to_client.get(auth[7:].strip())
+        if client_id is None:
+            return jsonify({"error": "Missing or invalid Authorization"}), 401
+        data = request.get_json(silent=True) or {}
+        contract_id = (data.get("contract_id") or "").strip()
+        try:
+            step = int(data.get("step", 0))
+            total = int(data.get("total", 1))
+        except (TypeError, ValueError):
+            return jsonify({"error": "step and total must be integers"}), 400
+        if total <= 0:
+            total = 1
+        step = max(0, min(step, total))
+        _worker_progress[client_id] = {
+            "contract_id": contract_id,
+            "step": step,
+            "total": total,
+            "updated_at": time.time(),
+        }
+        return jsonify({"ok": True}), 200
+    # GET
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"progress": None}), 200
+    rec = _worker_progress.get(client_id)
+    if not rec:
+        return jsonify({"progress": None}), 200
+    if time.time() - rec["updated_at"] > WORKER_PROGRESS_TTL:
+        _worker_progress.pop(client_id, None)
+        return jsonify({"progress": None}), 200
+    return jsonify({
+        "progress": {
+            "contract_id": rec["contract_id"],
+            "step": rec["step"],
+            "total": rec["total"],
+            "updated_at": rec["updated_at"],
+        }
+    }), 200
 
 
 @app.route("/")

@@ -22,9 +22,10 @@ def deterministic_seed(client_id, contract_id):
     return int(h[:8], 16) % (2**32)
 
 
-def compute_cosmological_simulation(client_id, contract_id, work_units, seed=None):
+def compute_cosmological_simulation(client_id, contract_id, work_units, seed=None, progress_callback=None):
     """
     Космологические симуляции: N-body задача (гравитационные взаимодействия).
+    Начальное состояние частиц от rng(seed) — разный task_seed даёт разный результат (защита от replay).
     """
     if seed is None:
         seed = deterministic_seed(client_id, contract_id)
@@ -47,6 +48,8 @@ def compute_cosmological_simulation(client_id, contract_id, work_units, seed=Non
     total_energy = 0.0
 
     for step in range(work_units):
+        if step and step % 10000 == 0 and progress_callback:
+            progress_callback(step, work_units)
         for i in range(n_particles):
             fx, fy, fz = 0.0, 0.0, 0.0
             for j in range(n_particles):
@@ -88,15 +91,19 @@ def compute_cosmological_simulation(client_id, contract_id, work_units, seed=Non
     return result_hash, str(seed)
 
 
-def compute_supernova_modeling(client_id, contract_id, work_units, seed=None):
+def compute_supernova_modeling(client_id, contract_id, work_units, seed=None, progress_callback=None):
     """Моделирование сверхновых: радиационно-гидродинамический взрыв."""
     if seed is None:
         seed = deterministic_seed(client_id, contract_id)
     rng = random.Random(seed)
-
-    T, P, rho = 1e9, 1e15, 1e6
+    # Начальное состояние зависит от seed, иначе при любом seed результат один и тот же (replay).
+    T = 1e9 * (1.0 + rng.uniform(-0.02, 0.02))
+    P = 1e15 * (1.0 + rng.uniform(-0.02, 0.02))
+    rho = 1e6 * (1.0 + rng.uniform(-0.02, 0.02))
 
     for iteration in range(work_units):
+        if iteration and iteration % 10000 == 0 and progress_callback:
+            progress_callback(iteration, work_units)
         dT_dt = -0.1 * T * rho / (1.0 + T/1e8)
         dP_dt = -0.05 * P * T / 1e9
         drho_dt = -0.02 * rho * math.sqrt(T/1e9)
@@ -117,8 +124,8 @@ def compute_supernova_modeling(client_id, contract_id, work_units, seed=None):
     return result_hash, str(seed)
 
 
-def compute_mhd_jets(client_id, contract_id, work_units, seed=None):
-    """МГД джетов и аккреции."""
+def compute_mhd_jets(client_id, contract_id, work_units, seed=None, progress_callback=None):
+    """МГД джетов и аккреции. Начальные Bx,By,Bz,vx от rng(seed) — разный task_seed даёт разный результат (защита от replay)."""
     if seed is None:
         seed = deterministic_seed(client_id, contract_id)
     rng = random.Random(seed)
@@ -130,6 +137,8 @@ def compute_mhd_jets(client_id, contract_id, work_units, seed=None):
     vx = [[[rng.uniform(-0.1, 0.1) for _ in range(grid_size)] for _ in range(grid_size)] for _ in range(grid_size)]
 
     for step in range(work_units):
+        if step and step % 10000 == 0 and progress_callback:
+            progress_callback(step, work_units)
         for i in range(1, grid_size-1):
             for j in range(1, grid_size-1):
                 for k in range(1, grid_size-1):
@@ -148,8 +157,8 @@ def compute_mhd_jets(client_id, contract_id, work_units, seed=None):
     return result_hash, str(seed)
 
 
-def compute_radiative_transfer(client_id, contract_id, work_units, seed=None):
-    """Радиационный перенос."""
+def compute_radiative_transfer(client_id, contract_id, work_units, seed=None, progress_callback=None):
+    """Радиационный перенос. Начальная интенсивность I от rng(seed) — разный task_seed даёт разный результат (защита от replay)."""
     if seed is None:
         seed = deterministic_seed(client_id, contract_id)
     rng = random.Random(seed)
@@ -158,6 +167,8 @@ def compute_radiative_transfer(client_id, contract_id, work_units, seed=None):
     I = [[[rng.uniform(0, 1) for _ in range(n_points)] for _ in range(n_frequencies)] for _ in range(n_angles)]
 
     for step in range(work_units):
+        if step and step % 10000 == 0 and progress_callback:
+            progress_callback(step, work_units)
         for angle_idx in range(n_angles):
             angle = angle_idx * math.pi / n_angles
             cos_angle = math.cos(angle)
@@ -176,8 +187,8 @@ def compute_radiative_transfer(client_id, contract_id, work_units, seed=None):
     return result_hash, str(seed)
 
 
-def compute_gravitational_waves(client_id, contract_id, work_units, seed=None):
-    """Гравитационные волны."""
+def compute_gravitational_waves(client_id, contract_id, work_units, seed=None, progress_callback=None):
+    """Гравитационные волны. Начальные h_plus, h_cross от rng(seed) — разный task_seed даёт разный результат (защита от replay)."""
     if seed is None:
         seed = deterministic_seed(client_id, contract_id)
     rng = random.Random(seed)
@@ -189,6 +200,8 @@ def compute_gravitational_waves(client_id, contract_id, work_units, seed=None):
     dt, dx = 0.001, 0.1
 
     for step in range(work_units):
+        if step and step % 10000 == 0 and progress_callback:
+            progress_callback(step, work_units)
         h_plus_new = [[0.0 for _ in range(grid_size)] for _ in range(grid_size)]
         h_cross_new = [[0.0 for _ in range(grid_size)] for _ in range(grid_size)]
         for i in range(1, grid_size-1):
@@ -209,15 +222,32 @@ def compute_gravitational_waves(client_id, contract_id, work_units, seed=None):
 
 
 def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None):
-    """Простой PoW: поиск хеша с нужным префиксом."""
+    """Простой PoW: поиск хеша с нужным префиксом. Порядок перебора nonce зависит от seed — разный task_seed даёт разный результат (защита от replay)."""
     target_prefix = "0" * difficulty
     final_result, solution_nonce = None, None
-    for nonce in range(1, work_units + 1):
-        text = f"{client_id}-{contract_id}-{nonce}"
-        hash_result = hashlib.sha256(text.encode()).hexdigest()
-        if hash_result.startswith(target_prefix):
-            final_result = hash_result
-            solution_nonce = str(nonce)
+    # Порядок перебора nonce зависит от seed, иначе при том же контракте всегда находим один и тот же nonce → replay.
+    if seed is not None:
+        try:
+            s = int(seed) & 0x7FFFFFFF
+        except (TypeError, ValueError):
+            s = 0
+        max_nonce = max(work_units * 2, 10000)
+        for i in range(work_units):
+            nonce = 1 + (s * 31 + i) % max_nonce
+            text = f"{client_id}-{contract_id}-{nonce}"
+            hash_result = hashlib.sha256(text.encode()).hexdigest()
+            if hash_result.startswith(target_prefix):
+                final_result = hash_result
+                solution_nonce = str(nonce)
+                break
+    else:
+        for nonce in range(1, work_units + 1):
+            text = f"{client_id}-{contract_id}-{nonce}"
+            hash_result = hashlib.sha256(text.encode()).hexdigest()
+            if hash_result.startswith(target_prefix):
+                final_result = hash_result
+                solution_nonce = str(nonce)
+                break
     return final_result or "", solution_nonce
 
 
