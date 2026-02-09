@@ -1,14 +1,19 @@
 """
 Единый модуль вычислений для оркестратора и воркера.
 Один источник правды: одинаковый код и детерминированный seed (SHA256) для строгой верификации.
+
+Правило для всех типов контрактов: result_data (proof) должен быть уникален по client_id,
+т.е. в хеш или в входные данные результата всегда включается client_id. Иначе у разных
+клиентов при одинаковом seed получится один proof и сдача будет отклоняться как «proof already used».
 """
 import hashlib
 import math
 import random
 
-# Диапазон seed для валидации на оркестраторе (защита от переполнения и DoS)
+# Диапазон seed для валидации на оркестраторе (защита от переполнения и DoS).
+# 64 бит — чтобы коллизии между разными клиентами были практически невозможны (proof already used).
 SEED_MIN = 0
-SEED_MAX = 2**32 - 1
+SEED_MAX = (1 << 64) - 1
 
 
 def deterministic_seed(client_id, contract_id):
@@ -87,7 +92,8 @@ def compute_cosmological_simulation(client_id, contract_id, work_units, seed=Non
             total_energy = ke + pe
 
     final_state = f"{particles[0]['x']:.6f}{particles[0]['y']:.6f}{total_energy:.6f}"
-    result_hash = hashlib.sha256(final_state.encode()).hexdigest()
+    # Включаем client_id в хеш: у разных клиентов разный result_data даже при одинаковом seed (нет «proof already used»).
+    result_hash = hashlib.sha256((client_id + "|" + final_state).encode()).hexdigest()
     return result_hash, str(seed)
 
 
@@ -120,7 +126,7 @@ def compute_supernova_modeling(client_id, contract_id, work_units, seed=None, pr
                 break
 
     final_state = f"{T:.6e}{P:.6e}{rho:.6e}"
-    result_hash = hashlib.sha256(final_state.encode()).hexdigest()
+    result_hash = hashlib.sha256((client_id + "|" + final_state).encode()).hexdigest()
     return result_hash, str(seed)
 
 
@@ -153,7 +159,7 @@ def compute_mhd_jets(client_id, contract_id, work_units, seed=None, progress_cal
                     vx[i][j][k] += dvx_dt * dt * 0.1
 
     final_state = f"{Bx[10][10][10]:.6f}{By[10][10][10]:.6f}{Bz[10][10][10]:.6f}"
-    result_hash = hashlib.sha256(final_state.encode()).hexdigest()
+    result_hash = hashlib.sha256((client_id + "|" + final_state).encode()).hexdigest()
     return result_hash, str(seed)
 
 
@@ -183,7 +189,7 @@ def compute_radiative_transfer(client_id, contract_id, work_units, seed=None, pr
 
     total_intensity = sum(sum(sum(row) for row in freq) for freq in I)
     final_state = f"{total_intensity:.6e}"
-    result_hash = hashlib.sha256(final_state.encode()).hexdigest()
+    result_hash = hashlib.sha256((client_id + "|" + final_state).encode()).hexdigest()
     return result_hash, str(seed)
 
 
@@ -217,12 +223,12 @@ def compute_gravitational_waves(client_id, contract_id, work_units, seed=None, p
 
     amplitude = math.sqrt(h_plus[15][15]**2 + h_cross[15][15]**2)
     final_state = f"{amplitude:.6e}"
-    result_hash = hashlib.sha256(final_state.encode()).hexdigest()
+    result_hash = hashlib.sha256((client_id + "|" + final_state).encode()).hexdigest()
     return result_hash, str(seed)
 
 
 def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None):
-    """Простой PoW: поиск хеша с нужным префиксом. Порядок перебора nonce зависит от seed — разный task_seed даёт разный результат (защита от replay)."""
+    """Простой PoW: поиск хеша с нужным префиксом. Порядок перебора nonce зависит от seed — разный task_seed даёт разный результат (защита от replay). Result уже привязан к client_id (text = client_id-contract_id-nonce)."""
     target_prefix = "0" * difficulty
     final_result, solution_nonce = None, None
     # Порядок перебора nonce зависит от seed, иначе при том же контракте всегда находим один и тот же nonce → replay.
@@ -234,6 +240,7 @@ def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None
         max_nonce = max(work_units * 2, 10000)
         for i in range(work_units):
             nonce = 1 + (s * 31 + i) % max_nonce
+            # client_id в строке хеша — proof уникален на клиента (как и у остальных контрактов).
             text = f"{client_id}-{contract_id}-{nonce}"
             hash_result = hashlib.sha256(text.encode()).hexdigest()
             if hash_result.startswith(target_prefix):
@@ -242,6 +249,7 @@ def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None
                 break
     else:
         for nonce in range(1, work_units + 1):
+            # client_id в строке хеша — proof уникален на клиента.
             text = f"{client_id}-{contract_id}-{nonce}"
             hash_result = hashlib.sha256(text.encode()).hexdigest()
             if hash_result.startswith(target_prefix):

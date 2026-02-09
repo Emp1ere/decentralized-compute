@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
-from blockchain import Blockchain, FEE_PER_WORK_RECEIPT
+from blockchain import Blockchain, FEE_PER_WORK_RECEIPT, MAX_PENDING_WORK_PER_CLIENT
 from contracts import CONTRACTS  # Исполняемые контракты вместо JSON
+import hashlib
 import uuid
 import random
 import os
@@ -307,14 +308,18 @@ def auth_login():
 @limiter.limit("10 per minute")  # Защита от DDoS: не более 10 регистраций с одного IP в минуту
 def register_client():
     """
-    Регистрация клиента. Выдаём client_id и api_key (секретный ключ для последующих запросов).
-    api_key нужно передавать в заголовке: Authorization: Bearer <api_key>.
+    Анонимная регистрация (без логина): выдаём client_id и api_key.
+    Используется воркером, запущенным без API_KEY/CLIENT_ID. Для сдачи работ на свой аккаунт
+    запускайте воркер из дашборда с выбранным вычислителем (тогда API_KEY и CLIENT_ID передаются).
     """
     client_id = str(uuid.uuid4())
     api_key = secrets.token_urlsafe(32)
     api_key_to_client[api_key] = client_id
     blockchain.balances[client_id] = 0
-    logger.info("client_registered: %s...", client_id[:8])
+    logger.warning(
+        "anonymous_registration: new client_id=%s... (no auth; caller should use dashboard with calculator selected to attribute work to their account)",
+        client_id[:8],
+    )
     return jsonify({"client_id": client_id, "api_key": api_key}), 200
 
 def _active_workers_count(contract_id):
@@ -355,10 +360,12 @@ def get_task():
     # Учитываем активного вычислителя по этому контракту
     _active_task_takers[(contract.contract_id, client_id)] = time.time()
     spec = contract.get_task_spec()
-    # Уникальный task_seed при каждой выдаче — чтобы разный результат и не было "Proof already used".
-    # Для всех типов вычислений (в т.ч. simple_pow и астро).
-    spec["task_seed"] = uuid.uuid4().int & (2**32 - 1)  # уникальный при каждом вызове, без повторов
-    logger.info("task_issued: contract_id=%s client_id=%s...", contract.contract_id, client_id[:8])
+    # Уникальный task_seed при каждой выдаче, 64 бит + привязка к client_id — чтобы коллизии
+    # между разными клиентами были практически невозможны (proof already used by different client).
+    base = uuid.uuid4().int & ((1 << 64) - 1)
+    client_bits = int(hashlib.sha256(client_id.encode()).hexdigest()[:16], 16) % (1 << 64)
+    spec["task_seed"] = (base ^ client_bits) & ((1 << 64) - 1)
+    logger.info("task_issued: contract_id=%s client_id=%s... task_seed=%s", contract.contract_id, client_id[:8], spec["task_seed"])
     return jsonify(spec), 200
 
 @app.route("/submit_work", methods=["POST"])
@@ -396,11 +403,57 @@ def submit_work():
         logger.warning("submit_work: nonce required")
         return jsonify({"error": "nonce required for verification"}), 400
 
-    # Защита от повторной сдачи (replay): одно и то же доказательство нельзя использовать дважды
-    used_proofs = blockchain.get_used_proof_ids()
-    if result_data and result_data in used_proofs:
-        logger.warning("submit_work: proof already used (replay)")
-        return jsonify({"error": "Proof already used (replay attack rejected)"}), 400
+    # Защита от повторной сдачи (replay): проверяем, используется ли proof уже
+    # Если proof используется тем же клиентом и для того же контракта — это идемпотентный запрос (OK)
+    # Если другим клиентом или для другого контракта — это мошенничество (reject)
+    if result_data:
+        existing_receipt = blockchain.find_work_receipt_by_proof(result_data)
+        if existing_receipt:
+            if (existing_receipt["client_id"] == client_id and 
+                existing_receipt["contract_id"] == contract_id):
+                # Идемпотентность: тот же клиент повторно отправляет тот же proof
+                # (например, из-за таймаута или сетевой ошибки)
+                logger.info("submit_work: proof already processed (idempotent request) client_id=%s... contract_id=%s", 
+                           client_id[:8], contract_id)
+                # Получаем reward_amount для ответа
+                contract = CONTRACTS.get(contract_id)
+                reward_amount = contract.get_reward() if contract else 0
+                return jsonify({
+                    "status": "success",
+                    "reward_issued": reward_amount,
+                    "message": "Proof already processed (idempotent request)"
+                }), 200
+            else:
+                # Другой client_id уже записан в цепочке с этим proof (мы не создаём нового клиента —
+                # это старая запись в блокчейне; «анонимный» = не в users.json, например от прошлого GET /register).
+                existing_cid = existing_receipt["client_id"] or ""
+                result_prefix = (result_data[:16] + "...") if result_data and len(result_data) >= 16 else (result_data or "empty")
+                is_known_user = False
+                try:
+                    if auth_find_by_client_id(existing_cid) is not None:
+                        is_known_user = True
+                except Exception:
+                    pass
+                if not is_known_user:
+                    logger.info(
+                        "submit_work: proof already in chain under client_id=%s (that client is not in users.json; "
+                        "this is an existing chain entry, we are NOT creating a new client now)",
+                        existing_cid[:8],
+                    )
+                logger.warning(
+                    "submit_work: proof already used by different client (same contract) — "
+                    "existing_client=%s requested_client=%s contract_id=%s result_data=%s",
+                    existing_cid[:8], client_id[:8], contract_id, result_prefix,
+                )
+                # 409 Conflict: задача уже засчитана другому вычислителю (идемпотентность не применяется).
+                hint = ""
+                if not is_known_user:
+                    hint = " That client_id is already in the chain (from a past run), not created now. To avoid this for new runs, start the worker from the dashboard with your calculator selected (64-bit task_seed makes your proof unique)."
+                return jsonify({
+                    "error": "Proof already used by another worker for this contract (task already completed)." + hint,
+                    "code": "proof_used_other_client",
+                    "existing_client_prefix": existing_cid[:8] if existing_cid else None,
+                }), 409
 
     # Находим контракт по contract_id
     contract = CONTRACTS.get(contract_id)
@@ -446,12 +499,24 @@ def submit_work():
     # не вызывал mine_pending_transactions (блок создаётся только при submit_work на этом узле),
     # поэтому награда не попадала в цепочку и баланс оставался 0. Теперь блок создаём здесь и пушим пиру.
     
-    # Добавляем транзакции локально и создаём блок
-    blockchain.add_transaction(reward_tx)
-    blockchain.add_transaction(work_receipt_tx)
-
-    # Критическое исправление: блокировка + синхронизация pending перед созданием блока
+    # Критическое исправление: добавление транзакций и создание блока под одной блокировкой,
+    # чтобы не остаться с «сиротой» reward_tx в pending при лимите work_receipt на клиента.
     with _block_creation_lock:
+        n_pending = sum(
+            1 for t in blockchain.pending_transactions
+            if t.get("type") == "work_receipt" and t.get("client_id") == client_id
+        )
+        if n_pending >= MAX_PENDING_WORK_PER_CLIENT:
+            return jsonify({
+                "error": "Client already has work in pending; wait for the next block and retry.",
+                "code": "pending_limit",
+            }), 429
+        try:
+            blockchain.add_transaction(reward_tx)
+            blockchain.add_transaction(work_receipt_tx)
+        except ValueError as e:
+            logger.warning("submit_work: add_transaction failed: %s", e)
+            return jsonify({"error": "Cannot add transaction", "detail": str(e)}), 400
         sync_pending_from_peer()
         new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
 
@@ -642,11 +707,13 @@ def _run_worker_container(contract_id, api_key=None, client_id=None, run_once=Fa
             image=worker_image,
             environment=env,
             network=docker_network,
-            remove=True,
+            remove=False,  # Оставляем контейнер после выхода, чтобы можно было снять логи: docker logs <id>
             detach=True,
         )
-        logger.info("run_worker started container for contract_id=%s (reward will go to client_id=%s...)",
-                    contract_id, (client_id or "")[:8] if client_id else None)
+        # container — объект Container; id можно посмотреть в docker ps -a для снятия логов воркера
+        cid = container.id[:12] if hasattr(container, "id") else ""
+        logger.info("run_worker started container for contract_id=%s (reward will go to client_id=%s...) container_id=%s — логи: docker logs %s",
+                    contract_id, (client_id or "")[:8] if client_id else None, cid, cid or "<id>")
         if run_once:
             return True, "Воркер запущен: выполнит одну задачу и остановится."
         return True, "Воркер запущен: будет брать следующие задачи автоматически до остановки контейнера."

@@ -108,6 +108,20 @@ class BaseContract:
         return self.reward
 
 
+class QuickTestPoW(BaseContract):
+    """Быстрый тест: 1 ведущий нуль, 100 попыток — решение находится почти всегда за 1–2 секунды."""
+
+    contract_id = "sc-000"
+    work_units_required = 100
+    reward = 2
+    task_name = "Быстрый тест"
+    task_description = "Найти хеш с 1 ведущим нулём (для быстрой проверки сдачи)"
+    task_category = "Тестовая"
+
+    def _difficulty(self):
+        return 1  # Хеш должен начинаться с "0" — за 100 попыток решение находится почти всегда
+
+
 class SimpleHashPoW(BaseContract):
     """Контракт: PoW с 3 ведущими нулями, 1000 единиц работы, фиксированное вознаграждение."""
 
@@ -238,6 +252,7 @@ class GravitationalWaves(BaseContract):
 # Реестр контрактов по contract_id: один экземпляр на тип, быстрый доступ по id
 CONTRACTS = {
     c.contract_id: c() for c in (
+        QuickTestPoW,
         SimpleHashPoW,
         ComplexHashPoW,
         CosmologicalSimulation,

@@ -4225,5 +4225,53 @@
     "previous_hash": "92dd239650d1af9ca456192100dacbda332da2e9c7b093dfe0779cc0fb5ac4bd",
     "nonce": 0,
     "hash": "8d99f722c4d3505a0968c567d18c4e181dcbca5623aaf6f66aa4ac4152ad58f7"
+  },
+  {
+    "index": 175,
+    "timestamp": 1770662393.6668458,
+    "transactions": [
+      {
+        "amount": 350,
+        "contract_id": "astro-004",
+        "from": "system_contract",
+        "to": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "type": "reward"
+      },
+      {
+        "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "contract_id": "astro-004",
+        "fee": 1,
+        "result_data": "6972dd5e810f6fc22b07ad4bfb2d6715da57fa507424e59f945fa616cc6d5ae9",
+        "type": "work_receipt",
+        "work_units": 70000
+      }
+    ],
+    "previous_hash": "8d99f722c4d3505a0968c567d18c4e181dcbca5623aaf6f66aa4ac4152ad58f7",
+    "nonce": 0,
+    "hash": "d70f7a31dfcf192a2bd0e3722cea301da37cd899dae415bf0664b5ba92c0e0ba"
+  },
+  {
+    "index": 176,
+    "timestamp": 1770671833.378902,
+    "transactions": [
+      {
+        "amount": 300,
+        "contract_id": "astro-003",
+        "from": "system_contract",
+        "to": "5c4fd466-bbc3-4209-894f-b29388259c96",
+        "type": "reward"
+      },
+      {
+        "client_id": "5c4fd466-bbc3-4209-894f-b29388259c96",
+        "contract_id": "astro-003",
+        "fee": 1,
+        "result_data": "5ff9e570a109db02956673b68c9af0ff96a870b7a388ccbb1f6f4bdcb2fe8ce3",
+        "type": "work_receipt",
+        "work_units": 60000
+      }
+    ],
+    "previous_hash": "d70f7a31dfcf192a2bd0e3722cea301da37cd899dae415bf0664b5ba92c0e0ba",
+    "nonce": 0,
+    "hash": "fcf55a2cb9e3441205e3a1a0547e6665a17afc6db24e58e92016e274345ee861"
   }
 ]

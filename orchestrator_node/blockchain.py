@@ -403,6 +403,34 @@ class Blockchain:
                 used.add(tx["result_data"])
         return used
 
+    def find_work_receipt_by_proof(self, result_data):
+        """
+        Найти транзакцию work_receipt по result_data (proof).
+        Возвращает словарь с client_id и contract_id, если proof найден, иначе None.
+        Используется для проверки идемпотентности: если proof уже используется тем же клиентом
+        и для того же контракта, это нормальный повторный запрос (идемпотентность).
+        """
+        # Проверяем в цепочке блоков
+        for block in self.chain:
+            for tx in block.transactions:
+                if (tx.get("type") == "work_receipt" and 
+                    tx.get("result_data") == result_data):
+                    return {
+                        "client_id": tx.get("client_id"),
+                        "contract_id": tx.get("contract_id"),
+                        "in_block": True
+                    }
+        # Проверяем в pending транзакциях
+        for tx in self.pending_transactions:
+            if (tx.get("type") == "work_receipt" and 
+                tx.get("result_data") == result_data):
+                return {
+                    "client_id": tx.get("client_id"),
+                    "contract_id": tx.get("contract_id"),
+                    "in_block": False
+                }
+        return None
+
     def get_chain_json(self):
         """Получить всю цепочку в формате JSON (для синхронизации и просмотра)."""
         return [block.__dict__ for block in self.chain]

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 echo "Запуск системы..."
-docker-compose up -d --build
+docker-compose up -d --build || docker compose up -d --build
 echo "Ожидание запуска сервисов (10 сек)..."
 sleep 10
 echo "Открываю интерфейс в браузере."

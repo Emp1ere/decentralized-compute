@@ -29,6 +29,13 @@ class ClientWorker:
     def __init__(self):
         self.client_id = None
         self.api_key = None  # Секрет для аутентификации (Authorization: Bearer)
+        # Если запуск по контракту (из дашборда), без API_KEY не создаём анонимного клиента — иначе
+        # появится «чужой» client_id в цепочке и повторная сдача того же proof будет отклоняться.
+        if CONTRACT_ID and not (API_KEY_FROM_ENV or CLIENT_ID_FROM_ENV):
+            raise ValueError(
+                "When CONTRACT_ID is set (e.g. run from dashboard), API_KEY and CLIENT_ID must be set too. "
+                "Start the worker from the dashboard with your calculator selected so rewards go to your account."
+            )
         if API_KEY_FROM_ENV and CLIENT_ID_FROM_ENV:
             self.api_key = API_KEY_FROM_ENV
             self.client_id = CLIENT_ID_FROM_ENV
@@ -36,7 +43,11 @@ class ClientWorker:
         elif API_KEY_FROM_ENV:
             self._use_existing_key()
         else:
-            self.register()  # Сразу регистрируемся при создании
+            logger.warning(
+                "Worker has no API_KEY/CLIENT_ID; calling /register (anonymous client). "
+                "To attribute work to your account, start the worker from the dashboard with your calculator selected."
+            )
+            self.register()  # Сразу регистрируемся при создании (только когда CONTRACT_ID не задан)
 
     def _auth_headers(self):
         """Заголовки с API-ключом для аутентификации (и опционально для TLS — используйте https в ORCHESTRATOR_URL)."""
@@ -135,8 +146,9 @@ class ClientWorker:
             logger.warning("Unknown computation_type %s, using simple_pow", computation_type)
             compute_func = compute_simple_pow
 
-        logger.info("Starting computation: type=%s contract_id=%s work_units=%s",
-                   computation_type, contract_id, target_work)
+        task_seed = task.get("task_seed")
+        logger.info("Starting computation: type=%s contract_id=%s work_units=%s task_seed=%s",
+                   computation_type, contract_id, target_work, task_seed)
         if target_work >= 10000 and computation_type != "simple_pow":
             logger.info("Large task (%s units): computation may take 10-60 minutes; progress will be logged every 10000 steps.",
                         target_work)
@@ -169,9 +181,13 @@ class ClientWorker:
             work_units_done = target_work
             solution_nonce = computed_seed if computed_seed else str(seed)
         
-        logger.info("Computation completed: result_hash=%s... nonce=%s", 
+        # result_data теперь всегда включает client_id в хеше (уникальный proof на клиента)
+        logger.info("Computation completed: result_hash=%s... nonce=%s client_id_in_proof=yes",
                    result_data[:16] if result_data else "none", solution_nonce)
         
+        if not result_data or solution_nonce is None:
+            logger.warning("No solution found in %s attempts (increase work_units or lower difficulty); not submitting.",
+                           target_work)
         return work_units_done, result_data or "", solution_nonce
 
     def submit_work(self, task, work_done, result_data, solution_nonce=None):
@@ -203,8 +219,14 @@ class ClientWorker:
                 return
             except requests.RequestException as e:
                 body = ""
+                status = None
                 if hasattr(e, "response") and e.response is not None:
                     body = (e.response.text or "")[:500]
+                    status = getattr(e.response, "status_code", None)
+                # 409: proof уже засчитан другому воркеру — не повторять
+                if status == 409:
+                    logger.info("submit_work: task already completed by another worker (409), stopping retries")
+                    return
                 logger.warning("submit_work attempt %s/%s failed: %s response=%s", attempt, max_attempts, e, body)
                 if attempt < max_attempts:
                     delay = 5 * attempt
@@ -248,8 +270,10 @@ class ClientWorker:
             if task:
                 work_done, result, solution_nonce = self.perform_computation(task)
                 self._report_progress(task["contract_id"], work_done, work_done)
-                self.submit_work(task, work_done, result, solution_nonce)
-                self.check_balance()
+                if result and solution_nonce is not None:
+                    self.submit_work(task, work_done, result, solution_nonce)
+                    self.check_balance()
+                # иначе уже залогировано в perform_computation (no solution found)
                 if RUN_ONCE:
                     logger.info("RUN_ONCE: one task done, exiting.")
                     return
@@ -264,7 +288,11 @@ if __name__ == "__main__":
         logger.info("Contract filter: only tasks for contract_id=%s (other contracts will NOT be requested)", CONTRACT_ID)
     else:
         logger.warning("No CONTRACT_ID set: worker will request random contracts (rewards may be for any contract)")
-    worker = ClientWorker()
+    try:
+        worker = ClientWorker()
+    except ValueError as e:
+        logger.error("%s", e)
+        raise SystemExit(1)
     if worker.client_id:
         logger.info("Worker started. Rewards will go to client_id=%s...", worker.client_id[:8])
     worker.run()
