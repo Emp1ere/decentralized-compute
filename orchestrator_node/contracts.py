@@ -95,12 +95,7 @@ class BaseContract:
             except Exception:
                 return False
         
-        if nonce is None or nonce == "":
-            return False
-        
-        if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
-            return False
-        
+        # Неизвестный тип вычислений или fallback не сработал
         return False
 
     def get_reward(self):

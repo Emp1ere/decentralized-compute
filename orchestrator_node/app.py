@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
-from blockchain import Blockchain, FEE_PER_WORK_RECEIPT, MAX_PENDING_WORK_PER_CLIENT
+from blockchain import Blockchain, FEE_PER_WORK_RECEIPT, MAX_PENDING_WORK_PER_CLIENT, MAX_PENDING_TOTAL
 from contracts import CONTRACTS  # Исполняемые контракты вместо JSON
 import hashlib
 import uuid
@@ -148,29 +148,6 @@ def get_current_leader():
     return NODE_IDS[leader_index]
 
 
-def get_leader_url(leader_id):
-    """
-    Получить URL лидера по его идентификатору.
-    Для простоты используем схему: node-1 -> orchestrator_node_1:5000, node-2 -> orchestrator_node_2:5000
-    """
-    if leader_id == NODE_ID:
-        return None  # Это мы сами, не нужно отправлять запрос
-    
-    # Маппинг идентификаторов узлов на их URL в Docker-сети
-    node_url_map = {
-        "node-1": "http://orchestrator_node_1:5000",
-        "node-2": "http://orchestrator_node_2:5000",
-        "node-3": "http://orchestrator_node_3:5000",
-    }
-    
-    if leader_id in node_url_map:
-        return node_url_map[leader_id]
-    
-    # Если формат нестандартный, используем PEER_URL как fallback
-    # (предполагаем, что пир может быть лидером)
-    return PEER_URL
-
-
 def sync_pending_from_peer():
     """
     Критическое исправление: синхронизация pending транзакций с пиром перед созданием блока.
@@ -184,9 +161,22 @@ def sync_pending_from_peer():
         response = requests.get(f"{PEER_URL.rstrip('/')}/pending", timeout=PEER_REQUEST_TIMEOUT, headers=headers)
         if response.status_code == 200:
             peer_pending = response.json()
+            if not isinstance(peer_pending, list):
+                logger.warning("sync_pending: invalid response format from peer")
+                return
+            # Защита от переполнения: проверяем общий лимит перед добавлением
+            current_pending = len(blockchain.pending_transactions)
+            if current_pending >= MAX_PENDING_TOTAL:
+                logger.debug("sync_pending: local pending full (%s), skipping sync", current_pending)
+                return
             # Объединяем транзакции (убираем дубликаты по result_data для work_receipt)
             local_result_data = {tx.get("result_data") for tx in blockchain.pending_transactions if tx.get("type") == "work_receipt" and tx.get("result_data")}
+            added_count = 0
             for tx in peer_pending:
+                # Проверяем лимит перед каждой попыткой добавления
+                if len(blockchain.pending_transactions) >= MAX_PENDING_TOTAL:
+                    logger.debug("sync_pending: reached max pending limit (%s), stopping", MAX_PENDING_TOTAL)
+                    break
                 # Проверяем, нет ли уже такой транзакции
                 if tx.get("type") == "work_receipt" and tx.get("result_data"):
                     if tx.get("result_data") in local_result_data:
@@ -194,13 +184,18 @@ def sync_pending_from_peer():
                 # Пытаемся добавить транзакцию (может быть отклонена из-за лимитов)
                 try:
                     blockchain.add_transaction(tx)
+                    added_count += 1
                 except ValueError:
                     pass  # Уже есть или невалидна (не критично)
-            logger.debug("sync_pending_completed: local=%s peer=%s", len(blockchain.pending_transactions), len(peer_pending))
+            logger.debug("sync_pending_completed: local=%s peer=%s added=%s", len(blockchain.pending_transactions), len(peer_pending), added_count)
+        else:
+            logger.warning("sync_pending: peer returned status %s", response.status_code)
+    except requests.Timeout:
+        logger.warning("sync_pending: timeout after %ss", PEER_REQUEST_TIMEOUT)
     except requests.RequestException as e:
-        logger.debug("sync_pending_failed: %s", e)
-    except Exception:
-        logger.debug("sync_pending_error")
+        logger.warning("sync_pending_failed: %s", e)
+    except Exception as e:
+        logger.warning("sync_pending_error: %s", e)
 
 
 def sync_chain_from_peer():
@@ -213,16 +208,23 @@ def sync_chain_from_peer():
         response = requests.get(f"{PEER_URL.rstrip('/')}/chain", timeout=PEER_REQUEST_TIMEOUT, headers=headers)
         if response.status_code == 200:
             peer_chain = response.json()
+            if not isinstance(peer_chain, list):
+                logger.warning("sync_chain: invalid response format from peer")
+                return
             # Пытаемся заменить локальную цепочку на цепочку пира (longest valid chain)
             ok, err = blockchain.replace_chain_from_peer(peer_chain)
             if ok:
                 logger.info("sync_chain_replaced: blocks=%s", len(peer_chain))
             else:
                 logger.debug("sync_chain_not_replaced: %s", err)
+        else:
+            logger.warning("sync_chain: peer returned status %s", response.status_code)
+    except requests.Timeout:
+        logger.warning("sync_chain: timeout after %ss", PEER_REQUEST_TIMEOUT)
     except requests.RequestException as e:
         logger.warning("sync_chain_failed: %s", e)
-    except Exception:
-        logger.exception("sync_chain_error")
+    except Exception as e:
+        logger.warning("sync_chain_error: %s", e)
 
 
 def startup_sync():
@@ -397,6 +399,14 @@ def submit_work():
     if not all([client_id, contract_id, work_units_done is not None]):
         logger.warning("submit_work: missing data (client_id=%s contract_id=%s work_units_done=%s)", bool(client_id), contract_id, work_units_done)
         return jsonify({"error": "Missing data"}), 400
+
+    # Защита от DoS: проверка размера result_data (хеш должен быть 64 символа, максимум 1KB для безопасности)
+    if result_data:
+        if not isinstance(result_data, str):
+            return jsonify({"error": "result_data must be a string"}), 400
+        if len(result_data) > 1024:  # Максимум 1KB
+            logger.warning("submit_work: result_data too large (%s bytes)", len(result_data))
+            return jsonify({"error": "result_data too large (max 1KB)"}), 400
 
     # Защита от мошенничества: обязателен nonce для строгой верификации (невозможно подделать результат)
     if nonce is None or nonce == "":
