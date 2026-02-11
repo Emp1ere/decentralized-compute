@@ -228,13 +228,25 @@ def sync_chain_from_peer():
 
 
 def startup_sync():
-    """Начальная синхронизация при старте узла: ждём 3 секунды, затем один раз синхронизируемся с пиром."""
+    """
+    Начальная синхронизация при старте узла.
+    
+    Ждём 3 секунды, чтобы пир успел подняться, затем один раз синхронизируемся с пиром
+    для получения актуальной цепочки блоков. Это гарантирует, что узел начинает работу
+    с актуальным состоянием блокчейна.
+    """
     time.sleep(3)  # Ждём, чтобы пир успел подняться
     sync_chain_from_peer()
 
 
 def periodic_sync():
-    """Периодическая синхронизация: раз в SYNC_INTERVAL секунд запрашиваем цепочку у пира."""
+    """
+    Периодическая синхронизация цепочки блоков с пиром.
+    
+    Выполняется в фоновом потоке каждые SYNC_INTERVAL секунд (по умолчанию 10 секунд).
+    Это обеспечивает постоянную актуальность цепочки и быстрое разрешение форков
+    при одновременном создании блоков на разных узлах.
+    """
     while True:
         time.sleep(SYNC_INTERVAL)
         sync_chain_from_peer()
@@ -325,16 +337,31 @@ def register_client():
     return jsonify({"client_id": client_id, "api_key": api_key}), 200
 
 def _active_workers_count(contract_id):
-    """Число активных вычислителей по контракту (получили задачу и не сдали за ACTIVE_WORKER_TTL сек)."""
+    """
+    Подсчёт активных вычислителей по указанному контракту.
+    
+    Активным считается вычислитель, который получил задачу по контракту и не сдал работу
+    в течение ACTIVE_WORKER_TTL секунд (15 минут). Устаревшие записи автоматически удаляются.
+    
+    Args:
+        contract_id: Идентификатор контракта для подсчёта активных вычислителей
+    
+    Returns:
+        int: Количество уникальных активных вычислителей по контракту
+    """
     now = time.time()
     cutoff = now - ACTIVE_WORKER_TTL
     seen = set()
     to_del = []
+    # Проходим по всем записям активных вычислителей
     for (cid, clid), ts in list(_active_task_takers.items()):
         if ts < cutoff:
+            # Запись устарела, помечаем для удаления
             to_del.append((cid, clid))
         elif cid == contract_id:
+            # Вычислитель активен по нужному контракту
             seen.add(clid)
+    # Удаляем устаревшие записи для освобождения памяти
     for k in to_del:
         _active_task_takers.pop(k, None)
     return len(seen)
@@ -561,11 +588,24 @@ def submit_work():
 @app.route("/me", methods=["GET"])
 @limiter.limit("60 per minute")
 def me():
-    """По API-ключу возвращает client_id, nickname (если есть), balance и число сданных работ."""
+    """
+    Получение профиля текущего пользователя по API-ключу.
+    
+    Возвращает информацию о вычислителе: client_id, nickname (если есть постоянный аккаунт),
+    login, баланс токенов и количество сданных работ. Используется для отображения профиля
+    в интерфейсе и проверки валидности API-ключа.
+    
+    Returns:
+        JSON с полями: client_id, nickname (опционально), login (опционально), balance, submissions_count
+    
+    Raises:
+        401: Если API-ключ отсутствует или неверный
+    """
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     out = {"client_id": client_id}
+    # Пытаемся получить данные постоянного аккаунта (если есть)
     try:
         profile = auth_find_by_client_id(client_id)
         if profile:
@@ -573,7 +613,9 @@ def me():
             out["login"] = profile.get("login")
     except Exception:
         pass
+    # Получаем баланс из блокчейна
     out["balance"] = blockchain.get_balance(client_id)
+    # Подсчитываем количество сданных работ по всей цепочке блоков
     work_count = 0
     for block in blockchain.chain:
         for tx in block.transactions:
@@ -637,6 +679,47 @@ def get_chain():
     """Посмотреть весь блокчейн (для синхронизации и просмотра)."""
     return jsonify(blockchain.get_chain_json()), 200
 
+@app.route("/explorer/block/<int:index>", methods=["GET"])
+@limiter.limit("120 per minute")
+def explorer_block(index):
+    """Explorer: один блок по индексу (публичный read-only)."""
+    if index < 0 or index >= len(blockchain.chain):
+        return jsonify({"error": "Block not found"}), 404
+    block = blockchain.chain[index]
+    return jsonify(block.__dict__), 200
+
+
+@app.route("/explorer/address/<client_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def explorer_address(client_id):
+    """Explorer: баланс и список транзакций по client_id (адрес вычислителя)."""
+    client_id = (client_id or "").strip()
+    if not client_id:
+        return jsonify({"error": "client_id required"}), 400
+    balance = blockchain.get_balance(client_id)
+    transactions = []
+    for block in blockchain.chain:
+        b_dict = block.__dict__
+        for tx in block.transactions:
+            involved = False
+            if tx.get("type") == "reward" and tx.get("to") == client_id:
+                involved = True
+            if tx.get("type") == "work_receipt" and tx.get("client_id") == client_id:
+                involved = True
+            if involved:
+                transactions.append({
+                    "block_index": block.index,
+                    "block_hash": block.hash,
+                    "tx": tx,
+                })
+    transactions.reverse()
+    return jsonify({
+        "client_id": client_id,
+        "balance": balance,
+        "transactions": transactions,
+    }), 200
+
+
 @app.route("/pending", methods=["GET"])
 @require_node_secret
 def get_pending():
@@ -688,11 +771,24 @@ def get_contracts():
 
 def _run_worker_container(contract_id, api_key=None, client_id=None, run_once=False):
     """
-    Запуск контейнера воркера с CONTRACT_ID (для выбранной задачи).
-    Если переданы api_key и client_id, воркер работает от этого аккаунта — награда попадёт на ваш баланс.
-    run_once: если True, воркер выполнит одну задачу и выйдет; иначе — цикл до остановки (как в BOINC).
-    Требует: доступ к Docker (сокет), env WORKER_IMAGE, ORCHESTRATOR_URL_FOR_WORKER, DOCKER_NETWORK.
-    Возвращает (success: bool, message: str).
+    Запуск Docker-контейнера воркера для выполнения задач по указанному контракту.
+    
+    Воркер запускается с переменными окружения CONTRACT_ID, API_KEY и CLIENT_ID (если переданы).
+    Если переданы api_key и client_id, воркер работает от этого аккаунта — награда попадёт на баланс этого вычислителя.
+    
+    Args:
+        contract_id: Идентификатор контракта, для которого запускается воркер
+        api_key: API-ключ вычислителя (опционально, для аутентификации воркера)
+        client_id: ID вычислителя (опционально, для проверки соответствия ключу)
+        run_once: Если True, воркер выполнит одну задачу и выйдет;
+                  если False, воркер будет брать задачи в цикле до остановки контейнера (как в BOINC)
+    
+    Returns:
+        tuple: (success: bool, message: str) - результат запуска и сообщение для пользователя
+    
+    Требования:
+        - Доступ к Docker (сокет /var/run/docker.sock)
+        - Переменные окружения: WORKER_IMAGE, ORCHESTRATOR_URL_FOR_WORKER, DOCKER_NETWORK
     """
     if contract_id not in CONTRACTS:
         return False, "Unknown contract_id"
@@ -773,6 +869,7 @@ def run_worker():
 
 
 # --- Прогресс воркера для отображения в интерфейсе: client_id -> { contract_id, step, total, updated_at }
+# Используется для отображения прогресса выполнения задачи в реальном времени на вкладке "Профиль"
 _worker_progress = {}
 WORKER_PROGRESS_TTL = 300  # 5 минут — считаем прогресс устаревшим, если дольше нет обновлений
 
@@ -781,8 +878,18 @@ WORKER_PROGRESS_TTL = 300  # 5 минут — считаем прогресс у
 @limiter.limit("60 per minute")
 def worker_progress():
     """
-    GET: прогресс воркера для текущего вычислителя (по API-ключу). Для отображения в интерфейсе.
-    POST: воркер отправляет прогресс (contract_id, step, total). Требуется Authorization.
+    Управление прогрессом выполнения задач воркером.
+    
+    GET: Получение текущего прогресса воркера для вычислителя, определённого по API-ключу.
+         Используется для отображения прогресс-бара в интерфейсе на вкладке "Профиль".
+    
+    POST: Воркер отправляет обновление прогресса (contract_id, step, total).
+          Требуется аутентификация через Authorization header.
+          Прогресс автоматически удаляется через WORKER_PROGRESS_TTL секунд без обновлений.
+    
+    Returns:
+        GET: JSON с полем "progress" (объект с contract_id, step, total, updated_at) или null
+        POST: JSON с полем "ok": true при успешном сохранении
     """
     if request.method == "POST":
         auth = request.headers.get("Authorization")
@@ -833,6 +940,12 @@ def worker_progress():
 def dashboard():
     """Веб-интерфейс (дашборд по принципам BOINC)."""
     return send_from_directory(app.static_folder or "static", "dashboard.html")
+
+
+@app.route("/explorer")
+def explorer():
+    """Block Explorer: просмотр блоков и адресов (вычислителей)."""
+    return send_from_directory(app.static_folder or "static", "explorer.html")
 
 @app.route("/receive_block", methods=["POST"])
 @limiter.limit("120 per minute")  # Синхронизация узлов: больше лимит, чтобы не было 429 при активном обмене блоками

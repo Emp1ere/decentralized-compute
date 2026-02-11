@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Block Explorer — Distributed Compute</title>
+  <style>
+    :root {
+      --bg: #1a1d23;
+      --panel: #252830;
+      --border: #3d424d;
+      --text: #e6e8ec;
+      --muted: #8b909a;
+      --accent: #5c9ead;
+      --success: #7cb342;
+      --error: #e57373;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 12px 20px 24px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 8px; color: var(--accent); }
+    .links { margin-bottom: 20px; font-size: 0.9rem; color: var(--muted); }
+    .links a { color: var(--accent); margin-right: 16px; }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .card .label { color: var(--muted); font-size: 0.85rem; margin-bottom: 4px; }
+    .card .value { font-size: 1.35rem; font-weight: 600; }
+    .section { margin-bottom: 28px; }
+    .section h2 { font-size: 1rem; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+    input[type="text"], input[type="number"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      min-width: 200px;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    button.primary:hover { filter: brightness(1.1); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover { background: rgba(255,255,255,0.05); }
+    .mono { font-family: ui-monospace, monospace; font-size: 0.85em; }
+    .hash { word-break: break-all; max-width: 280px; }
+    .detail-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .detail-panel .meta { margin-bottom: 16px; }
+    .detail-panel .meta div { margin-bottom: 6px; }
+    .detail-panel .meta .k { color: var(--muted); }
+    .msg { margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 0.9rem; }
+    .msg.err { background: rgba(229, 115, 115, 0.15); color: var(--error); }
+    .msg.ok { background: rgba(124, 179, 66, 0.15); color: var(--success); }
+    .loading { color: var(--muted); }
+    .muted { color: var(--muted); }
+    #block-detail, #address-result { display: none; }
+    #block-detail.active, #address-result.active { display: block; }
+    .tx-type-reward { color: var(--success); }
+    .tx-type-work_receipt { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>Block Explorer</h1>
+  <div class="links">
+    <a href="/dashboard">← Дашборд</a>
+    <span class="muted">Узел: <span id="base-url"></span></span>
+  </div>
+
+  <div class="overview-grid">
+    <div class="card"><div class="label">Длина цепочки</div><div id="ex-chain-len" class="value">—</div></div>
+    <div class="card"><div class="label">Последний блок</div><div id="ex-last-index" class="value">—</div></div>
+    <div class="card"><div class="label">В очереди (pending)</div><div id="ex-pending" class="value">—</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Поиск блока по индексу</h2>
+    <div class="row">
+      <input type="number" id="search-block-index" min="0" placeholder="Индекс блока">
+      <button type="button" class="primary" id="btn-search-block">Показать блок</button>
+      <span id="block-search-msg" class="msg" style="display:none;"></span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Последние блоки</h2>
+    <p class="loading" id="blocks-load">Загрузка…</p>
+    <table id="blocks-table" style="display:none;">
+      <thead><tr><th>Индекс</th><th>Хеш</th><th>Транзакций</th><th>Время</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="block-detail" class="detail-panel">
+    <h2 style="margin-top:0;">Блок <span id="detail-index"></span></h2>
+    <div class="meta">
+      <div><span class="k">Хеш:</span> <span id="detail-hash" class="mono hash"></span></div>
+      <div><span class="k">Предыдущий хеш:</span> <span id="detail-prev" class="mono hash"></span></div>
+      <div><span class="k">Время:</span> <span id="detail-time"></span></div>
+      <div><span class="k">Транзакций:</span> <span id="detail-tx-count"></span></div>
+    </div>
+    <table id="detail-tx-table">
+      <thead><tr><th>Тип</th><th>От / Вычислитель</th><th>Кому</th><th>Сумма / Комиссия</th><th>Контракт</th><th>Ед. работы</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section" style="margin-top:32px;">
+    <h2>Поиск по адресу (client_id)</h2>
+    <div class="row">
+      <input type="text" id="search-address" placeholder="UUID вычислителя (client_id)">
+      <button type="button" class="primary" id="btn-search-address">Показать адрес</button>
+      <span id="address-msg" class="msg" style="display:none;"></span>
+    </div>
+  </div>
+
+  <div id="address-result" class="detail-panel">
+    <h2 style="margin-top:0;">Адрес <span id="addr-client-id" class="mono"></span></h2>
+    <div class="meta">
+      <div><span class="k">Баланс:</span> <span id="addr-balance" class="value"></span> токенов</div>
+      <div><span class="k">Транзакций:</span> <span id="addr-tx-count"></span></div>
+    </div>
+    <table id="address-tx-table">
+      <thead><tr><th>Блок</th><th>Тип</th><th>Детали</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const base = window.location.origin;
+    document.getElementById('base-url').textContent = base;
+
+    function api(path) {
+      return fetch(base + path).then(r => {
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        return r.json();
+      });
+    }
+
+    function loadSummary() {
+      Promise.all([api('/metrics'), api('/chain')])
+        .then(([m, chain]) => {
+          document.getElementById('ex-chain-len').textContent = m.chain_length ?? '—';
+          const len = (chain && chain.length) ? chain.length : 0;
+          document.getElementById('ex-last-index').textContent = len ? (len - 1) : '—';
+          document.getElementById('ex-pending').textContent = m.pending_transactions ?? '—';
+          renderBlocksTable(chain || []);
+        })
+        .catch(() => {
+          document.getElementById('ex-chain-len').textContent = '—';
+          document.getElementById('ex-last-index').textContent = '—';
+          document.getElementById('ex-pending').textContent = '—';
+          document.getElementById('blocks-load').textContent = 'Ошибка загрузки';
+        });
+    }
+
+    function renderBlocksTable(chain) {
+      const load = document.getElementById('blocks-load');
+      const table = document.getElementById('blocks-table');
+      const list = (chain || []).slice(-50).reverse();
+      load.style.display = 'none';
+      const tbody = table.querySelector('tbody');
+      tbody.innerHTML = '';
+      list.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.className = 'clickable';
+        const ts = b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : '—';
+        tr.innerHTML = '<td>' + b.index + '</td><td class="mono hash" title="' + (b.hash || '') + '">' + (b.hash || '').slice(0, 16) + '…</td><td>' + (b.transactions && b.transactions.length) + '</td><td>' + ts + '</td>';
+        tr.addEventListener('click', () => showBlock(b.index));
+        tbody.appendChild(tr);
+      });
+      table.style.display = list.length ? 'table' : 'none';
+    }
+
+    function showBlock(index) {
+      api('/explorer/block/' + index)
+        .then(block => {
+          document.getElementById('block-detail').classList.add('active');
+          document.getElementById('detail-index').textContent = block.index;
+          document.getElementById('detail-hash').textContent = block.hash || '—';
+          document.getElementById('detail-prev').textContent = block.previous_hash || '—';
+          document.getElementById('detail-time').textContent = block.timestamp ? new Date(block.timestamp * 1000).toLocaleString() : '—';
+          document.getElementById('detail-tx-count').textContent = (block.transactions && block.transactions.length) || 0;
+          const tbody = document.querySelector('#detail-tx-table tbody');
+          tbody.innerHTML = '';
+          (block.transactions || []).forEach(tx => {
+            const tr = document.createElement('tr');
+            const type = tx.type || '—';
+            const from = (tx.from || tx.client_id || '—').toString().slice(0, 20);
+            const to = (tx.to || '—').toString().slice(0, 20);
+            const amount = tx.amount != null ? tx.amount : (tx.fee != null ? '−' + tx.fee : '—');
+            const contract = tx.contract_id || '—';
+            const work = tx.work_units != null ? tx.work_units : '—';
+            tr.innerHTML = '<td class="tx-type-' + type + '">' + type + '</td><td class="mono">' + from + '</td><td class="mono">' + to + '</td><td>' + amount + '</td><td>' + contract + '</td><td>' + work + '</td>';
+            tbody.appendChild(tr);
+          });
+          document.getElementById('block-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        })
+        .catch(e => {
+          document.getElementById('block-search-msg').textContent = 'Ошибка: ' + e.message;
+          document.getElementById('block-search-msg').className = 'msg err';
+          document.getElementById('block-search-msg').style.display = 'block';
+        });
+    }
+
+    document.getElementById('btn-search-block').addEventListener('click', () => {
+      const idx = document.getElementById('search-block-index').value.trim();
+      document.getElementById('block-search-msg').style.display = 'none';
+      if (idx === '') return;
+      const n = parseInt(idx, 10);
+      if (isNaN(n) || n < 0) {
+        document.getElementById('block-search-msg').textContent = 'Введите неотрицательный индекс';
+        document.getElementById('block-search-msg').className = 'msg err';
+        document.getElementById('block-search-msg').style.display = 'block';
+        return;
+      }
+      showBlock(n);
+    });
+
+    document.getElementById('btn-search-address').addEventListener('click', () => {
+      const clientId = document.getElementById('search-address').value.trim();
+      document.getElementById('address-msg').style.display = 'none';
+      document.getElementById('address-result').classList.remove('active');
+      if (!clientId) return;
+      api('/explorer/address/' + encodeURIComponent(clientId))
+        .then(data => {
+          document.getElementById('address-msg').style.display = 'none';
+          document.getElementById('address-result').classList.add('active');
+          document.getElementById('addr-client-id').textContent = data.client_id;
+          document.getElementById('addr-balance').textContent = data.balance ?? 0;
+          document.getElementById('addr-tx-count').textContent = (data.transactions && data.transactions.length) || 0;
+          const tbody = document.querySelector('#address-tx-table tbody');
+          tbody.innerHTML = '';
+          (data.transactions || []).forEach(({ block_index, block_hash, tx }) => {
+            const tr = document.createElement('tr');
+            let details = '';
+            if (tx.type === 'reward') details = 'Награда +' + (tx.amount ?? 0) + ' за ' + (tx.contract_id || '');
+            if (tx.type === 'work_receipt') details = 'Работа: ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0) + ', комиссия ' + (tx.fee ?? 0);
+            tr.innerHTML = '<td><a href="#" class="mono block-link" data-index="' + block_index + '">' + block_index + '</a></td><td class="tx-type-' + (tx.type || '') + '">' + (tx.type || '—') + '</td><td>' + details + '</td>';
+            tbody.appendChild(tr);
+          });
+          document.querySelectorAll('#address-tx-table .block-link').forEach(el => {
+            el.addEventListener('click', e => { e.preventDefault(); showBlock(parseInt(el.dataset.index, 10)); });
+          });
+          document.getElementById('address-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        })
+        .catch(e => {
+          document.getElementById('address-msg').textContent = 'Ошибка: ' + e.message;
+          document.getElementById('address-msg').className = 'msg err';
+          document.getElementById('address-msg').style.display = 'block';
+        });
+    });
+
+    loadSummary();
+  </script>
+</body>
+</html>

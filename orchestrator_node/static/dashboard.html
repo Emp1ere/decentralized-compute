@@ -142,6 +142,7 @@
   <div class="node-links">
     Узел: <span id="current-node">текущий</span>
     <a href="/dashboard">Обновить</a>
+    <a href="/explorer">Explorer</a>
   </div>
   <div class="tabs">
     <button type="button" data-tab="overview" class="active">Обзор</button>
@@ -203,9 +204,9 @@
 
   <div id="panel-work" class="panel">
     <p class="label">Текущий вычислитель</p>
-    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Выберите вычислителя на вкладке «Обзор» или вставьте его API-ключ. Награда за сданную работу начисляется на баланс этого вычислителя.</p>
-    <div class="row">
-      <input type="text" id="input-api-key-work" placeholder="API-ключ вычислителя">
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Выберите вычислителя на вкладке «Обзор» или вставьте его API-ключ там. Награда за сданную работу начисляется на баланс этого вычислителя.</p>
+    <div class="row" style="margin-bottom:12px;">
+      <span class="muted" style="font-size:0.9em;">Используется API-ключ выбранного вычислителя из вкладки «Обзор». Для смены вычислителя вернитесь на вкладку «Обзор».</span>
     </div>
     <div class="row">
       <button type="button" class="primary" id="btn-get-task">Получить задачу</button>
@@ -332,7 +333,7 @@
         </div>
         <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
           <label for="profile-withdraw-card">Номер карты:</label>
-          <input type="text" id="profile-withdraw-card" placeholder="0000 0000 0000 0000" maxlength="19" style="min-width:200px;">
+          <input type="text" id="profile-withdraw-card" placeholder="0000 0000 0000 0000" maxlength="19" style="min-width:200px;" pattern="[0-9\s]{12,19}" inputmode="numeric">
         </div>
         <div class="row">
           <button type="button" class="primary" id="btn-profile-withdraw">Вывести на карту</button>
@@ -343,35 +344,72 @@
   </div>
 
   <script>
+    // Базовый URL текущего узла для всех API-запросов
     const base = window.location.origin;
     document.getElementById('current-node').textContent = base;
 
+    // Ключи для localStorage: сохранение вычислителей и текущей задачи
+    const STORAGE_KEY_CLIENTS = 'dc_clients';
+    const STORAGE_KEY_CURRENT_TASK = 'dc_current_task';
+    const STORAGE_KEY_TASK_CLIENT_ID = 'dc_task_client_id';
+
+    /**
+     * Переключение между вкладками интерфейса.
+     * При переключении загружаются соответствующие данные и запускаются/останавливаются периодические обновления.
+     * @param {string} id - Идентификатор вкладки (overview, work, contracts, tasks, chain, stats, profile)
+     */
     function showPanel(id) {
+      // Скрываем все панели и убираем активное состояние у всех кнопок
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      
+      // Активируем выбранную панель и кнопку
       const panel = document.getElementById('panel-' + id);
       const btn = document.querySelector('.tabs button[data-tab="' + id + '"]');
       if (panel) panel.classList.add('active');
       if (btn) btn.classList.add('active');
-      if (id === 'overview') loadOverview();
-      if (id === 'profile') { startWorkerProgressPolling(); }
-      else { stopWorkerProgressPolling(); }
+      
+      // Загружаем данные в зависимости от выбранной вкладки
+      if (id === 'overview') {
+        loadOverview();
+        startOverviewAutoRefresh(); // Запускаем автообновление для вкладки "Обзор"
+      } else {
+        stopOverviewAutoRefresh(); // Останавливаем автообновление при переключении на другую вкладку
+      }
+      
+      if (id === 'profile') { 
+        startWorkerProgressPolling(); 
+        loadProfile();
+      } else { 
+        stopWorkerProgressPolling(); 
+      }
       if (id === 'contracts') loadContracts();
       if (id === 'tasks') loadTasks();
       if (id === 'chain') loadChain();
       if (id === 'stats') loadStats();
-      if (id === 'profile') loadProfile();
     }
+    
+    // Обработчики кликов по вкладкам
     document.querySelectorAll('.tabs button').forEach(b => {
       b.addEventListener('click', () => showPanel(b.dataset.tab));
     });
 
+    /**
+     * Универсальная функция для выполнения GET-запросов к API.
+     * Выбрасывает ошибку при неверном статусе ответа.
+     * @param {string} path - Путь API (например, '/metrics', '/chain')
+     * @returns {Promise<Object>} JSON-ответ от сервера
+     */
     async function api(path) {
       const r = await fetch(base + path);
       if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
       return r.json();
     }
 
+    /**
+     * Загрузка данных для вкладки "Обзор": состояние узла и метрики.
+     * Обновляет карточки с информацией о состоянии узла, длине цепочки, количестве вычислителей и pending транзакциях.
+     */
     function loadOverview() {
       Promise.all([fetch(base + '/health').then(r => r.json()), api('/metrics')])
         .then(([health, m]) => {
@@ -388,20 +426,98 @@
         });
     }
 
+    // Автообновление данных на вкладке "Обзор" каждые 30 секунд
+    let overviewAutoRefreshIntervalId = null;
+    function startOverviewAutoRefresh() {
+      stopOverviewAutoRefresh();
+      loadOverview(); // Загружаем сразу при открытии вкладки
+      overviewAutoRefreshIntervalId = setInterval(loadOverview, 30000); // Обновляем каждые 30 секунд
+    }
+    function stopOverviewAutoRefresh() {
+      if (overviewAutoRefreshIntervalId) {
+        clearInterval(overviewAutoRefreshIntervalId);
+        overviewAutoRefreshIntervalId = null;
+      }
+    }
+
+    /**
+     * Текущая задача, полученная через /get_task.
+     * Сохраняется в localStorage для восстановления при перезагрузке страницы.
+     */
     let currentTask = null;
-    /** ID вычислителя, для которого сейчас отображается задача на вкладке «Работа». При смене аккаунта сбрасываем панель. */
+    
+    /**
+     * ID вычислителя, для которого сейчас отображается задача на вкладке «Работа».
+     * При смене аккаунта сбрасываем панель, чтобы избежать путаницы с задачами разных вычислителей.
+     */
     let workPanelAccountId = null;
 
-    const STORAGE_KEY_CLIENTS = 'dc_clients';
+    /**
+     * Получение списка сохранённых вычислителей из localStorage.
+     * Каждый вычислитель содержит: id, label, apiKey, balance, submissions_count, client_id.
+     * @returns {Array<Object>} Массив объектов вычислителей
+     */
     function getSavedClients() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_CLIENTS);
         return raw ? JSON.parse(raw) : [];
       } catch (e) { return []; }
     }
+    
+    /**
+     * Сохранение списка вычислителей в localStorage.
+     * @param {Array<Object>} list - Массив объектов вычислителей для сохранения
+     */
     function setSavedClients(list) {
       localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(list));
     }
+    
+    /**
+     * Сохранение текущей задачи в localStorage для восстановления при перезагрузке страницы.
+     * Сохраняем также ID вычислителя, чтобы проверить при восстановлении, что задача всё ещё актуальна.
+     */
+    function saveCurrentTask() {
+      if (currentTask && workPanelAccountId) {
+        localStorage.setItem(STORAGE_KEY_CURRENT_TASK, JSON.stringify(currentTask));
+        localStorage.setItem(STORAGE_KEY_TASK_CLIENT_ID, workPanelAccountId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_CURRENT_TASK);
+        localStorage.removeItem(STORAGE_KEY_TASK_CLIENT_ID);
+      }
+    }
+    
+    /**
+     * Восстановление текущей задачи из localStorage при загрузке страницы.
+     * Проверяем, что задача соответствует текущему вычислителю, иначе не восстанавливаем.
+     */
+    function restoreCurrentTask() {
+      try {
+        const savedTask = localStorage.getItem(STORAGE_KEY_CURRENT_TASK);
+        const savedClientId = localStorage.getItem(STORAGE_KEY_TASK_CLIENT_ID);
+        if (savedTask && savedClientId) {
+          const task = JSON.parse(savedTask);
+          const currentClientId = getSelectedClientId();
+          // Восстанавливаем задачу только если вычислитель не изменился
+          if (currentClientId === savedClientId) {
+            currentTask = task;
+            workPanelAccountId = savedClientId;
+            setCurrentTask(task);
+          } else {
+            // Если вычислитель изменился, очищаем сохранённую задачу
+            localStorage.removeItem(STORAGE_KEY_CURRENT_TASK);
+            localStorage.removeItem(STORAGE_KEY_TASK_CLIENT_ID);
+          }
+        }
+      } catch (e) {
+        // При ошибке парсинга просто игнорируем сохранённую задачу
+        localStorage.removeItem(STORAGE_KEY_CURRENT_TASK);
+        localStorage.removeItem(STORAGE_KEY_TASK_CLIENT_ID);
+      }
+    }
+    /**
+     * Обновление выпадающего списка вычислителей в интерфейсе.
+     * Отображает баланс и количество сданных работ для каждого вычислителя.
+     */
     function refreshClientSelect() {
       const list = getSavedClients();
       const sel = document.getElementById('select-client');
@@ -415,8 +531,16 @@
         opt.textContent = (c.label || 'Вычислитель') + ' · баланс: ' + bal + ' · сдано: ' + sub;
         sel.appendChild(opt);
       });
+      // Восстанавливаем выбранное значение, если оно всё ещё существует в списке
       if (cur && list.some(c => c.id === cur)) sel.value = cur;
     }
+    
+    /**
+     * Синхронизация данных вычислителя с сервером через API /me.
+     * Обновляет баланс и количество сданных работ из блокчейна.
+     * @param {Object} c - Объект вычислителя с apiKey
+     * @returns {Promise<Object>} Обновлённый объект вычислителя с актуальными данными
+     */
     async function syncWorkerData(c) {
       if (!c.apiKey) return c;
       try {
@@ -425,6 +549,32 @@
         const d = await r.json();
         return { ...c, balance: d.balance ?? 0, submissions_count: d.submissions_count ?? 0, client_id: d.client_id || c.client_id };
       } catch (e) { return c; }
+    }
+    
+    /**
+     * Проверка валидности API-ключа через запрос к /me.
+     * Используется при вводе ключа для немедленной валидации.
+     * @param {string} apiKey - API-ключ для проверки
+     * @returns {Promise<{valid: boolean, error?: string, data?: Object}>} Результат проверки
+     */
+    async function validateApiKey(apiKey) {
+      if (!apiKey || !apiKey.trim()) {
+        return { valid: false, error: 'API-ключ не может быть пустым' };
+      }
+      try {
+        const r = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + apiKey.trim() } });
+        if (!r.ok) {
+          const errorData = await r.json().catch(() => ({}));
+          if (r.status === 401) {
+            return { valid: false, error: 'Неверный API-ключ' };
+          }
+          return { valid: false, error: errorData.error || 'Ошибка проверки ключа' };
+        }
+        const data = await r.json();
+        return { valid: true, data: data };
+      } catch (e) {
+        return { valid: false, error: 'Ошибка подключения к серверу: ' + e.message };
+      }
     }
     document.getElementById('btn-sync-workers').onclick = async function() {
       const list = getSavedClients();
@@ -454,7 +604,6 @@
           '<button type="button" data-remove="' + c.id + '">Удалить</button>';
         row.querySelector('[data-use]').onclick = () => {
           document.getElementById('input-api-key').value = c.apiKey || '';
-          document.getElementById('input-api-key-work').value = c.apiKey || '';
           document.getElementById('select-client').value = c.id;
           if (getSelectedClientId() !== workPanelAccountId) clearWorkPanelForNewAccount();
           workPanelAccountId = getSelectedClientId();
@@ -467,6 +616,9 @@
           refreshSavedClientsList();
         };
         row.querySelector('[data-remove]').onclick = () => {
+          if (!confirm('Удалить вычислителя "' + (c.label || 'Вычислитель') + '"? Это действие нельзя отменить.')) {
+            return;
+          }
           setSavedClients(list.filter(x => x.id !== c.id));
           refreshClientSelect();
           refreshSavedClientsList();
@@ -480,26 +632,84 @@
       const c = list.find(x => x.id === id);
       if (c && c.apiKey) {
         document.getElementById('input-api-key').value = c.apiKey;
-        document.getElementById('input-api-key-work').value = c.apiKey;
       }
       if (getSelectedClientId() !== workPanelAccountId) clearWorkPanelForNewAccount();
       workPanelAccountId = getSelectedClientId();
       if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
     };
-    document.getElementById('btn-add-client').onclick = function() {
+    /**
+     * Обработчик добавления вычислителя по API-ключу.
+     * Проверяет валидность ключа перед добавлением и синхронизирует данные с сервером.
+     */
+    document.getElementById('btn-add-client').onclick = async function() {
       const key = document.getElementById('input-api-key').value.trim();
-      if (!key) { document.getElementById('auth-msg').className = 'msg err'; document.getElementById('auth-msg').textContent = 'Введите API-ключ.'; document.getElementById('auth-msg').style.display = 'block'; return; }
+      const msgEl = document.getElementById('auth-msg');
+      msgEl.style.display = 'none';
+      
+      if (!key) { 
+        msgEl.className = 'msg err'; 
+        msgEl.textContent = 'Введите API-ключ.'; 
+        msgEl.style.display = 'block'; 
+        return; 
+      }
+      
+      // Проверяем валидность API-ключа перед добавлением
+      this.disabled = true;
+      this.textContent = 'Проверка...';
+      const validation = await validateApiKey(key);
+      
+      if (!validation.valid) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = '❌ ' + validation.error;
+        msgEl.style.display = 'block';
+        this.disabled = false;
+        this.textContent = 'Добавить';
+        return;
+      }
+      
+      // Проверяем, не добавлен ли уже этот ключ
       const list = getSavedClients();
+      const existing = list.find(c => c.apiKey === key);
+      if (existing) {
+        msgEl.className = 'msg info';
+        msgEl.textContent = 'Этот вычислитель уже добавлен.';
+        msgEl.style.display = 'block';
+        document.getElementById('select-client').value = existing.id;
+        this.disabled = false;
+        this.textContent = 'Добавить';
+        return;
+      }
+      
+      // Добавляем вычислителя с данными из сервера
       const id = 'c' + Date.now();
-      list.push({ id, label: 'Вычислитель ' + (list.length + 1), apiKey: key });
+      const label = validation.data?.nickname || validation.data?.login || 'Вычислитель ' + (list.length + 1);
+      const newClient = { 
+        id, 
+        label: label,
+        apiKey: key,
+        balance: validation.data?.balance ?? 0,
+        submissions_count: validation.data?.submissions_count ?? 0,
+        client_id: validation.data?.client_id
+      };
+      list.push(newClient);
       setSavedClients(list);
       refreshClientSelect();
       refreshSavedClientsList();
       document.getElementById('select-client').value = id;
-      document.getElementById('auth-msg').style.display = 'none';
+      msgEl.className = 'msg ok';
+      msgEl.textContent = '✅ Вычислитель добавлен: ' + label;
+      msgEl.style.display = 'block';
+      this.disabled = false;
+      this.textContent = 'Добавить';
     };
     refreshClientSelect();
     refreshSavedClientsList();
+    
+    // Восстанавливаем сохранённую задачу после загрузки списка вычислителей
+    // Используем setTimeout, чтобы гарантировать, что список вычислителей уже загружен
+    setTimeout(() => {
+      restoreCurrentTask();
+    }, 100);
 
     const AUTH_API_KEY = 'dc_auth_api_key';
     const AUTH_NICKNAME = 'dc_auth_nickname';
@@ -531,7 +741,6 @@
       if (nickname) localStorage.setItem(AUTH_NICKNAME, nickname);
       if (login) localStorage.setItem(AUTH_LOGIN, login);
       document.getElementById('input-api-key').value = apiKey;
-      document.getElementById('input-api-key-work').value = apiKey;
       const list = getSavedClients();
       const existing = list.find(c => c.apiKey === apiKey);
       if (!existing) {
@@ -577,14 +786,12 @@
       localStorage.removeItem(AUTH_NICKNAME);
       localStorage.removeItem(AUTH_LOGIN);
       document.getElementById('input-api-key').value = '';
-      document.getElementById('input-api-key-work').value = '';
       showAuthForms();
       if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
     };
     if (localStorage.getItem(AUTH_API_KEY)) {
       const key = localStorage.getItem(AUTH_API_KEY);
       document.getElementById('input-api-key').value = key;
-      document.getElementById('input-api-key-work').value = key;
       showAuthProfile();
       refreshProfileFromMe();
     } else {
@@ -813,8 +1020,8 @@
         if (c && c.apiKey) return c.apiKey;
       }
       const k1 = document.getElementById('input-api-key').value.trim();
-      const k2 = document.getElementById('input-api-key-work').value.trim();
-      return k2 || k1;
+      // Убрано дублирование: используем только поле из вкладки "Обзор"
+      return k1;
     }
     function getSelectedClientId() {
       const v = document.getElementById('select-client').value;
@@ -834,7 +1041,7 @@
       if (workerBlock) workerBlock.style.display = 'none';
       if (msg) {
         msg.className = 'msg info';
-        msg.textContent = 'Вычислитель сменён. Нажмите «Получить задачу» для текущего вычислителя.';
+        msg.textContent = '⚠️ Вычислитель изменён. Предыдущая задача была сброшена, так как она была получена для другого вычислителя. Нажмите «Получить задачу» для текущего вычислителя.';
         msg.style.display = 'block';
       }
       if (runBtn) runBtn.disabled = true;
@@ -850,14 +1057,25 @@
       if (balanceResult) { balanceResult.style.display = 'none'; balanceResult.textContent = ''; }
     }
 
+    /**
+     * Установка текущей задачи и отображение её в интерфейсе.
+     * Сохраняет задачу в localStorage для восстановления при перезагрузке страницы.
+     * @param {Object} task - Объект задачи с полями contract_id, work_units_required, difficulty и т.д.
+     */
     function setCurrentTask(task) {
       currentTask = task;
       workPanelAccountId = getSelectedClientId();
+      
+      // Сохраняем задачу в localStorage для восстановления при перезагрузке
+      saveCurrentTask();
+      
       const specEl = document.getElementById('work-task-spec');
       const bodyEl = document.getElementById('work-task-body');
       const runBtn = document.getElementById('btn-run-work');
       const msg = document.getElementById('work-task-msg');
       specEl.style.display = 'block';
+      
+      // Формируем HTML с информацией о задаче
       const taskName = task.task_name || task.contract_id || '';
       const taskDesc = task.task_description || '';
       const taskCategory = task.task_category || '';
@@ -870,10 +1088,12 @@
       html += '<strong>Difficulty:</strong> ' + (task.difficulty ?? '') + '<br>';
       if (task.computation_type) html += '<strong>Тип вычислений:</strong> ' + task.computation_type;
       bodyEl.innerHTML = html;
+      
       runBtn.disabled = false;
       msg.className = 'msg ok';
       msg.textContent = 'Задача: ' + (taskName || task.contract_id || '') + ', единиц работы: ' + (task.work_units_required ?? '');
       msg.style.display = 'block';
+      
       // Блок «Выполнить в воркере»: команда с CONTRACT_ID
       const cid = task.contract_id || '';
       const workerBlock = document.getElementById('work-run-in-worker');
@@ -1046,17 +1266,34 @@
     document.getElementById('btn-get-task').onclick = async () => {
       const key = getApiKey();
       const msg = document.getElementById('work-task-msg');
+      const btn = document.getElementById('btn-get-task');
       msg.style.display = 'none';
-      if (!key) { msg.className = 'msg err'; msg.textContent = 'Введите API-ключ (вкладка Обзор или выберите вычислителя).'; msg.style.display = 'block'; return; }
+      if (!key) { 
+        msg.className = 'msg err'; 
+        msg.textContent = '❌ Выберите вычислителя на вкладке «Обзор» или введите API-ключ там.'; 
+        msg.style.display = 'block'; 
+        return; 
+      }
+      btn.disabled = true;
+      btn.textContent = 'Загрузка...';
       try {
         const r = await fetch(base + '/get_task', { headers: { 'Authorization': 'Bearer ' + key } });
         const task = await r.json();
-        if (!r.ok) throw new Error(task.error || r.status);
+        if (!r.ok) {
+          if (r.status === 401) {
+            throw new Error('Неверный API-ключ. Проверьте ключ на вкладке «Обзор».');
+          } else {
+            throw new Error(task.error || 'Ошибка сервера: ' + r.status);
+          }
+        }
         setCurrentTask(task);
       } catch (e) {
         msg.className = 'msg err';
-        msg.textContent = 'Ошибка: ' + e.message;
+        msg.textContent = '❌ Ошибка получения задачи: ' + e.message + ' Проверьте, что выбран вычислитель и API-ключ правильный.';
         msg.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Получить задачу';
       }
     };
 
@@ -1082,7 +1319,21 @@
         
         // Выбираем тип вычислений
         let result;
-        if (computationType === 'simple_pow') {
+          // Предупреждение для астрофизических задач
+          if (computationType !== 'simple_pow' && targetWork > 1000) {
+            const taskName = currentTask.task_name || currentTask.contract_id || '';
+            const confirmMsg = 'Для задачи "' + taskName + '" требуется выполнить ' + targetWork + ' единиц работы.\n\n' +
+              'В браузере будет выполнена упрощённая версия (1000 единиц) для демонстрации.\n' +
+              'Для получения награды используйте воркер (кнопка «Запустить воркер автоматически»).\n\n' +
+              'Продолжить с упрощённой версией?';
+            if (!confirm(confirmMsg)) {
+              progressEl.style.display = 'none';
+              runBtn.disabled = false;
+              return;
+            }
+          }
+          
+          if (computationType === 'simple_pow') {
           progressEl.textContent = 'Вычисление PoW (0 из ' + targetWork + ')…';
           result = await runPoW(clientId, currentTask.contract_id, targetWork, difficulty, (n) => {
             progressEl.textContent = 'Вычисление PoW (' + n + ' из ' + targetWork + ')…';
@@ -1091,9 +1342,9 @@
           // Астрофизические задачи: используем упрощённые вычисления для браузера
           const taskName = currentTask.task_name || currentTask.contract_id || '';
           const browserWorkUnits = Math.min(targetWork, 1000); // Ограничиваем для браузера
-          progressEl.textContent = 'Вычисление: ' + taskName + ' (0 из ' + browserWorkUnits + ')…';
+          progressEl.textContent = 'Вычисление: ' + taskName + ' (0 из ' + browserWorkUnits + ', упрощённая версия)…';
           result = await runAstrophysicsComputation(clientId, currentTask.contract_id, browserWorkUnits, computationType, (n) => {
-            progressEl.textContent = 'Вычисление: ' + taskName + ' (' + n + ' из ' + browserWorkUnits + ')…';
+            progressEl.textContent = 'Вычисление: ' + taskName + ' (' + n + ' из ' + browserWorkUnits + ', упрощённая версия)…';
           });
           // Отправляем реальный объём выполненной работы (для браузера это упрощённая версия)
           // Примечание: для полных вычислений используйте воркер
@@ -1105,13 +1356,13 @@
           progressEl.style.display = 'none';
           runBtn.disabled = false;
           resultEl.className = 'msg info';
-          resultEl.textContent = 'Выполнено ' + result.work_units_done + ' из ' + targetWork + ' единиц работы (упрощённая версия для браузера). ' +
-            'Для полных вычислений используйте воркер. Результат не отправлен (недостаточно работы для получения награды).';
+          resultEl.textContent = 'ℹ️ Выполнено ' + result.work_units_done + ' из ' + targetWork + ' единиц работы (упрощённая версия для браузера). ' +
+            'Для получения награды требуется выполнить полный объём работы — используйте воркер (кнопка «Запустить воркер автоматически» выше). Результат не отправлен.';
           resultEl.style.display = 'block';
           return;
         }
         
-        progressEl.textContent = 'Отправка результата…';
+        progressEl.textContent = 'Отправка результата на сервер (это может занять до 15 минут для больших задач)…';
         const subRes = await fetch(base + '/submit_work', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
@@ -1126,9 +1377,19 @@
         const subData = await subRes.json();
         progressEl.style.display = 'none';
         runBtn.disabled = false;
-        if (!subRes.ok) throw new Error(subData.error || subRes.status);
+        if (!subRes.ok) {
+          let errorMsg = subData.error || 'Ошибка сервера: ' + subRes.status;
+          if (subRes.status === 401) {
+            errorMsg = 'Неверный API-ключ. Проверьте ключ на вкладке «Обзор».';
+          } else if (subRes.status === 400) {
+            errorMsg = 'Ошибка валидации: ' + (subData.error || 'неверные данные');
+          } else if (subRes.status === 409) {
+            errorMsg = 'Эта задача уже была сдана другим вычислителем. Получите новую задачу.';
+          }
+          throw new Error(errorMsg);
+        }
         resultEl.className = 'msg ok';
-        resultEl.textContent = 'Работа принята. Начислено: ' + (subData.reward_issued ?? '') + ' токенов.';
+        resultEl.textContent = '✅ Работа принята. Начислено: ' + (subData.reward_issued ?? '') + ' токенов. Проверьте баланс на вкладке «Обзор».';
         resultEl.style.display = 'block';
       } catch (e) {
         progressEl.style.display = 'none';
@@ -1351,9 +1612,11 @@
         msgEl.style.display = 'block';
         return;
       }
-      if (card.length < 12) {
+      // Валидация номера карты: только цифры, длина 12-19 символов
+      const cardDigits = card.replace(/\s/g, '');
+      if (!/^\d{12,19}$/.test(cardDigits)) {
         msgEl.className = 'msg err';
-        msgEl.textContent = 'Введите номер карты (минимум 12 цифр).';
+        msgEl.textContent = '❌ Неверный формат номера карты. Введите 12-19 цифр (например: 1234567890123456).';
         msgEl.style.display = 'block';
         return;
       }
@@ -1366,6 +1629,7 @@
       updateProfileWithdrawRub();
     };
 
+    // Инициализация при загрузке страницы
     loadOverview();
   </script>
 </body>
