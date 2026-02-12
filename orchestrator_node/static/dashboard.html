@@ -35,7 +35,12 @@
       gap: 2px;
       margin-bottom: 16px;
       border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
     }
+    .tabs::-webkit-scrollbar { height: 6px; }
+    .tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
     .tabs button {
       background: transparent;
       border: none;
@@ -45,6 +50,8 @@
       font-size: 0.95rem;
       border-bottom: 2px solid transparent;
       margin-bottom: -1px;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .tabs button:hover { color: var(--text); }
     .tabs button.active {
@@ -98,6 +105,12 @@
       border-collapse: collapse;
       font-size: 0.9rem;
     }
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .table-responsive table { min-width: 620px; }
     th, td {
       text-align: left;
       padding: 10px 12px;
@@ -119,7 +132,11 @@
     }
     #table-contracts td .progress-pct { font-weight: 600; }
     #table-contracts .btn-take-task { font-size: 0.85rem; padding: 6px 12px; }
+    #table-contracts { min-width: 1180px; }
+    #table-tasks { min-width: 680px; }
+    #table-chain { min-width: 720px; }
     .saved-client-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.9rem; }
+    .saved-client-row > span { flex: 1 1 auto; min-width: 0; word-break: break-word; }
     .saved-client-row button { padding: 4px 10px; font-size: 0.85rem; }
     .mono { font-family: ui-monospace, monospace; font-size: 0.85em; }
     .hash { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
@@ -135,6 +152,43 @@
       height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-top: 8px; max-width: 300px;
     }
     .progress-bar div { height: 100%; background: var(--accent); transition: width 0.2s; }
+    @media (max-width: 900px) {
+      body { padding: 10px 12px 18px; }
+      h1 { font-size: 1.08rem; margin-bottom: 12px; }
+      .node-links { display: flex; flex-wrap: wrap; gap: 8px; }
+      .node-links a { margin-right: 0; }
+      .panel { padding: 14px; }
+      .overview-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+      }
+      .card .value { font-size: 1.2rem; }
+      .row { align-items: stretch; }
+      .row > label,
+      .row > strong,
+      .row > p,
+      .row > code,
+      .row > .msg { width: 100%; }
+      input[type="text"],
+      input[type="number"],
+      input[type="password"],
+      select,
+      button.primary {
+        width: 100%;
+        min-width: 0 !important;
+      }
+      #select-client { margin-left: 0 !important; }
+      .saved-client-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+      }
+      .saved-client-row button { width: 100%; }
+      .msg { word-break: break-word; }
+      pre { font-size: 0.8rem; }
+      #work-worker-cmd { width: 100%; }
+      #work-worker-balance-result { margin-left: 0 !important; margin-top: 8px; }
+    }
   </style>
 </head>
 <body>
@@ -262,28 +316,34 @@
   <div id="panel-contracts" class="panel">
     <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты - типы заданий с наградой за сдачу. Вычислители берут задачу по контракту, выполняют требуемый объём работы и сдают результат. «Выполнено %» - доля от целевого объёма контракта; «Осталось» - сколько единиц работы ещё не выполнено; «Активных вычислителей» - кто недавно запрашивал задачу по этому контракту.</p>
     <p class="loading" id="contracts-load">Загрузка…</p>
-    <table id="table-contracts" style="display:none;">
-      <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Ед. на сдачу</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Осталось (ед. работы)</th><th>Награда за сдачу</th><th>Действие</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-responsive">
+      <table id="table-contracts" style="display:none;">
+        <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Ед. на сдачу</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Осталось (ед. работы)</th><th>Награда за сдачу</th><th>Действие</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <div id="panel-tasks" class="panel">
     <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Сданные работы (work_receipt) из блокчейна: вычислитель, контракт и количество единиц работы. Показаны последние 100 записей из последних 100 блоков (если сдачи по нужному контракту нет — она могла быть в более старом блоке).</p>
     <p class="loading" id="tasks-load">Загрузка…</p>
     <p id="tasks-empty" style="display:none; color: var(--muted);">Нет сданных работ в последних блоках.</p>
-    <table id="table-tasks" style="display:none;">
-      <thead><tr><th>Блок</th><th>Вычислитель</th><th>Контракт</th><th>Ед. работы</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-responsive">
+      <table id="table-tasks" style="display:none;">
+        <thead><tr><th>Блок</th><th>Вычислитель</th><th>Контракт</th><th>Ед. работы</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <div id="panel-chain" class="panel">
     <p class="loading" id="chain-load">Загрузка…</p>
-    <table id="table-chain" style="display:none;">
-      <thead><tr><th>Индекс</th><th>Хеш</th><th>Транзакций</th><th>Время</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-responsive">
+      <table id="table-chain" style="display:none;">
+        <thead><tr><th>Индекс</th><th>Хеш</th><th>Транзакций</th><th>Время</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <div id="panel-stats" class="panel">
