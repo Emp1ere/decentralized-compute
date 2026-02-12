@@ -1,6 +1,107 @@
 # Исполняемые смарт-контракты: только проверка работы и вознаграждение (минимальная «стоимость»).
 import hashlib  # Для проверки хеша результата вычислителя
 
+SUPPORTED_COMPUTATION_TYPES = (
+    "simple_pow",
+    "cosmological",
+    "supernova",
+    "mhd",
+    "radiative",
+    "gravitational_waves",
+)
+
+DEFAULT_DIFFICULTY_BY_COMPUTATION = {
+    "simple_pow": 3,
+    "cosmological": 5,
+    "supernova": 5,
+    "mhd": 4,
+    "radiative": 4,
+    "gravitational_waves": 6,
+}
+
+
+def default_difficulty_for(computation_type):
+    """Возвращает сложность по умолчанию для типа вычислений."""
+    return DEFAULT_DIFFICULTY_BY_COMPUTATION.get(computation_type, 3)
+
+
+def verify_contract_result(
+    *,
+    expected_contract_id,
+    expected_work_units_required,
+    expected_difficulty,
+    expected_computation_type,
+    client_id,
+    contract_id,
+    work_units_done,
+    result_data,
+    nonce=None,
+):
+    """
+    Унифицированная верификация результата для системных и пользовательских контрактов.
+    """
+    if contract_id != expected_contract_id:
+        return False
+    if work_units_done < expected_work_units_required:
+        return False
+
+    # Для простого PoW проверяем хеш с префиксом
+    if expected_computation_type == "simple_pow":
+        prefix = "0" * expected_difficulty
+        if not (result_data and isinstance(result_data, str) and result_data.startswith(prefix)):
+            return False
+        if nonce is None or nonce == "":
+            return False
+        expected_input = f"{client_id}-{contract_id}-{nonce}"
+        expected_hash = hashlib.sha256(expected_input.encode()).hexdigest()
+        if expected_hash != result_data:
+            return False
+        return True
+
+    # Астрофизические задачи: строгая верификация через shared.computation_types
+    if expected_computation_type in (
+        "cosmological",
+        "supernova",
+        "mhd",
+        "radiative",
+        "gravitational_waves",
+    ):
+        if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
+            return False
+        try:
+            int(result_data, 16)
+        except ValueError:
+            return False
+        if nonce is None or nonce == "":
+            return False
+        try:
+            seed_val = int(nonce)
+        except (ValueError, TypeError):
+            return False
+        try:
+            from shared.computation_types import (
+                COMPUTATION_TYPES,
+                SEED_MIN,
+                SEED_MAX,
+            )
+        except ImportError:
+            # Старые образы без shared: fallback на проверку формата
+            return True
+        if not (SEED_MIN <= seed_val <= SEED_MAX):
+            return False
+        compute_func = COMPUTATION_TYPES.get(expected_computation_type)
+        if not compute_func:
+            return False
+        try:
+            expected_result, _ = compute_func(
+                client_id, contract_id, expected_work_units_required, seed=seed_val
+            )
+            return expected_result == result_data
+        except Exception:
+            return False
+
+    return False
+
 
 class BaseContract:
     """Базовый контракт: только верификация результата и размер вознаграждения."""
@@ -37,66 +138,17 @@ class BaseContract:
         Для разных типов вычислений используется разная верификация.
         В терминах BOINC: роль validator — определение корректности результата (без репликации по большинству).
         """
-        if contract_id != self.contract_id:  # Контракт должен совпадать
-            return False
-        if work_units_done < self.work_units_required:  # Объём работы не достигнут
-            return False
-        
-        # Для простого PoW проверяем хеш с префиксом
-        if self.computation_type == "simple_pow":
-            prefix = "0" * self._difficulty()  # Требуемый префикс хеша
-            if not (result_data and isinstance(result_data, str) and result_data.startswith(prefix)):
-                return False  # Результат не является хешем с нужным префиксом
-            # Защита от мошенничества: nonce обязателен
-            if nonce is None or nonce == "":
-                return False
-            expected_input = f"{client_id}-{contract_id}-{nonce}"
-            expected_hash = hashlib.sha256(expected_input.encode()).hexdigest()
-            if expected_hash != result_data:
-                return False
-            return True
-        
-        # Астрофизические задачи: строгая верификация через общий модуль shared.computation_types
-        # (одинаковый код и детерминированный seed по nonce). Fallback на приём по формату, если shared недоступен.
-        if self.computation_type in ("cosmological", "supernova", "mhd", "radiative", "gravitational_waves"):
-            if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
-                return False
-            try:
-                int(result_data, 16)
-            except ValueError:
-                return False
-            if nonce is None or nonce == "":
-                return False
-            # Валидация nonce: только число в допустимом диапазоне (защита от DoS и переполнения)
-            try:
-                seed_val = int(nonce)
-            except (ValueError, TypeError):
-                return False
-            try:
-                from shared.computation_types import (
-                    COMPUTATION_TYPES,
-                    SEED_MIN,
-                    SEED_MAX,
-                )
-            except ImportError:
-                # Старые образы без shared: принимаем по формату (fallback без потери работоспособности)
-                return True
-
-            if not (SEED_MIN <= seed_val <= SEED_MAX):
-                return False
-            compute_func = COMPUTATION_TYPES.get(self.computation_type)
-            if not compute_func:
-                return False
-            try:
-                expected_result, _ = compute_func(
-                    client_id, contract_id, self.work_units_required, seed=seed_val
-                )
-                return expected_result == result_data
-            except Exception:
-                return False
-        
-        # Неизвестный тип вычислений или fallback не сработал
-        return False
+        return verify_contract_result(
+            expected_contract_id=self.contract_id,
+            expected_work_units_required=self.work_units_required,
+            expected_difficulty=self._difficulty(),
+            expected_computation_type=self.computation_type,
+            client_id=client_id,
+            contract_id=contract_id,
+            work_units_done=work_units_done,
+            result_data=result_data,
+            nonce=nonce,
+        )
 
     def get_reward(self):
         """Размер вознаграждения за выполнение контракта."""

@@ -1,6 +1,18 @@
 from flask import Flask, request, jsonify, send_from_directory
 from blockchain import Blockchain, FEE_PER_WORK_RECEIPT, MAX_PENDING_WORK_PER_CLIENT, MAX_PENDING_TOTAL
-from contracts import CONTRACTS  # Исполняемые контракты вместо JSON
+from contracts import (
+    CONTRACTS,
+    SUPPORTED_COMPUTATION_TYPES,
+    default_difficulty_for,
+    verify_contract_result,
+)  # Исполняемые контракты вместо JSON
+from contract_market import (
+    ContractMarket,
+    STATUS_ACTIVE,
+    STATUS_CLOSED,
+    STATUS_DRAFT,
+    STATUS_PAUSED,
+)
 import hashlib
 import uuid
 import random
@@ -28,6 +40,8 @@ _error_counts = {}
 
 # Инициализируем наш блокчейн
 blockchain = Blockchain()
+# Хранилище пользовательских контрактов поставщиков
+contract_market = ContractMarket()
 
 # --- Критическое исправление: блокировка при создании блока (защита от race condition) ---
 _block_creation_lock = threading.Lock()
@@ -367,6 +381,88 @@ def _active_workers_count(contract_id):
     return len(seen)
 
 
+def _build_dynamic_task_spec(contract_record):
+    """Преобразовать пользовательский контракт в спецификацию задачи для воркера."""
+    return {
+        "contract_id": contract_record["contract_id"],
+        "work_units_required": int(contract_record["work_units_required"]),
+        "difficulty": int(contract_record["difficulty"]),
+        "task_name": contract_record.get("task_name") or contract_record["contract_id"],
+        "task_description": contract_record.get("task_description", ""),
+        "task_category": contract_record.get("task_category", "Пользовательская"),
+        "computation_type": contract_record.get("computation_type", "simple_pow"),
+        "contract_origin": "provider",
+        "provider_client_id": contract_record.get("provider_client_id"),
+    }
+
+
+def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
+    """
+    Получить рантайм-описание контракта (системный или пользовательский).
+    allow_inactive_dynamic=True используется в submit_work, чтобы принимать уже выданные задачи.
+    """
+    static_contract = CONTRACTS.get(contract_id)
+    if static_contract:
+        return {
+            "kind": "system",
+            "contract_id": static_contract.contract_id,
+            "spec": static_contract.get_task_spec(),
+            "reward": static_contract.get_reward(),
+            "verify": static_contract.verify,
+            "record": None,
+        }
+
+    dynamic_contract = contract_market.get_contract(contract_id)
+    if not dynamic_contract:
+        return None
+    if (not allow_inactive_dynamic) and (not contract_market.is_assignable(dynamic_contract)):
+        return None
+
+    expected_contract_id = dynamic_contract["contract_id"]
+    expected_work_units_required = int(dynamic_contract["work_units_required"])
+    expected_difficulty = int(dynamic_contract["difficulty"])
+    expected_computation_type = dynamic_contract.get("computation_type", "simple_pow")
+
+    def _verify(client_id, runtime_contract_id, work_units_done, result_data, nonce=None):
+        return verify_contract_result(
+            expected_contract_id=expected_contract_id,
+            expected_work_units_required=expected_work_units_required,
+            expected_difficulty=expected_difficulty,
+            expected_computation_type=expected_computation_type,
+            client_id=client_id,
+            contract_id=runtime_contract_id,
+            work_units_done=work_units_done,
+            result_data=result_data,
+            nonce=nonce,
+        )
+
+    return {
+        "kind": "provider",
+        "contract_id": dynamic_contract["contract_id"],
+        "spec": _build_dynamic_task_spec(dynamic_contract),
+        "reward": int(dynamic_contract["reward_per_task"]),
+        "verify": _verify,
+        "record": dynamic_contract,
+    }
+
+
+def _available_contract_runtimes():
+    """Список контрактов, доступных для выдачи задач исполнителям."""
+    runtimes = []
+    for contract in CONTRACTS.values():
+        runtimes.append({
+            "kind": "system",
+            "contract_id": contract.contract_id,
+            "spec": contract.get_task_spec(),
+            "reward": contract.get_reward(),
+            "verify": contract.verify,
+            "record": None,
+        })
+    for dynamic_contract in contract_market.list_active_contracts():
+        runtimes.append(_resolve_contract_runtime(dynamic_contract["contract_id"], allow_inactive_dynamic=False))
+    return [r for r in runtimes if r is not None]
+
+
 @app.route("/get_task", methods=["GET"])
 @limiter.limit("60 per minute")  # Защита от DDoS: не более 60 запросов задач в минуту на ключ
 def get_task():
@@ -381,20 +477,29 @@ def get_task():
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     contract_id = request.args.get("contract_id")
     if contract_id:
-        contract = CONTRACTS.get(contract_id)
-        if not contract:
-            return jsonify({"error": "Unknown contract_id"}), 400
+        runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=False)
+        if not runtime:
+            return jsonify({"error": "Unknown contract_id or contract is not active"}), 400
     else:
-        contract = random.choice(list(CONTRACTS.values()))
+        candidates = _available_contract_runtimes()
+        if not candidates:
+            return jsonify({"error": "No available contracts"}), 503
+        runtime = random.choice(candidates)
     # Учитываем активного вычислителя по этому контракту
-    _active_task_takers[(contract.contract_id, client_id)] = time.time()
-    spec = contract.get_task_spec()
+    _active_task_takers[(runtime["contract_id"], client_id)] = time.time()
+    spec = dict(runtime["spec"])
     # Уникальный task_seed при каждой выдаче, 64 бит + привязка к client_id — чтобы коллизии
     # между разными клиентами были практически невозможны (proof already used by different client).
     base = uuid.uuid4().int & ((1 << 64) - 1)
     client_bits = int(hashlib.sha256(client_id.encode()).hexdigest()[:16], 16) % (1 << 64)
     spec["task_seed"] = (base ^ client_bits) & ((1 << 64) - 1)
-    logger.info("task_issued: contract_id=%s client_id=%s... task_seed=%s", contract.contract_id, client_id[:8], spec["task_seed"])
+    logger.info(
+        "task_issued: contract_id=%s origin=%s client_id=%s... task_seed=%s",
+        runtime["contract_id"],
+        runtime["kind"],
+        client_id[:8],
+        spec["task_seed"],
+    )
     return jsonify(spec), 200
 
 @app.route("/submit_work", methods=["POST"])
@@ -426,6 +531,12 @@ def submit_work():
     if not all([client_id, contract_id, work_units_done is not None]):
         logger.warning("submit_work: missing data (client_id=%s contract_id=%s work_units_done=%s)", bool(client_id), contract_id, work_units_done)
         return jsonify({"error": "Missing data"}), 400
+    try:
+        work_units_done = int(work_units_done)
+    except (TypeError, ValueError):
+        return jsonify({"error": "work_units_done must be integer"}), 400
+    if work_units_done <= 0:
+        return jsonify({"error": "work_units_done must be > 0"}), 400
 
     # Защита от DoS: проверка размера result_data (хеш должен быть 64 символа, максимум 1KB для безопасности)
     if result_data:
@@ -453,8 +564,8 @@ def submit_work():
                 logger.info("submit_work: proof already processed (idempotent request) client_id=%s... contract_id=%s", 
                            client_id[:8], contract_id)
                 # Получаем reward_amount для ответа
-                contract = CONTRACTS.get(contract_id)
-                reward_amount = contract.get_reward() if contract else 0
+                runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=True)
+                reward_amount = runtime["reward"] if runtime else 0
                 return jsonify({
                     "status": "success",
                     "reward_issued": reward_amount,
@@ -492,34 +603,42 @@ def submit_work():
                     "existing_client_prefix": existing_cid[:8] if existing_cid else None,
                 }), 409
 
-    # Находим контракт по contract_id
-    contract = CONTRACTS.get(contract_id)
-    if not contract:
+    runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=True)
+    if not runtime:
         logger.warning("submit_work: invalid contract_id=%s", contract_id)
         return jsonify({"error": "Invalid contract ID"}), 400
 
     # BOINC: validator определяет корректность результата. У нас для астро-контрактов verify() заново
     # выполняет полное вычисление (60k–70k шагов) — может занять 10–15 мин; воркер должен ждать (timeout 900s).
-    logger.info("submit_work: starting verification for client_id=%s... contract_id=%s (may take several minutes for large tasks)",
-                client_id[:8], contract_id)
-    if not contract.verify(client_id, contract_id, work_units_done, result_data, nonce):
+    logger.info(
+        "submit_work: starting verification for client_id=%s... contract_id=%s origin=%s (may take several minutes for large tasks)",
+        client_id[:8],
+        contract_id,
+        runtime["kind"],
+    )
+    if not runtime["verify"](client_id, contract_id, work_units_done, result_data, nonce):
         logger.warning("submit_work_verification_failed: client_id=%s... contract_id=%s (balance not updated)", client_id[:8], contract_id)
         return jsonify({"error": "Work verification failed"}), 400
     logger.info("submit_work: verification passed for client_id=%s... contract_id=%s", client_id[:8], contract_id)
 
-    reward_amount = contract.get_reward()
+    reward_amount = int(runtime["reward"])
     if reward_amount < FEE_PER_WORK_RECEIPT:
         logger.warning("Contract reward %s less than fee %s", reward_amount, FEE_PER_WORK_RECEIPT)
     logger.info("work_verified: client_id=%s... reward=%s contract_id=%s", client_id[:8], reward_amount, contract_id)
 
     # Создаём транзакцию вознаграждения
+    reward_from = "system_contract"
+    if runtime["kind"] == "provider":
+        reward_from = f"provider_contract:{contract_id}"
     reward_tx = {
         "type": "reward",
-        "from": "system_contract",
+        "from": reward_from,
         "to": client_id,
         "amount": reward_amount,
         "contract_id": contract_id
     }
+    if runtime["kind"] == "provider" and runtime["record"]:
+        reward_tx["provider_client_id"] = runtime["record"].get("provider_client_id")
     
     # Assimilator (BOINC): учёт верифицированного результата — запись в блокчейн (reward + work_receipt; result_data для replay, fee сжигается).
     work_receipt_tx = {
@@ -538,6 +657,7 @@ def submit_work():
     
     # Критическое исправление: добавление транзакций и создание блока под одной блокировкой,
     # чтобы не остаться с «сиротой» reward_tx в pending при лимите work_receipt на клиента.
+    dynamic_reservation = None
     with _block_creation_lock:
         n_pending = sum(
             1 for t in blockchain.pending_transactions
@@ -548,14 +668,26 @@ def submit_work():
                 "error": "Client already has work in pending; wait for the next block and retry.",
                 "code": "pending_limit",
             }), 429
+        if runtime["kind"] == "provider":
+            dynamic_reservation, reserve_err = contract_market.reserve_submission(
+                contract_id=contract_id,
+                reward_amount=reward_amount,
+                work_units_done=work_units_done,
+            )
+            if reserve_err:
+                return jsonify({"error": reserve_err, "code": "provider_contract_budget"}), 409
         try:
             blockchain.add_transaction(reward_tx)
             blockchain.add_transaction(work_receipt_tx)
         except ValueError as e:
+            if dynamic_reservation:
+                contract_market.rollback_submission(contract_id=contract_id, reservation=dynamic_reservation)
             logger.warning("submit_work: add_transaction failed: %s", e)
             return jsonify({"error": "Cannot add transaction", "detail": str(e)}), 400
         sync_pending_from_peer()
         new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
+        if dynamic_reservation and not new_block:
+            contract_market.rollback_submission(contract_id=contract_id, reservation=dynamic_reservation)
 
     if new_block:
         new_balance = blockchain.get_balance(client_id)
@@ -636,6 +768,165 @@ def get_balance(client_id):
         return jsonify({"error": "Forbidden: can only request own balance"}), 403
     balance = blockchain.get_balance(client_id)
     return jsonify({"client_id": client_id, "balance": balance}), 200
+
+
+def _provider_contract_error_response(error):
+    if error == "Forbidden":
+        return jsonify({"error": error}), 403
+    if error == "Contract not found":
+        return jsonify({"error": error}), 404
+    return jsonify({"error": error}), 400
+
+
+@app.route("/provider/contracts", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
+def provider_contracts():
+    """
+    API поставщика контрактов:
+    - GET: список своих контрактов
+    - POST: создать новый контракт (status=draft по умолчанию)
+    """
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+
+    if request.method == "GET":
+        return jsonify(contract_market.list_provider_contracts(provider_client_id)), 200
+
+    data = request.get_json(silent=True) or {}
+    task_name = (data.get("task_name") or "").strip()
+    task_description = (data.get("task_description") or "").strip()
+    task_category = (data.get("task_category") or "").strip() or "Пользовательская"
+    computation_type = (data.get("computation_type") or "simple_pow").strip()
+
+    if not task_name:
+        return jsonify({"error": "task_name is required"}), 400
+    if computation_type not in SUPPORTED_COMPUTATION_TYPES:
+        return jsonify({"error": "Unsupported computation_type"}), 400
+
+    try:
+        work_units_required = int(data.get("work_units_required", 1000))
+        reward_per_task = int(data.get("reward_per_task", 10))
+        target_total_work_units = int(data.get("target_total_work_units", work_units_required * 10))
+        difficulty = int(data.get("difficulty", default_difficulty_for(computation_type)))
+        initial_budget_tokens = int(data.get("initial_budget_tokens", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Numeric fields must be integers"}), 400
+
+    if work_units_required <= 0:
+        return jsonify({"error": "work_units_required must be > 0"}), 400
+    if reward_per_task <= 0:
+        return jsonify({"error": "reward_per_task must be > 0"}), 400
+    if target_total_work_units < work_units_required:
+        return jsonify({"error": "target_total_work_units must be >= work_units_required"}), 400
+    if difficulty <= 0 or difficulty > 8:
+        return jsonify({"error": "difficulty must be in range 1..8"}), 400
+    if initial_budget_tokens < 0:
+        return jsonify({"error": "initial_budget_tokens must be >= 0"}), 400
+
+    created = contract_market.create_contract(
+        provider_client_id=provider_client_id,
+        task_name=task_name,
+        task_description=task_description,
+        task_category=task_category,
+        computation_type=computation_type,
+        work_units_required=work_units_required,
+        reward_per_task=reward_per_task,
+        target_total_work_units=target_total_work_units,
+        difficulty=difficulty,
+        initial_budget_tokens=initial_budget_tokens,
+    )
+
+    activate_now = data.get("activate_now") in (True, "true", "1", 1)
+    if activate_now:
+        updated, err = contract_market.set_status(
+            contract_id=created["contract_id"],
+            provider_client_id=provider_client_id,
+            new_status=STATUS_ACTIVE,
+        )
+        if err:
+            return _provider_contract_error_response(err)
+        created = updated
+    return jsonify(created), 201
+
+
+@app.route("/provider/contracts/<contract_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def provider_contract_details(contract_id):
+    """Детали контракта: владелец видит всегда, остальные — только активные."""
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    requester = get_client_id_from_auth()
+    if requester == contract.get("provider_client_id") or contract.get("status") == STATUS_ACTIVE:
+        return jsonify(contract), 200
+    return jsonify({"error": "Forbidden"}), 403
+
+
+@app.route("/provider/contracts/<contract_id>/fund", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_fund(contract_id):
+    """Пополнить бюджет пользовательского контракта."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = int(data.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be integer"}), 400
+    updated, err = contract_market.fund_contract(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        amount=amount,
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    return jsonify(updated), 200
+
+
+@app.route("/provider/contracts/<contract_id>/status", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_status(contract_id):
+    """Сменить статус контракта (active/paused/closed)."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip()
+    updated, err = contract_market.set_status(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        new_status=new_status,
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    return jsonify(updated), 200
+
+
+@app.route("/provider/contracts/<contract_id>/refund", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_refund(contract_id):
+    """Вернуть неиспользованный бюджет поставщику (логическая операция модели)."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    amount = data.get("amount")
+    if amount is not None:
+        try:
+            amount = int(amount)
+        except (TypeError, ValueError):
+            return jsonify({"error": "amount must be integer"}), 400
+    updated, refunded_amount, err = contract_market.refund_contract(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        amount=amount,
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    return jsonify({"contract": updated, "refunded_amount": refunded_amount}), 200
+
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -765,6 +1056,43 @@ def get_contracts():
             "remaining_volume": remaining_volume,
             "free_volume": remaining_volume,  # для совместимости: свободный объём = оставшаяся работа
             "reward_per_task": c.get_reward(),
+            "contract_origin": "system",
+            "status": STATUS_ACTIVE,
+        })
+
+    # Публичные пользовательские контракты поставщиков (только активные)
+    for contract_record in contract_market.list_active_contracts():
+        cid = contract_record["contract_id"]
+        wu_required = int(contract_record["work_units_required"])
+        total_done = chain_stats.get(cid, {}).get("total_work_done", 0)
+        jobs_count = chain_stats.get(cid, {}).get("jobs_count", 0)
+        target = int(contract_record["target_total_work_units"])
+        completion_pct = min(100.0, (total_done / target * 100)) if target else 0.0
+        remaining_volume = max(0, target - total_done)
+        active_workers = _active_workers_count(cid)
+        out.append({
+            "contract_id": cid,
+            "work_units_required": wu_required,
+            "difficulty": int(contract_record["difficulty"]),
+            "reward": int(contract_record["reward_per_task"]),
+            "task_name": contract_record.get("task_name", cid),
+            "task_description": contract_record.get("task_description", ""),
+            "task_category": contract_record.get("task_category", "Пользовательская"),
+            "computation_type": contract_record.get("computation_type", "simple_pow"),
+            "total_work_done": total_done,
+            "jobs_count": jobs_count,
+            "completion_pct": round(completion_pct, 1),
+            "active_workers": active_workers,
+            "target_total": target,
+            "remaining_volume": remaining_volume,
+            "free_volume": remaining_volume,
+            "reward_per_task": int(contract_record["reward_per_task"]),
+            "contract_origin": "provider",
+            "status": contract_record.get("status", STATUS_DRAFT),
+            "provider_client_id": contract_record.get("provider_client_id"),
+            "budget_tokens_total": int(contract_record.get("budget_tokens_total", 0)),
+            "budget_tokens_spent": int(contract_record.get("budget_tokens_spent", 0)),
+            "budget_tokens_available": int(contract_record.get("budget_tokens_available", 0)),
         })
     return jsonify(out), 200
 
@@ -790,8 +1118,9 @@ def _run_worker_container(contract_id, api_key=None, client_id=None, run_once=Fa
         - Доступ к Docker (сокет /var/run/docker.sock)
         - Переменные окружения: WORKER_IMAGE, ORCHESTRATOR_URL_FOR_WORKER, DOCKER_NETWORK
     """
-    if contract_id not in CONTRACTS:
-        return False, "Unknown contract_id"
+    runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=False)
+    if not runtime:
+        return False, "Unknown contract_id or contract is not active"
     worker_image = os.environ.get("WORKER_IMAGE", "").strip()
     orchestrator_url = os.environ.get("ORCHESTRATOR_URL_FOR_WORKER", "http://orchestrator_node_1:5000").strip()
     docker_network = os.environ.get("DOCKER_NETWORK", "distributed-compute_default").strip()
