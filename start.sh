@@ -13,4 +13,8 @@ else
   echo "Откройте в браузере: http://localhost:8080"
 fi
 echo "Готово. Интерфейс: http://localhost:8080"
+echo "Первый поставщик (по умолчанию):"
+echo "  login: ${BOOTSTRAP_PROVIDER_LOGIN:-first_provider}"
+echo "  password: ${BOOTSTRAP_PROVIDER_PASSWORD:-first_provider_change_me}"
+echo "  (измените через переменные окружения или .env перед запуском)"
 echo "Чтобы остановить: docker-compose down"

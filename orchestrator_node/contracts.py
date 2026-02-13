@@ -296,16 +296,36 @@ class GravitationalWaves(BaseContract):
         return 6  # Максимальная сложность
 
 
-# Реестр контрактов по contract_id: один экземпляр на тип, быстрый доступ по id
-CONTRACTS = {
-    c.contract_id: c() for c in (
-        QuickTestPoW,
-        SimpleHashPoW,
-        ComplexHashPoW,
-        CosmologicalSimulation,
-        SupernovaModeling,
-        MHDJetAccretion,
-        RadiativeTransfer,
-        GravitationalWaves,
-    )
-}
+SYSTEM_CONTRACT_CLASSES = (
+    QuickTestPoW,
+    SimpleHashPoW,
+    ComplexHashPoW,
+    CosmologicalSimulation,
+    SupernovaModeling,
+    MHDJetAccretion,
+    RadiativeTransfer,
+    GravitationalWaves,
+)
+
+
+def _to_provider_template(contract):
+    spec = contract.get_task_spec()
+    work_units_required = int(spec["work_units_required"])
+    target_total = int(getattr(contract, "target_total_work_units", None) or (10 * work_units_required))
+    reward = int(contract.get_reward())
+    jobs_estimate = max(1, target_total // max(1, work_units_required))
+    return {
+        "contract_id": contract.contract_id,
+        "task_name": spec.get("task_name", contract.contract_id),
+        "task_description": spec.get("task_description", ""),
+        "task_category": spec.get("task_category", "Пользовательская"),
+        "computation_type": spec.get("computation_type", "simple_pow"),
+        "work_units_required": work_units_required,
+        "difficulty": int(spec.get("difficulty", default_difficulty_for(spec.get("computation_type", "simple_pow")))),
+        "reward_per_task": reward,
+        "target_total_work_units": target_total,
+        "initial_budget_tokens": reward * jobs_estimate,
+    }
+
+
+SYSTEM_CONTRACT_TEMPLATES = [_to_provider_template(cls()) for cls in SYSTEM_CONTRACT_CLASSES]

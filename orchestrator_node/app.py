@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify, send_from_directory
 from blockchain import Blockchain, FEE_PER_WORK_RECEIPT, MAX_PENDING_WORK_PER_CLIENT, MAX_PENDING_TOTAL
 from contracts import (
-    CONTRACTS,
+    SYSTEM_CONTRACT_TEMPLATES,
     SUPPORTED_COMPUTATION_TYPES,
     default_difficulty_for,
     verify_contract_result,
-)  # Исполняемые контракты вместо JSON
+)  # Унифицированная верификация и шаблоны миграции контрактов
 from contract_market import (
     ContractMarket,
     STATUS_ACTIVE,
@@ -49,8 +49,19 @@ _block_creation_lock = threading.Lock()
 # --- Безопасность: аутентификация по API-ключу ---
 # api_key -> client_id (ключ выдаётся при регистрации; для постоянных аккаунтов загружаем из auth_storage)
 api_key_to_client = {}
+auth_load_all = None
+auth_create_user = None
+auth_verify_login = None
+auth_find_by_client_id = None
+auth_ensure_user = None
 try:
-    from auth_storage import load_all_into as auth_load_all, create_user as auth_create_user, verify_login as auth_verify_login, find_by_client_id as auth_find_by_client_id
+    from auth_storage import (
+        load_all_into as auth_load_all,
+        create_user as auth_create_user,
+        verify_login as auth_verify_login,
+        find_by_client_id as auth_find_by_client_id,
+        ensure_user as auth_ensure_user,
+    )
     n = auth_load_all(api_key_to_client)
     if n:
         logger.info("auth_loaded: %s persistent account(s)", n)
@@ -112,6 +123,53 @@ else:
         NODE_IDS = ["node-1", "node-2"]
     else:
         NODE_IDS = [NODE_ID]  # Один узел
+
+
+BOOTSTRAP_PROVIDER_LOGIN = os.environ.get("BOOTSTRAP_PROVIDER_LOGIN", "first_provider")
+BOOTSTRAP_PROVIDER_PASSWORD = os.environ.get("BOOTSTRAP_PROVIDER_PASSWORD", "first_provider_change_me")
+BOOTSTRAP_PROVIDER_NICKNAME = os.environ.get("BOOTSTRAP_PROVIDER_NICKNAME", "Первый поставщик")
+
+
+def _bootstrap_provider_and_contracts():
+    """
+    Создаёт/подключает первого поставщика и мигрирует шаблонные контракты
+    в пользовательский формат (provider contracts).
+    """
+    if auth_ensure_user is None:
+        logger.warning("bootstrap_provider: auth storage unavailable")
+        return None
+    provider, err = auth_ensure_user(
+        BOOTSTRAP_PROVIDER_LOGIN,
+        BOOTSTRAP_PROVIDER_PASSWORD,
+        nickname=BOOTSTRAP_PROVIDER_NICKNAME,
+    )
+    if err:
+        logger.warning("bootstrap_provider_failed: %s", err)
+        return None
+    api_key_to_client[provider["api_key"]] = provider["client_id"]
+    seed_leader = sorted(NODE_IDS)[0] if NODE_IDS else NODE_ID
+    if NODE_ID == seed_leader:
+        created = contract_market.upsert_seed_contracts(
+            provider_client_id=provider["client_id"],
+            templates=SYSTEM_CONTRACT_TEMPLATES,
+        )
+        if created:
+            logger.info(
+                "bootstrap_contracts_seeded: provider=%s created=%s",
+                provider["login"],
+                len(created),
+            )
+    else:
+        logger.info("bootstrap_contracts_seed_skipped: node_id=%s leader=%s", NODE_ID, seed_leader)
+    logger.info(
+        "bootstrap_provider_ready: login=%s client_id=%s...",
+        provider["login"],
+        provider["client_id"][:8],
+    )
+    return provider
+
+
+BOOTSTRAP_PROVIDER = _bootstrap_provider_and_contracts()
 
 
 @app.before_request
@@ -283,10 +341,9 @@ def auth_register():
     login = (data.get("login") or "").strip()
     password = data.get("password") or ""
     nickname = (data.get("nickname") or "").strip() or login
-    try:
-        user, err = auth_create_user(login, password, nickname)
-    except NameError:
+    if auth_create_user is None:
         return jsonify({"error": "Auth storage not available"}), 503
+    user, err = auth_create_user(login, password, nickname)
     if err:
         return jsonify({"error": err}), 400
     api_key_to_client[user["api_key"]] = user["client_id"]
@@ -314,10 +371,9 @@ def auth_login():
         return jsonify({"error": "Invalid JSON"}), 400
     login = (data.get("login") or "").strip()
     password = data.get("password") or ""
-    try:
-        user, err = auth_verify_login(login, password)
-    except NameError:
+    if auth_verify_login is None:
         return jsonify({"error": "Auth storage not available"}), 503
+    user, err = auth_verify_login(login, password)
     if err:
         return jsonify({"error": err}), 401
     api_key_to_client[user["api_key"]] = user["client_id"]
@@ -398,20 +454,9 @@ def _build_dynamic_task_spec(contract_record):
 
 def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
     """
-    Получить рантайм-описание контракта (системный или пользовательский).
+    Получить рантайм-описание пользовательского контракта поставщика.
     allow_inactive_dynamic=True используется в submit_work, чтобы принимать уже выданные задачи.
     """
-    static_contract = CONTRACTS.get(contract_id)
-    if static_contract:
-        return {
-            "kind": "system",
-            "contract_id": static_contract.contract_id,
-            "spec": static_contract.get_task_spec(),
-            "reward": static_contract.get_reward(),
-            "verify": static_contract.verify,
-            "record": None,
-        }
-
     dynamic_contract = contract_market.get_contract(contract_id)
     if not dynamic_contract:
         return None
@@ -449,15 +494,6 @@ def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
 def _available_contract_runtimes():
     """Список контрактов, доступных для выдачи задач исполнителям."""
     runtimes = []
-    for contract in CONTRACTS.values():
-        runtimes.append({
-            "kind": "system",
-            "contract_id": contract.contract_id,
-            "spec": contract.get_task_spec(),
-            "reward": contract.get_reward(),
-            "verify": contract.verify,
-            "record": None,
-        })
     for dynamic_contract in contract_market.list_active_contracts():
         runtimes.append(_resolve_contract_runtime(dynamic_contract["contract_id"], allow_inactive_dynamic=False))
     return [r for r in runtimes if r is not None]
@@ -627,9 +663,7 @@ def submit_work():
     logger.info("work_verified: client_id=%s... reward=%s contract_id=%s", client_id[:8], reward_amount, contract_id)
 
     # Создаём транзакцию вознаграждения
-    reward_from = "system_contract"
-    if runtime["kind"] == "provider":
-        reward_from = f"provider_contract:{contract_id}"
+    reward_from = f"provider_contract:{contract_id}"
     reward_tx = {
         "type": "reward",
         "from": reward_from,
@@ -637,7 +671,7 @@ def submit_work():
         "amount": reward_amount,
         "contract_id": contract_id
     }
-    if runtime["kind"] == "provider" and runtime["record"]:
+    if runtime["record"]:
         reward_tx["provider_client_id"] = runtime["record"].get("provider_client_id")
     
     # Assimilator (BOINC): учёт верифицированного результата — запись в блокчейн (reward + work_receipt; result_data для replay, fee сжигается).
@@ -1030,37 +1064,7 @@ def get_contracts():
     """
     chain_stats = blockchain.get_contract_stats()
     out = []
-    for cid, c in CONTRACTS.items():
-        spec = c.get_task_spec()
-        wu_required = spec["work_units_required"]
-        total_done = chain_stats.get(cid, {}).get("total_work_done", 0)
-        jobs_count = chain_stats.get(cid, {}).get("jobs_count", 0)
-        target = getattr(c, "target_total_work_units", None) or (10 * wu_required)
-        completion_pct = min(100.0, (total_done / target * 100)) if target else 0.0
-        remaining_volume = max(0, target - total_done)  # оставшийся объём для распределённых вычислителей
-        active_workers = _active_workers_count(cid)
-        out.append({
-            "contract_id": cid,
-            "work_units_required": wu_required,
-            "difficulty": spec["difficulty"],
-            "reward": c.get_reward(),
-            "task_name": spec.get("task_name", ""),
-            "task_description": spec.get("task_description", ""),
-            "task_category": spec.get("task_category", ""),
-            "computation_type": spec.get("computation_type", "simple_pow"),
-            "total_work_done": total_done,
-            "jobs_count": jobs_count,
-            "completion_pct": round(completion_pct, 1),
-            "active_workers": active_workers,
-            "target_total": target,
-            "remaining_volume": remaining_volume,
-            "free_volume": remaining_volume,  # для совместимости: свободный объём = оставшаяся работа
-            "reward_per_task": c.get_reward(),
-            "contract_origin": "system",
-            "status": STATUS_ACTIVE,
-        })
-
-    # Публичные пользовательские контракты поставщиков (только активные)
+    # Публичные контракты поставщиков (только активные)
     for contract_record in contract_market.list_active_contracts():
         cid = contract_record["contract_id"]
         wu_required = int(contract_record["work_units_required"])
@@ -1169,7 +1173,7 @@ def _run_worker_container(contract_id, api_key=None, client_id=None, run_once=Fa
 def run_worker():
     """
     Запуск воркера в Docker для выполнения выбранной задачи (контракта).
-    Требуется авторизация. Тело: {"contract_id": "sc-001", "client_id": "опционально для проверки"}.
+    Требуется авторизация. Тело: {"contract_id": "<id_контракта>", "client_id": "опционально для проверки"}.
     Награда начисляется на client_id, соответствующий api_key. Если передан client_id в теле,
     он должен совпадать с ключом — иначе 400 (защита от неверного выбора вычислителя в интерфейсе).
     """

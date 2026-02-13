@@ -5,7 +5,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from contracts import CONTRACTS, SimpleHashPoW, ComplexHashPoW
+from contracts import SYSTEM_CONTRACT_TEMPLATES, SimpleHashPoW, ComplexHashPoW
 
 
 class TestSimpleHashPoW:
@@ -61,9 +61,10 @@ class TestComplexHashPoW:
         assert ComplexHashPoW().get_reward() == 50
 
 
-class TestCONTRACTS:
-    def test_registry(self):
-        assert "sc-001" in CONTRACTS
-        assert "sc-002" in CONTRACTS
-        assert CONTRACTS["sc-001"].work_units_required == 1000
-        assert CONTRACTS["sc-002"].work_units_required == 5000
+class TestSystemTemplates:
+    def test_templates_present(self):
+        by_id = {t["contract_id"]: t for t in SYSTEM_CONTRACT_TEMPLATES}
+        assert "sc-001" in by_id
+        assert "sc-002" in by_id
+        assert by_id["sc-001"]["work_units_required"] == 1000
+        assert by_id["sc-002"]["work_units_required"] == 5000

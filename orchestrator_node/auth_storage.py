@@ -117,3 +117,32 @@ def verify_login(login, password):
         "login": user["login"],
         "nickname": user.get("nickname") or user["login"],
     }, None
+
+
+def ensure_user(login, password, nickname=None):
+    """
+    Возвращает существующего пользователя по логину либо создаёт нового.
+    Полезно для bootstrap-аккаунтов (например, первого поставщика контрактов).
+    """
+    existing = find_by_login(login)
+    if existing:
+        return {
+            "client_id": existing["client_id"],
+            "api_key": existing["api_key"],
+            "login": existing["login"],
+            "nickname": existing.get("nickname") or existing["login"],
+        }, None
+    created, err = create_user(login, password, nickname=nickname)
+    if created:
+        return created, None
+    if err == "Login already taken":
+        # Защита от гонки между узлами: второй узел перечитывает уже созданного пользователя.
+        existing = find_by_login(login)
+        if existing:
+            return {
+                "client_id": existing["client_id"],
+                "api_key": existing["api_key"],
+                "login": existing["login"],
+                "nickname": existing.get("nickname") or existing["login"],
+            }, None
+    return None, err

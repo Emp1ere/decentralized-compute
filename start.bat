@@ -28,5 +28,12 @@ echo Opening browser: http://localhost:8080
 start "" "http://localhost:8080"
 echo.
 echo Done. To stop: docker-compose down
+if "%BOOTSTRAP_PROVIDER_LOGIN%"=="" set BOOTSTRAP_PROVIDER_LOGIN=first_provider
+if "%BOOTSTRAP_PROVIDER_PASSWORD%"=="" set BOOTSTRAP_PROVIDER_PASSWORD=first_provider_change_me
+echo.
+echo Bootstrap first provider:
+echo   login: %BOOTSTRAP_PROVIDER_LOGIN%
+echo   password: %BOOTSTRAP_PROVIDER_PASSWORD%
+echo   (change via environment variables or .env before start)
 echo.
 pause

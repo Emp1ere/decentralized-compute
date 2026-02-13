@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import pytest
 from app import app, blockchain
-from contracts import CONTRACTS
 
 
 @pytest.fixture
@@ -59,21 +58,31 @@ def test_get_task_requires_auth(client):
 
 def test_get_task_success(client, auth_headers):
     headers, _ = auth_headers
+    contracts_res = client.get("/contracts")
+    assert contracts_res.status_code == 200
+    available_ids = {c["contract_id"] for c in contracts_res.get_json()}
+    assert available_ids
     r = client.get("/get_task", headers=headers)
     assert r.status_code == 200
     data = r.get_json()
     assert "contract_id" in data
     assert "work_units_required" in data
     assert "difficulty" in data
-    assert data["contract_id"] in list(CONTRACTS.keys())
+    assert data["contract_id"] in available_ids
 
 
 def test_get_task_by_contract_id(client, auth_headers):
     headers, _ = auth_headers
-    r = client.get("/get_task", headers=headers, query_string={"contract_id": "sc-001"})
+    contracts_res = client.get("/contracts")
+    assert contracts_res.status_code == 200
+    contracts_list = contracts_res.get_json()
+    assert contracts_list
+    picked_contract_id = contracts_list[0]["contract_id"]
+
+    r = client.get("/get_task", headers=headers, query_string={"contract_id": picked_contract_id})
     assert r.status_code == 200
     data = r.get_json()
-    assert data["contract_id"] == "sc-001"
+    assert data["contract_id"] == picked_contract_id
     r2 = client.get("/get_task", headers=headers, query_string={"contract_id": "unknown"})
     assert r2.status_code == 400
 
@@ -84,10 +93,13 @@ def test_submit_work_requires_auth(client):
 
 
 def test_submit_work_success(client, auth_headers):
-    """Проверяем сдачу работы для любой задачи с simple_pow (sc-001, sc-002)."""
+    """Проверяем сдачу работы для любого доступного simple_pow контракта."""
     headers, client_id = auth_headers
-    # Берём случайную задачу только среди simple_pow, чтобы не зависать на астрофизических (difficulty 5)
-    simple_pow_ids = [cid for cid, c in CONTRACTS.items() if getattr(c, "computation_type", "") == "simple_pow"]
+    contracts_res = client.get("/contracts")
+    assert contracts_res.status_code == 200
+    contracts_list = contracts_res.get_json()
+    # Берём задачу среди доступных simple_pow, чтобы тест был быстрым
+    simple_pow_ids = [c["contract_id"] for c in contracts_list if c.get("computation_type") == "simple_pow"]
     assert simple_pow_ids, "Need at least one simple_pow contract"
     contract_id = random.choice(simple_pow_ids)
     r = client.get("/get_task", headers=headers, query_string={"contract_id": contract_id})

@@ -47,6 +47,11 @@ echo "Интерфейс: http://localhost:8080"
 echo "Узел 1:    http://localhost:5000"
 echo "Узел 2:    http://localhost:5001"
 echo
+echo "Первый поставщик (bootstrap):"
+echo "  login: ${BOOTSTRAP_PROVIDER_LOGIN:-first_provider}"
+echo "  password: ${BOOTSTRAP_PROVIDER_PASSWORD:-first_provider_change_me}"
+echo "  (измените через переменные окружения или .env перед пересборкой)"
+echo
 echo "Для просмотра логов:"
 echo "  docker logs orchestrator_node_1"
 echo "  docker logs orchestrator_node_2"

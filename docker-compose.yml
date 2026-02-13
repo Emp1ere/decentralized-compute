@@ -22,6 +22,10 @@ services:
       - SYNC_INTERVAL=30
       # Секрет для запросов между узлами (receive_block, receive_chain) — задайте свой в продакшене
       - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+      # Bootstrap первого поставщика: его аккаунт используется для мигрированных базовых контрактов
+      - BOOTSTRAP_PROVIDER_LOGIN=${BOOTSTRAP_PROVIDER_LOGIN:-first_provider}
+      - BOOTSTRAP_PROVIDER_PASSWORD=${BOOTSTRAP_PROVIDER_PASSWORD:-first_provider_change_me}
+      - BOOTSTRAP_PROVIDER_NICKNAME=${BOOTSTRAP_PROVIDER_NICKNAME:-Первый поставщик}
       # Решение централизации: идентификатор узла для ротации лидера
       - NODE_ID=node-1
       - NODE_IDS=node-1,node-2
@@ -48,6 +52,9 @@ services:
       - PEER_URL=http://orchestrator_node_1:5000
       - SYNC_INTERVAL=30
       - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+      - BOOTSTRAP_PROVIDER_LOGIN=${BOOTSTRAP_PROVIDER_LOGIN:-first_provider}
+      - BOOTSTRAP_PROVIDER_PASSWORD=${BOOTSTRAP_PROVIDER_PASSWORD:-first_provider_change_me}
+      - BOOTSTRAP_PROVIDER_NICKNAME=${BOOTSTRAP_PROVIDER_NICKNAME:-Первый поставщик}
       - NODE_ID=node-2
       - NODE_IDS=node-1,node-2
       - WORKER_IMAGE=distributed-compute-client_worker_1

@@ -202,6 +202,7 @@
     <button type="button" data-tab="overview" class="active">Обзор</button>
     <button type="button" data-tab="work">Работа</button>
     <button type="button" data-tab="contracts">Контракты</button>
+    <button type="button" data-tab="provider">Поставщик</button>
     <button type="button" data-tab="tasks">Задачи</button>
     <button type="button" data-tab="chain">Блокчейн</button>
     <button type="button" data-tab="stats">Статистика</button>
@@ -273,7 +274,7 @@
       <div id="work-run-in-worker" class="card" style="display:none; margin-bottom: 16px;">
       <div class="label">Выполнить задачу в воркере</div>
       <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Воркер запускается с API-ключом выбранного вычислителя (вкладка «Обзор») и <strong>только для контракта текущей задачи</strong> (см. блок «Текущая задача» выше). Награда начислится на этого вычислителя. Перед запуском нажмите «Использовать» для нужного вычислителя и при необходимости «Обновить данные».</p>
-      <p class="muted" style="font-size:0.8em; margin-bottom:8px;">Если на баланс уже начислялись токены за другие контракты — вероятно, работал ещё один воркер (другой контейнер или запуск без выбора задачи). Остановите все контейнеры воркеров (<code>docker ps</code>, затем <code>docker stop &lt;id&gt;</code>), затем запустите только один раз с нужной задачей (сначала «Получить задачу» или «Взять задачу» по astro-002).</p>
+      <p class="muted" style="font-size:0.8em; margin-bottom:8px;">Если на баланс уже начислялись токены за другие контракты — вероятно, работал ещё один воркер (другой контейнер или запуск без выбора задачи). Остановите все контейнеры воркеров (<code>docker ps</code>, затем <code>docker stop &lt;id&gt;</code>), затем запустите воркер заново после получения нужной задачи.</p>
       <div class="row" style="align-items:center; gap:16px; margin-bottom:12px; flex-wrap:wrap;">
         <span class="muted" style="font-size:0.9em;">Режим воркера:</span>
         <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
@@ -307,20 +308,74 @@
       <p style="font-size:0.85em; color:var(--muted); margin-top:8px;">
         <strong>Примечание:</strong> Для астрофизических задач в браузере выполняется упрощённая версия (до 1000 единиц работы для скорости).
         Для получения награды требуется выполнить полный объём работы - используйте воркеры для полных вычислений.
-        Простые задачи (sc-001, sc-002) можно выполнять полностью в браузере.
+        Простые пользовательские контракты (simple_pow) можно выполнять полностью в браузере.
       </p>
     </div>
     <div id="work-result" class="msg" style="display:none;"></div>
   </div>
 
   <div id="panel-contracts" class="panel">
-    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты - типы заданий с наградой за сдачу. Вычислители берут задачу по контракту, выполняют требуемый объём работы и сдают результат. «Выполнено %» - доля от целевого объёма контракта; «Осталось» - сколько единиц работы ещё не выполнено; «Активных вычислителей» - кто недавно запрашивал задачу по этому контракту.</p>
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Контракты поставщиков, доступные исполнителям. Вычислители берут задачу по контракту, выполняют требуемый объём работы и сдают результат. «Выполнено %» - доля от целевого объёма контракта; «Осталось» - сколько единиц работы ещё не выполнено; «Активных вычислителей» - кто недавно запрашивал задачу по этому контракту.</p>
     <p class="loading" id="contracts-load">Загрузка…</p>
     <div class="table-responsive">
       <table id="table-contracts" style="display:none;">
         <thead><tr><th>Название</th><th>Категория</th><th>Описание</th><th>Ед. на сдачу</th><th>Выполнено %</th><th>Активных вычислителей</th><th>Осталось (ед. работы)</th><th>Награда за сдачу</th><th>Действие</th></tr></thead>
         <tbody></tbody>
       </table>
+    </div>
+  </div>
+
+  <div id="panel-provider" class="panel">
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Управление контрактами поставщика: создание, пополнение бюджета, смена статуса (active/paused/closed) и возврат остатка.</p>
+    <p id="provider-auth-required" class="msg info" style="display:none;">Выберите вычислителя (API-ключ) на вкладке «Обзор». Его аккаунт будет использован как поставщик.</p>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="label">Создать контракт поставщика</div>
+      <div class="row">
+        <input type="text" id="provider-task-name" placeholder="Название задачи" style="min-width:200px;">
+        <input type="text" id="provider-task-category" placeholder="Категория" style="min-width:160px;">
+        <select id="provider-computation-type" style="min-width:180px;">
+          <option value="simple_pow">simple_pow</option>
+          <option value="cosmological">cosmological</option>
+          <option value="supernova">supernova</option>
+          <option value="mhd">mhd</option>
+          <option value="radiative">radiative</option>
+          <option value="gravitational_waves">gravitational_waves</option>
+        </select>
+      </div>
+      <div class="row">
+        <input type="number" id="provider-work-units" min="1" step="1" placeholder="Ед. на сдачу" style="min-width:140px;">
+        <input type="number" id="provider-reward" min="1" step="1" placeholder="Награда за сдачу" style="min-width:150px;">
+        <input type="number" id="provider-target" min="1" step="1" placeholder="Целевой объём" style="min-width:150px;">
+        <input type="number" id="provider-difficulty" min="1" step="1" placeholder="Difficulty" style="min-width:120px;">
+        <input type="number" id="provider-initial-budget" min="0" step="1" placeholder="Начальный бюджет" style="min-width:150px;">
+      </div>
+      <div class="row">
+        <input type="text" id="provider-task-description" placeholder="Описание задачи" style="min-width:460px;">
+      </div>
+      <div class="row" style="align-items:center;">
+        <label style="display:inline-flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="provider-activate-now" checked>
+          <span>Сразу активировать</span>
+        </label>
+      </div>
+      <div class="row">
+        <button type="button" class="primary" id="btn-provider-create">Создать контракт</button>
+        <span id="provider-create-msg" class="msg" style="display:none;"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div class="label">Мои контракты</div>
+        <button type="button" class="primary" id="btn-provider-refresh">Обновить</button>
+      </div>
+      <p class="loading" id="provider-load">Загрузка…</p>
+      <p id="provider-empty" class="muted" style="display:none;">Контрактов пока нет.</p>
+      <div class="table-responsive">
+        <table id="table-provider-contracts" style="display:none;">
+          <thead><tr><th>ID</th><th>Название</th><th>Статус</th><th>Награда</th><th>Прогресс</th><th>Бюджет (доступно)</th><th>Управление</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -416,7 +471,7 @@
     /**
      * Переключение между вкладками интерфейса.
      * При переключении загружаются соответствующие данные и запускаются/останавливаются периодические обновления.
-     * @param {string} id - Идентификатор вкладки (overview, work, contracts, tasks, chain, stats, profile)
+     * @param {string} id - Идентификатор вкладки (overview, work, contracts, provider, tasks, chain, stats, profile)
      */
     function showPanel(id) {
       // Скрываем все панели и убираем активное состояние у всех кнопок
@@ -444,6 +499,7 @@
         stopWorkerProgressPolling(); 
       }
       if (id === 'contracts') loadContracts();
+      if (id === 'provider') loadProviderPanel();
       if (id === 'tasks') loadTasks();
       if (id === 'chain') loadChain();
       if (id === 'stats') loadStats();
@@ -696,6 +752,7 @@
       if (getSelectedClientId() !== workPanelAccountId) clearWorkPanelForNewAccount();
       workPanelAccountId = getSelectedClientId();
       if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
+      if (document.getElementById('panel-provider').classList.contains('active')) loadProviderPanel();
     };
     /**
      * Обработчик добавления вычислителя по API-ключу.
@@ -761,6 +818,7 @@
       msgEl.style.display = 'block';
       this.disabled = false;
       this.textContent = 'Добавить';
+      if (document.getElementById('panel-provider').classList.contains('active')) loadProviderPanel();
     };
     refreshClientSelect();
     refreshSavedClientsList();
@@ -813,6 +871,7 @@
       }
       showAuthProfile();
       refreshProfileFromMe();
+      if (document.getElementById('panel-provider').classList.contains('active')) loadProviderPanel();
     }
     document.getElementById('btn-auth-login').onclick = async function() {
       const login = document.getElementById('auth-login').value.trim();
@@ -848,6 +907,7 @@
       document.getElementById('input-api-key').value = '';
       showAuthForms();
       if (document.getElementById('panel-contracts').classList.contains('active')) loadContracts();
+      if (document.getElementById('panel-provider').classList.contains('active')) loadProviderPanel();
     };
     if (localStorage.getItem(AUTH_API_KEY)) {
       const key = localStorage.getItem(AUTH_API_KEY);
@@ -1087,6 +1147,20 @@
       const v = document.getElementById('select-client').value;
       return v || null;
     }
+    function setInlineMsg(el, level, text) {
+      if (!el) return;
+      el.className = 'msg ' + (level || 'info');
+      el.textContent = text || '';
+      el.style.display = text ? 'block' : 'none';
+    }
+    const DEFAULT_DIFFICULTY_BY_COMPUTATION = {
+      simple_pow: 3,
+      cosmological: 5,
+      supernova: 5,
+      mhd: 4,
+      radiative: 4,
+      gravitational_waves: 6
+    };
     /** Сброс вкладки «Работа» при смене вычислителя: задача и блок воркера скрыты, подсказка — получить задачу заново. */
     function clearWorkPanelForNewAccount() {
       currentTask = null;
@@ -1482,6 +1556,220 @@
         msg.className = 'msg err';
         msg.textContent = 'Ошибка: ' + e.message;
         msg.style.display = 'block';
+      }
+    };
+
+    async function providerApi(path, { method = 'GET', payload = null } = {}) {
+      const apiKey = getApiKey();
+      if (!apiKey) throw new Error('Выберите вычислителя с API-ключом на вкладке «Обзор».');
+      const options = {
+        method,
+        headers: {
+          'Authorization': 'Bearer ' + apiKey
+        }
+      };
+      if (payload !== null) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(payload);
+      }
+      const response = await fetch(base + path, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
+      return data;
+    }
+
+    function loadProviderPanel() {
+      const hasKey = !!getApiKey();
+      const authRequired = document.getElementById('provider-auth-required');
+      const createBtn = document.getElementById('btn-provider-create');
+      const refreshBtn = document.getElementById('btn-provider-refresh');
+      if (authRequired) authRequired.style.display = hasKey ? 'none' : 'block';
+      if (createBtn) createBtn.disabled = !hasKey;
+      if (refreshBtn) refreshBtn.disabled = !hasKey;
+      if (!hasKey) {
+        const loadEl = document.getElementById('provider-load');
+        const emptyEl = document.getElementById('provider-empty');
+        const table = document.getElementById('table-provider-contracts');
+        if (loadEl) loadEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+        if (table) table.style.display = 'none';
+        if (emptyEl) emptyEl.textContent = 'Для просмотра контрактов выберите поставщика на вкладке «Обзор».';
+        return;
+      }
+      loadProviderContracts();
+    }
+
+    function renderProviderContracts(list) {
+      const table = document.getElementById('table-provider-contracts');
+      const tbody = table.querySelector('tbody');
+      const emptyEl = document.getElementById('provider-empty');
+      tbody.innerHTML = '';
+      (list || []).forEach(contract => {
+        const progress = contract.completion_pct != null ? contract.completion_pct + '%' : '-';
+        const budget = contract.budget_tokens_available != null ? contract.budget_tokens_available : '-';
+        const reward = contract.reward_per_task != null ? contract.reward_per_task : '-';
+        const row = document.createElement('tr');
+        row.innerHTML =
+          '<td class="mono">' + (contract.contract_id || '-') + '</td>' +
+          '<td><strong>' + (contract.task_name || '-') + '</strong></td>' +
+          '<td>' + (contract.status || '-') + '</td>' +
+          '<td>' + reward + '</td>' +
+          '<td>' + progress + '</td>' +
+          '<td>' + budget + '</td>' +
+          '<td>' +
+            '<div class="row" style="gap:6px;">' +
+              '<select data-provider-status style="min-width:120px;">' +
+                '<option value="active">active</option>' +
+                '<option value="paused">paused</option>' +
+                '<option value="closed">closed</option>' +
+                '<option value="draft">draft</option>' +
+              '</select>' +
+              '<button type="button" class="primary" data-provider-apply-status>Статус</button>' +
+            '</div>' +
+            '<div class="row" style="gap:6px; margin-top:6px;">' +
+              '<input type="number" min="1" step="1" placeholder="Токены" data-provider-fund style="min-width:100px;">' +
+              '<button type="button" class="primary" data-provider-fund-btn>Пополнить</button>' +
+              '<button type="button" data-provider-refund-btn>Вернуть</button>' +
+            '</div>' +
+          '</td>';
+        tbody.appendChild(row);
+        const statusSelect = row.querySelector('[data-provider-status]');
+        const applyBtn = row.querySelector('[data-provider-apply-status]');
+        const fundInput = row.querySelector('[data-provider-fund]');
+        const fundBtn = row.querySelector('[data-provider-fund-btn]');
+        const refundBtn = row.querySelector('[data-provider-refund-btn]');
+        statusSelect.value = contract.status || 'draft';
+
+        applyBtn.onclick = async () => {
+          try {
+            await providerApi('/provider/contracts/' + encodeURIComponent(contract.contract_id) + '/status', {
+              method: 'POST',
+              payload: { status: statusSelect.value }
+            });
+            await loadProviderContracts();
+            loadContracts();
+          } catch (e) {
+            alert('Ошибка смены статуса: ' + e.message);
+          }
+        };
+        fundBtn.onclick = async () => {
+          const amount = parseInt(fundInput.value, 10);
+          if (!amount || amount < 1) { alert('Укажите сумму пополнения (>= 1).'); return; }
+          try {
+            await providerApi('/provider/contracts/' + encodeURIComponent(contract.contract_id) + '/fund', {
+              method: 'POST',
+              payload: { amount }
+            });
+            fundInput.value = '';
+            await loadProviderContracts();
+            loadContracts();
+          } catch (e) {
+            alert('Ошибка пополнения: ' + e.message);
+          }
+        };
+        refundBtn.onclick = async () => {
+          if (!confirm('Вернуть весь доступный остаток по контракту ' + contract.contract_id + '?')) return;
+          try {
+            await providerApi('/provider/contracts/' + encodeURIComponent(contract.contract_id) + '/refund', {
+              method: 'POST',
+              payload: {}
+            });
+            await loadProviderContracts();
+            loadContracts();
+          } catch (e) {
+            alert('Ошибка возврата: ' + e.message);
+          }
+        };
+      });
+      table.style.display = list && list.length ? 'table' : 'none';
+      emptyEl.style.display = list && list.length ? 'none' : 'block';
+      if (!list || !list.length) emptyEl.textContent = 'Контрактов пока нет.';
+    }
+
+    async function loadProviderContracts() {
+      const loadEl = document.getElementById('provider-load');
+      const msgEl = document.getElementById('provider-create-msg');
+      const emptyEl = document.getElementById('provider-empty');
+      const table = document.getElementById('table-provider-contracts');
+      loadEl.style.display = 'block';
+      emptyEl.style.display = 'none';
+      table.style.display = 'none';
+      try {
+        const list = await providerApi('/provider/contracts');
+        loadEl.style.display = 'none';
+        renderProviderContracts(list || []);
+      } catch (e) {
+        loadEl.style.display = 'none';
+        table.style.display = 'none';
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = 'Ошибка загрузки: ' + e.message;
+        setInlineMsg(msgEl, 'err', 'Не удалось загрузить контракты поставщика.');
+      }
+    }
+
+    document.getElementById('provider-computation-type').addEventListener('change', function() {
+      const difficultyEl = document.getElementById('provider-difficulty');
+      if (!difficultyEl.value) {
+        difficultyEl.value = DEFAULT_DIFFICULTY_BY_COMPUTATION[this.value] || 3;
+      }
+    });
+
+    document.getElementById('btn-provider-refresh').onclick = function() {
+      loadProviderPanel();
+    };
+
+    document.getElementById('btn-provider-create').onclick = async function() {
+      const msgEl = document.getElementById('provider-create-msg');
+      const taskName = (document.getElementById('provider-task-name').value || '').trim();
+      const taskCategory = (document.getElementById('provider-task-category').value || '').trim() || 'Пользовательская';
+      const taskDescription = (document.getElementById('provider-task-description').value || '').trim();
+      const computationType = document.getElementById('provider-computation-type').value;
+      const workUnits = parseInt(document.getElementById('provider-work-units').value, 10);
+      const reward = parseInt(document.getElementById('provider-reward').value, 10);
+      const targetRaw = parseInt(document.getElementById('provider-target').value, 10);
+      const difficultyRaw = parseInt(document.getElementById('provider-difficulty').value, 10);
+      const budgetRaw = parseInt(document.getElementById('provider-initial-budget').value, 10);
+      const activateNow = !!document.getElementById('provider-activate-now').checked;
+
+      if (!taskName) { setInlineMsg(msgEl, 'err', 'Укажите название задачи.'); return; }
+      if (!workUnits || workUnits < 1) { setInlineMsg(msgEl, 'err', 'Ед. на сдачу должны быть >= 1.'); return; }
+      if (!reward || reward < 1) { setInlineMsg(msgEl, 'err', 'Награда должна быть >= 1.'); return; }
+
+      const targetTotal = targetRaw && targetRaw >= workUnits ? targetRaw : (workUnits * 10);
+      const difficulty = difficultyRaw && difficultyRaw > 0
+        ? difficultyRaw
+        : (DEFAULT_DIFFICULTY_BY_COMPUTATION[computationType] || 3);
+      const jobsEstimate = Math.max(1, Math.floor(targetTotal / Math.max(1, workUnits)));
+      const initialBudget = Number.isFinite(budgetRaw) ? Math.max(0, budgetRaw) : (reward * jobsEstimate);
+
+      const payload = {
+        task_name: taskName,
+        task_description: taskDescription,
+        task_category: taskCategory,
+        computation_type: computationType,
+        work_units_required: workUnits,
+        reward_per_task: reward,
+        target_total_work_units: targetTotal,
+        difficulty,
+        initial_budget_tokens: initialBudget,
+        activate_now: activateNow
+      };
+
+      this.disabled = true;
+      setInlineMsg(msgEl, 'info', 'Создание контракта...');
+      try {
+        const created = await providerApi('/provider/contracts', { method: 'POST', payload });
+        setInlineMsg(msgEl, 'ok', 'Контракт создан: ' + (created.contract_id || ''));
+        document.getElementById('provider-task-name').value = '';
+        document.getElementById('provider-task-description').value = '';
+        document.getElementById('provider-target').value = '';
+        document.getElementById('provider-initial-budget').value = '';
+        await loadProviderContracts();
+        loadContracts();
+      } catch (e) {
+        setInlineMsg(msgEl, 'err', 'Ошибка создания: ' + e.message);
+      } finally {
+        this.disabled = false;
       }
     };
 

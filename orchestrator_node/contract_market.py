@@ -87,10 +87,15 @@ class ContractMarket:
         target_total_work_units,
         difficulty,
         initial_budget_tokens=0,
+        contract_id=None,
+        status=STATUS_DRAFT,
     ):
+        if status not in SUPPORTED_STATUSES:
+            raise ValueError("Unsupported contract status")
         now = _now()
+        normalized_contract_id = (contract_id or "").strip() or f"usr-{uuid.uuid4().hex[:12]}"
         record = {
-            "contract_id": f"usr-{uuid.uuid4().hex[:12]}",
+            "contract_id": normalized_contract_id,
             "provider_client_id": provider_client_id,
             "task_name": task_name,
             "task_description": task_description,
@@ -100,7 +105,7 @@ class ContractMarket:
             "reward_per_task": int(reward_per_task),
             "target_total_work_units": int(target_total_work_units),
             "difficulty": int(difficulty),
-            "status": STATUS_DRAFT,
+            "status": status,
             "budget_tokens_total": int(initial_budget_tokens),
             "budget_tokens_spent": 0,
             "budget_tokens_refunded": 0,
@@ -111,6 +116,8 @@ class ContractMarket:
         }
         with _lock:
             state = _load_state()
+            if any(c.get("contract_id") == normalized_contract_id for c in state["contracts"]):
+                raise ValueError("Contract ID already exists")
             state["contracts"].append(record)
             _save_state(state)
         return _enrich_contract(record)
@@ -285,4 +292,50 @@ class ContractMarket:
         if _remaining_work_units(contract_record) <= 0:
             return False
         return True
+
+    def upsert_seed_contracts(self, *, provider_client_id, templates):
+        """
+        Инициализация/миграция стартовых контрактов в формат пользовательских.
+        Не изменяет существующие контракты, если contract_id уже есть.
+        """
+        created = []
+        with _lock:
+            state = _load_state()
+            existing_ids = {c.get("contract_id") for c in state["contracts"]}
+            now = _now()
+            for tpl in templates:
+                cid = (tpl.get("contract_id") or "").strip()
+                if not cid or cid in existing_ids:
+                    continue
+                reward = int(tpl.get("reward_per_task", 0))
+                target = int(tpl.get("target_total_work_units", 0))
+                wu_required = int(tpl.get("work_units_required", 1))
+                jobs_estimate = max(1, target // max(1, wu_required))
+                initial_budget = int(tpl.get("initial_budget_tokens", reward * jobs_estimate))
+                rec = {
+                    "contract_id": cid,
+                    "provider_client_id": provider_client_id,
+                    "task_name": tpl.get("task_name", cid),
+                    "task_description": tpl.get("task_description", ""),
+                    "task_category": tpl.get("task_category", "Пользовательская"),
+                    "computation_type": tpl.get("computation_type", "simple_pow"),
+                    "work_units_required": wu_required,
+                    "reward_per_task": reward,
+                    "target_total_work_units": target,
+                    "difficulty": int(tpl.get("difficulty", 1)),
+                    "status": tpl.get("status", STATUS_ACTIVE),
+                    "budget_tokens_total": initial_budget,
+                    "budget_tokens_spent": 0,
+                    "budget_tokens_refunded": 0,
+                    "completed_work_units": 0,
+                    "jobs_completed": 0,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                state["contracts"].append(rec)
+                existing_ids.add(cid)
+                created.append(_enrich_contract(rec))
+            if created:
+                _save_state(state)
+        return created
 
