@@ -12,7 +12,9 @@ from contract_market import (
     STATUS_CLOSED,
     STATUS_DRAFT,
     STATUS_PAUSED,
+    SUPPORTED_BUDGET_CURRENCIES,
 )
+from market_economy import MarketEconomy, DEFAULT_CURRENCY as MARKET_DEFAULT_CURRENCY
 import hashlib
 import uuid
 import random
@@ -42,6 +44,8 @@ _error_counts = {}
 blockchain = Blockchain()
 # Хранилище пользовательских контрактов поставщиков
 contract_market = ContractMarket()
+# Фиатная рыночная экономика (без криптовалют): кошельки, конверсия, вывод на карту
+market_economy = MarketEconomy()
 
 # --- Критическое исправление: блокировка при создании блока (защита от race condition) ---
 _block_creation_lock = threading.Lock()
@@ -439,6 +443,9 @@ def _active_workers_count(contract_id):
 
 def _build_dynamic_task_spec(contract_record):
     """Преобразовать пользовательский контракт в спецификацию задачи для воркера."""
+    reward_currency = (contract_record.get("budget_currency") or MARKET_DEFAULT_CURRENCY).upper()
+    if reward_currency not in SUPPORTED_BUDGET_CURRENCIES:
+        reward_currency = MARKET_DEFAULT_CURRENCY
     return {
         "contract_id": contract_record["contract_id"],
         "work_units_required": int(contract_record["work_units_required"]),
@@ -447,9 +454,52 @@ def _build_dynamic_task_spec(contract_record):
         "task_description": contract_record.get("task_description", ""),
         "task_category": contract_record.get("task_category", "Пользовательская"),
         "computation_type": contract_record.get("computation_type", "simple_pow"),
+        "reward_per_task": int(contract_record.get("reward_per_task", 0)),
+        "reward_currency": reward_currency,
         "contract_origin": "provider",
         "provider_client_id": contract_record.get("provider_client_id"),
     }
+
+
+def _normalized_budget_currency(raw_currency):
+    currency = (raw_currency or MARKET_DEFAULT_CURRENCY).strip().upper()
+    if currency not in SUPPORTED_BUDGET_CURRENCIES:
+        return None
+    return currency
+
+
+def _reward_event_id(*, client_id, contract_id, result_data, nonce):
+    payload = f"{client_id}|{contract_id}|{result_data or ''}|{nonce or ''}"
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _credit_market_reward_if_missing(
+    *,
+    client_id,
+    contract_id,
+    result_data,
+    nonce,
+    reward_amount,
+    reward_currency,
+    provider_client_id,
+):
+    if int(reward_amount or 0) <= 0:
+        return None
+    reward_id = _reward_event_id(
+        client_id=client_id,
+        contract_id=contract_id,
+        result_data=result_data,
+        nonce=nonce,
+    )
+    _, _, reward_err = market_economy.credit_reward_once(
+        reward_id=reward_id,
+        worker_client_id=client_id,
+        currency=reward_currency,
+        amount=reward_amount,
+        provider_client_id=provider_client_id,
+        contract_id=contract_id,
+    )
+    return reward_err
 
 
 def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
@@ -602,9 +652,35 @@ def submit_work():
                 # Получаем reward_amount для ответа
                 runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=True)
                 reward_amount = runtime["reward"] if runtime else 0
+                reward_currency = MARKET_DEFAULT_CURRENCY
+                provider_client_id = None
+                if runtime and runtime.get("record"):
+                    reward_currency = (
+                        _normalized_budget_currency(runtime["record"].get("budget_currency"))
+                        or MARKET_DEFAULT_CURRENCY
+                    )
+                    provider_client_id = runtime["record"].get("provider_client_id")
+                reward_sync_err = _credit_market_reward_if_missing(
+                    client_id=client_id,
+                    contract_id=contract_id,
+                    result_data=result_data,
+                    nonce=nonce,
+                    reward_amount=reward_amount,
+                    reward_currency=reward_currency,
+                    provider_client_id=provider_client_id,
+                )
+                if reward_sync_err:
+                    logger.error(
+                        "submit_work_idempotent_reward_sync_failed: client_id=%s... contract_id=%s err=%s",
+                        client_id[:8],
+                        contract_id,
+                        reward_sync_err,
+                    )
+                    return jsonify({"error": "Reward settlement sync failed", "detail": reward_sync_err}), 500
                 return jsonify({
                     "status": "success",
                     "reward_issued": reward_amount,
+                    "reward_currency": reward_currency,
                     "message": "Proof already processed (idempotent request)"
                 }), 200
             else:
@@ -658,9 +734,23 @@ def submit_work():
     logger.info("submit_work: verification passed for client_id=%s... contract_id=%s", client_id[:8], contract_id)
 
     reward_amount = int(runtime["reward"])
+    reward_currency = MARKET_DEFAULT_CURRENCY
+    provider_client_id = None
+    if runtime["record"]:
+        reward_currency = (
+            _normalized_budget_currency(runtime["record"].get("budget_currency"))
+            or MARKET_DEFAULT_CURRENCY
+        )
+        provider_client_id = runtime["record"].get("provider_client_id")
     if reward_amount < FEE_PER_WORK_RECEIPT:
         logger.warning("Contract reward %s less than fee %s", reward_amount, FEE_PER_WORK_RECEIPT)
-    logger.info("work_verified: client_id=%s... reward=%s contract_id=%s", client_id[:8], reward_amount, contract_id)
+    logger.info(
+        "work_verified: client_id=%s... reward=%s %s contract_id=%s",
+        client_id[:8],
+        reward_amount,
+        reward_currency,
+        contract_id,
+    )
 
     # Создаём транзакцию вознаграждения
     reward_from = f"provider_contract:{contract_id}"
@@ -669,10 +759,11 @@ def submit_work():
         "from": reward_from,
         "to": client_id,
         "amount": reward_amount,
-        "contract_id": contract_id
+        "contract_id": contract_id,
+        "currency": reward_currency,
     }
     if runtime["record"]:
-        reward_tx["provider_client_id"] = runtime["record"].get("provider_client_id")
+        reward_tx["provider_client_id"] = provider_client_id
     
     # Assimilator (BOINC): учёт верифицированного результата — запись в блокчейн (reward + work_receipt; result_data для replay, fee сжигается).
     work_receipt_tx = {
@@ -727,6 +818,23 @@ def submit_work():
         new_balance = blockchain.get_balance(client_id)
         logger.info("block_created: client_id=%s... reward=%s new_balance=%s block_index=%s",
                     client_id[:8], reward_amount, new_balance, new_block.index)
+        reward_sync_err = _credit_market_reward_if_missing(
+            client_id=client_id,
+            contract_id=contract_id,
+            result_data=result_data,
+            nonce=nonce,
+            reward_amount=reward_amount,
+            reward_currency=reward_currency,
+            provider_client_id=provider_client_id,
+        )
+        if reward_sync_err:
+            logger.error(
+                "submit_work_reward_sync_failed: client_id=%s... contract_id=%s err=%s",
+                client_id[:8],
+                contract_id,
+                reward_sync_err,
+            )
+            return jsonify({"error": "Reward settlement sync failed", "detail": reward_sync_err}), 500
 
     # Синхронизация с пиром: отправляем готовый блок
     if new_block and PEER_URL:
@@ -748,7 +856,8 @@ def submit_work():
 
     return jsonify({
         "status": "success", 
-        "reward_issued": reward_amount
+        "reward_issued": reward_amount,
+        "reward_currency": reward_currency,
     }), 200
 
 @app.route("/me", methods=["GET"])
@@ -781,6 +890,10 @@ def me():
         pass
     # Получаем баланс из блокчейна
     out["balance"] = blockchain.get_balance(client_id)
+    # Фиатный кошелёк для реальной экономики (без криптовалют)
+    wallet_info = market_economy.get_wallet(client_id)
+    out["fiat_wallet"] = wallet_info.get("balances", {})
+    out["fiat_total_rub_estimate"] = wallet_info.get("total_rub_estimate", 0)
     # Подсчитываем количество сданных работ по всей цепочке блоков
     work_count = 0
     for block in blockchain.chain:
@@ -804,11 +917,93 @@ def get_balance(client_id):
     return jsonify({"client_id": client_id, "balance": balance}), 200
 
 
+@app.route("/market/rates", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_rates():
+    """Курсы валют и спред рыночной конвертации."""
+    return jsonify(market_economy.get_rates()), 200
+
+
+@app.route("/market/wallet", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_wallet():
+    """Фиатный кошелёк текущего пользователя."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify(market_economy.get_wallet(client_id)), 200
+
+
+@app.route("/market/wallet/topup", methods=["POST"])
+@limiter.limit("30 per minute")
+def market_wallet_topup():
+    """Пополнение фиатного кошелька (имитация банковского пополнения)."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    wallet, err = market_economy.top_up_wallet(
+        client_id=client_id,
+        currency=data.get("currency"),
+        amount=data.get("amount"),
+        source=(data.get("source") or "bank_transfer"),
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"wallet": wallet}), 200
+
+
+@app.route("/market/convert", methods=["POST"])
+@limiter.limit("30 per minute")
+def market_convert():
+    """Конвертация валют внутри фиатного кошелька по рыночному курсу со спредом."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    conversion, err = market_economy.convert_currency(
+        client_id=client_id,
+        from_currency=data.get("from_currency"),
+        to_currency=data.get("to_currency"),
+        amount=data.get("amount"),
+    )
+    if err:
+        code = 409 if err == "Insufficient wallet balance" else 400
+        return jsonify({"error": err}), code
+    return jsonify(conversion), 200
+
+
+@app.route("/market/withdrawals", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
+def market_withdrawals():
+    """Заявки на вывод фиатных средств на банковскую карту."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if request.method == "GET":
+        limit = request.args.get("limit", 50)
+        rows = market_economy.list_withdrawals(client_id=client_id, limit=limit)
+        return jsonify({"withdrawals": rows}), 200
+    data = request.get_json(silent=True) or {}
+    withdrawal, wallet, err = market_economy.request_withdrawal(
+        client_id=client_id,
+        currency=data.get("currency"),
+        amount=data.get("amount"),
+        card_number=data.get("card_number"),
+    )
+    if err:
+        code = 409 if err == "Insufficient wallet balance" else 400
+        return jsonify({"error": err}), code
+    return jsonify({"withdrawal": withdrawal, "wallet": wallet}), 201
+
+
 def _provider_contract_error_response(error):
     if error == "Forbidden":
         return jsonify({"error": error}), 403
     if error == "Contract not found":
         return jsonify({"error": error}), 404
+    if error == "Insufficient wallet balance":
+        return jsonify({"error": error}), 409
     return jsonify({"error": error}), 400
 
 
@@ -846,6 +1041,9 @@ def provider_contracts():
         initial_budget_tokens = int(data.get("initial_budget_tokens", 0))
     except (TypeError, ValueError):
         return jsonify({"error": "Numeric fields must be integers"}), 400
+    budget_currency = _normalized_budget_currency(data.get("budget_currency"))
+    if not budget_currency:
+        return jsonify({"error": "Unsupported budget_currency"}), 400
 
     if work_units_required <= 0:
         return jsonify({"error": "work_units_required must be > 0"}), 400
@@ -858,18 +1056,43 @@ def provider_contracts():
     if initial_budget_tokens < 0:
         return jsonify({"error": "initial_budget_tokens must be >= 0"}), 400
 
-    created = contract_market.create_contract(
-        provider_client_id=provider_client_id,
-        task_name=task_name,
-        task_description=task_description,
-        task_category=task_category,
-        computation_type=computation_type,
-        work_units_required=work_units_required,
-        reward_per_task=reward_per_task,
-        target_total_work_units=target_total_work_units,
-        difficulty=difficulty,
-        initial_budget_tokens=initial_budget_tokens,
-    )
+    wallet_debited = False
+    if initial_budget_tokens > 0:
+        _, debit_err = market_economy.debit_wallet(
+            client_id=provider_client_id,
+            currency=budget_currency,
+            amount=initial_budget_tokens,
+            purpose="contract_create_funding",
+            meta={"task_name": task_name},
+        )
+        if debit_err:
+            return _provider_contract_error_response(debit_err)
+        wallet_debited = True
+
+    try:
+        created = contract_market.create_contract(
+            provider_client_id=provider_client_id,
+            task_name=task_name,
+            task_description=task_description,
+            task_category=task_category,
+            computation_type=computation_type,
+            work_units_required=work_units_required,
+            reward_per_task=reward_per_task,
+            target_total_work_units=target_total_work_units,
+            difficulty=difficulty,
+            initial_budget_tokens=initial_budget_tokens,
+            budget_currency=budget_currency,
+        )
+    except ValueError as exc:
+        if wallet_debited:
+            market_economy.credit_wallet(
+                client_id=provider_client_id,
+                currency=budget_currency,
+                amount=initial_budget_tokens,
+                purpose="contract_create_rollback",
+                meta={"task_name": task_name},
+            )
+        return jsonify({"error": str(exc)}), 400
 
     activate_now = data.get("activate_now") in (True, "true", "1", 1)
     if activate_now:
@@ -881,7 +1104,8 @@ def provider_contracts():
         if err:
             return _provider_contract_error_response(err)
         created = updated
-    return jsonify(created), 201
+    wallet_info = market_economy.get_wallet(provider_client_id)
+    return jsonify({"contract": created, "wallet": wallet_info}), 201
 
 
 @app.route("/provider/contracts/<contract_id>", methods=["GET"])
@@ -909,14 +1133,47 @@ def provider_contract_fund(contract_id):
         amount = int(data.get("amount", 0))
     except (TypeError, ValueError):
         return jsonify({"error": "amount must be integer"}), 400
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    budget_currency = _normalized_budget_currency(contract.get("budget_currency"))
+    if not budget_currency:
+        return jsonify({"error": "Unsupported budget_currency"}), 400
+    request_currency = data.get("currency")
+    if request_currency is not None:
+        normalized_request_currency = _normalized_budget_currency(request_currency)
+        if not normalized_request_currency:
+            return jsonify({"error": "Unsupported currency"}), 400
+        if normalized_request_currency != budget_currency:
+            return jsonify({"error": "Currency mismatch with contract budget"}), 400
+
+    _, debit_err = market_economy.debit_wallet(
+        client_id=provider_client_id,
+        currency=budget_currency,
+        amount=amount,
+        purpose="contract_funding",
+        meta={"contract_id": contract_id},
+    )
+    if debit_err:
+        return _provider_contract_error_response(debit_err)
     updated, err = contract_market.fund_contract(
         contract_id=contract_id,
         provider_client_id=provider_client_id,
         amount=amount,
     )
     if err:
+        market_economy.credit_wallet(
+            client_id=provider_client_id,
+            currency=budget_currency,
+            amount=amount,
+            purpose="contract_funding_rollback",
+            meta={"contract_id": contract_id},
+        )
         return _provider_contract_error_response(err)
-    return jsonify(updated), 200
+    wallet_info = market_economy.get_wallet(provider_client_id)
+    return jsonify({"contract": updated, "wallet": wallet_info}), 200
 
 
 @app.route("/provider/contracts/<contract_id>/status", methods=["POST"])
@@ -959,7 +1216,20 @@ def provider_contract_refund(contract_id):
     )
     if err:
         return _provider_contract_error_response(err)
-    return jsonify({"contract": updated, "refunded_amount": refunded_amount}), 200
+    budget_currency = _normalized_budget_currency(updated.get("budget_currency") if updated else None) or MARKET_DEFAULT_CURRENCY
+    credit_err = None
+    if refunded_amount and refunded_amount > 0:
+        _, credit_err = market_economy.credit_wallet(
+            client_id=provider_client_id,
+            currency=budget_currency,
+            amount=refunded_amount,
+            purpose="contract_refund",
+            meta={"contract_id": contract_id},
+        )
+    if credit_err:
+        return _provider_contract_error_response(credit_err)
+    wallet_info = market_economy.get_wallet(provider_client_id)
+    return jsonify({"contract": updated, "refunded_amount": refunded_amount, "wallet": wallet_info}), 200
 
 
 @app.route("/health", methods=["GET"])
@@ -1079,6 +1349,7 @@ def get_contracts():
             "work_units_required": wu_required,
             "difficulty": int(contract_record["difficulty"]),
             "reward": int(contract_record["reward_per_task"]),
+            "reward_currency": contract_record.get("budget_currency", MARKET_DEFAULT_CURRENCY),
             "task_name": contract_record.get("task_name", cid),
             "task_description": contract_record.get("task_description", ""),
             "task_category": contract_record.get("task_category", "Пользовательская"),
@@ -1094,6 +1365,7 @@ def get_contracts():
             "contract_origin": "provider",
             "status": contract_record.get("status", STATUS_DRAFT),
             "provider_client_id": contract_record.get("provider_client_id"),
+            "budget_currency": contract_record.get("budget_currency", MARKET_DEFAULT_CURRENCY),
             "budget_tokens_total": int(contract_record.get("budget_tokens_total", 0)),
             "budget_tokens_spent": int(contract_record.get("budget_tokens_spent", 0)),
             "budget_tokens_available": int(contract_record.get("budget_tokens_available", 0)),

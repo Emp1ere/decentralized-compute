@@ -19,10 +19,24 @@ DEFAULT_DIFFICULTY_BY_COMPUTATION = {
     "gravitational_waves": 6,
 }
 
+DEFAULT_BUDGET_CURRENCY_BY_COMPUTATION = {
+    "simple_pow": "RUB",
+    "cosmological": "USD",
+    "supernova": "USD",
+    "mhd": "EUR",
+    "radiative": "EUR",
+    "gravitational_waves": "USD",
+}
+
 
 def default_difficulty_for(computation_type):
     """Возвращает сложность по умолчанию для типа вычислений."""
     return DEFAULT_DIFFICULTY_BY_COMPUTATION.get(computation_type, 3)
+
+
+def default_budget_currency_for(computation_type):
+    """Возвращает валюту бюджета по умолчанию для типа вычислений."""
+    return DEFAULT_BUDGET_CURRENCY_BY_COMPUTATION.get(computation_type, "RUB")
 
 
 def verify_contract_result(
@@ -325,6 +339,7 @@ def _to_provider_template(contract):
         "reward_per_task": reward,
         "target_total_work_units": target_total,
         "initial_budget_tokens": reward * jobs_estimate,
+        "budget_currency": default_budget_currency_for(spec.get("computation_type", "simple_pow")),
     }
 
 

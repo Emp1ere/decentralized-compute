@@ -175,6 +175,12 @@ def test_contracts_with_stats(client):
 
 def test_provider_contract_flow(client, auth_headers):
     headers, client_id = auth_headers
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=headers,
+        json={"currency": "RUB", "amount": 12},
+    )
+    assert topup_res.status_code == 200
     # 1) Поставщик создаёт и сразу активирует пользовательский контракт
     create_res = client.post(
         "/provider/contracts",
@@ -189,11 +195,13 @@ def test_provider_contract_flow(client, auth_headers):
             "target_total_work_units": 400,
             "difficulty": 2,
             "initial_budget_tokens": 6,
+            "budget_currency": "RUB",
             "activate_now": True,
         },
     )
     assert create_res.status_code == 201
-    contract = create_res.get_json()
+    create_data = create_res.get_json()
+    contract = create_data.get("contract", create_data)
     assert contract["status"] == "active"
     contract_id = contract["contract_id"]
 
@@ -253,3 +261,87 @@ def test_provider_contract_flow(client, auth_headers):
     updated = contract_res.get_json()
     assert updated["status"] == "closed"
     assert updated["budget_tokens_available"] == 0
+
+
+def test_market_currency_budget_and_withdrawal_flow(client, auth_headers):
+    provider_headers, provider_client_id = auth_headers
+
+    # 1) Поставщик пополняет USD-кошелёк и создаёт контракт с бюджетом в USD.
+    topup_provider = client.post(
+        "/market/wallet/topup",
+        headers=provider_headers,
+        json={"currency": "USD", "amount": 20},
+    )
+    assert topup_provider.status_code == 200
+
+    create_res = client.post(
+        "/provider/contracts",
+        headers=provider_headers,
+        json={
+            "task_name": "USD contract",
+            "task_description": "Market economy test",
+            "task_category": "Finance",
+            "computation_type": "simple_pow",
+            "work_units_required": 150,
+            "reward_per_task": 5,
+            "target_total_work_units": 300,
+            "difficulty": 2,
+            "initial_budget_tokens": 10,
+            "budget_currency": "USD",
+            "activate_now": True,
+        },
+    )
+    assert create_res.status_code == 201
+    created_data = create_res.get_json()
+    contract = created_data.get("contract", created_data)
+    contract_id = contract["contract_id"]
+    assert contract["budget_currency"] == "USD"
+
+    # 2) Отдельный исполнитель выполняет задачу и получает доход в USD.
+    worker_reg = client.get("/register")
+    assert worker_reg.status_code == 200
+    worker_data = worker_reg.get_json()
+    worker_client_id = worker_data["client_id"]
+    worker_headers = {"Authorization": f"Bearer {worker_data['api_key']}"}
+
+    task_res = client.get("/get_task", headers=worker_headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    result_hash, nonce = _solve_pow(worker_client_id, contract_id, task["difficulty"])
+    assert result_hash is not None
+    submit_res = client.post(
+        "/submit_work",
+        headers=worker_headers,
+        json={
+            "client_id": worker_client_id,
+            "contract_id": contract_id,
+            "work_units_done": task["work_units_required"],
+            "result_data": result_hash,
+            "nonce": nonce,
+        },
+    )
+    assert submit_res.status_code == 200
+    submit_payload = submit_res.get_json()
+    assert submit_payload.get("reward_issued") == 5
+    assert submit_payload.get("reward_currency") == "USD"
+
+    # 3) Проверяем USD-баланс исполнителя и вывод на карту без криптовалют.
+    wallet_res = client.get("/market/wallet", headers=worker_headers)
+    assert wallet_res.status_code == 200
+    wallet = wallet_res.get_json()
+    assert wallet["balances"]["USD"] == 5
+
+    withdraw_res = client.post(
+        "/market/withdrawals",
+        headers=worker_headers,
+        json={
+            "currency": "USD",
+            "amount": 3,
+            "card_number": "1234567812345678",
+        },
+    )
+    assert withdraw_res.status_code == 201
+    withdraw_payload = withdraw_res.get_json()
+    assert withdraw_payload["withdrawal"]["status"] == "queued"
+    assert withdraw_payload["withdrawal"]["currency"] == "USD"
+    assert withdraw_payload["wallet"]["balances"]["USD"] == 2

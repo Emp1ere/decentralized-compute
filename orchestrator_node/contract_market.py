@@ -20,6 +20,8 @@ STATUS_ACTIVE = "active"
 STATUS_PAUSED = "paused"
 STATUS_CLOSED = "closed"
 SUPPORTED_STATUSES = {STATUS_DRAFT, STATUS_ACTIVE, STATUS_PAUSED, STATUS_CLOSED}
+SUPPORTED_BUDGET_CURRENCIES = {"RUB", "USD", "EUR"}
+DEFAULT_BUDGET_CURRENCY = "RUB"
 
 
 def _ensure_dir():
@@ -68,6 +70,11 @@ def _remaining_work_units(rec):
 
 def _enrich_contract(rec):
     out = copy.deepcopy(rec)
+    budget_currency = (rec.get("budget_currency") or DEFAULT_BUDGET_CURRENCY).upper()
+    if budget_currency not in SUPPORTED_BUDGET_CURRENCIES:
+        budget_currency = DEFAULT_BUDGET_CURRENCY
+    out["budget_currency"] = budget_currency
+    out["reward_currency"] = budget_currency
     out["budget_tokens_available"] = _budget_available(rec)
     out["remaining_work_units"] = _remaining_work_units(rec)
     return out
@@ -87,11 +94,15 @@ class ContractMarket:
         target_total_work_units,
         difficulty,
         initial_budget_tokens=0,
+        budget_currency=DEFAULT_BUDGET_CURRENCY,
         contract_id=None,
         status=STATUS_DRAFT,
     ):
         if status not in SUPPORTED_STATUSES:
             raise ValueError("Unsupported contract status")
+        normalized_currency = (budget_currency or DEFAULT_BUDGET_CURRENCY).upper()
+        if normalized_currency not in SUPPORTED_BUDGET_CURRENCIES:
+            raise ValueError("Unsupported budget currency")
         now = _now()
         normalized_contract_id = (contract_id or "").strip() or f"usr-{uuid.uuid4().hex[:12]}"
         record = {
@@ -103,6 +114,7 @@ class ContractMarket:
             "computation_type": computation_type,
             "work_units_required": int(work_units_required),
             "reward_per_task": int(reward_per_task),
+            "budget_currency": normalized_currency,
             "target_total_work_units": int(target_total_work_units),
             "difficulty": int(difficulty),
             "status": status,
@@ -312,6 +324,9 @@ class ContractMarket:
                 wu_required = int(tpl.get("work_units_required", 1))
                 jobs_estimate = max(1, target // max(1, wu_required))
                 initial_budget = int(tpl.get("initial_budget_tokens", reward * jobs_estimate))
+                budget_currency = (tpl.get("budget_currency") or DEFAULT_BUDGET_CURRENCY).upper()
+                if budget_currency not in SUPPORTED_BUDGET_CURRENCIES:
+                    budget_currency = DEFAULT_BUDGET_CURRENCY
                 rec = {
                     "contract_id": cid,
                     "provider_client_id": provider_client_id,
@@ -321,6 +336,7 @@ class ContractMarket:
                     "computation_type": tpl.get("computation_type", "simple_pow"),
                     "work_units_required": wu_required,
                     "reward_per_task": reward,
+                    "budget_currency": budget_currency,
                     "target_total_work_units": target,
                     "difficulty": int(tpl.get("difficulty", 1)),
                     "status": tpl.get("status", STATUS_ACTIVE),
