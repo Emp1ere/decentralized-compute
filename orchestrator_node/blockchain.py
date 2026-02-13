@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import threading
+from onchain_accounting import is_valid_onchain_economic_tx
 
 logger = logging.getLogger("blockchain")
 
@@ -84,6 +85,18 @@ def _apply_block_transactions(transactions, balances):
                 cid = tx.get("client_id")
                 if cid:
                     balances[cid] = max(0, balances.get(cid, 0) - int(fee))
+
+
+def _is_valid_chain_tx(tx):
+    """Проверка транзакции, поддерживаемой блокчейном."""
+    if not isinstance(tx, dict):
+        return False
+    tx_type = tx.get("type")
+    if tx_type == "reward":
+        return _is_valid_reward_tx(tx)
+    if tx_type == "work_receipt":
+        return _is_valid_work_receipt_tx(tx)
+    return is_valid_onchain_economic_tx(tx)
 
 
 class Block:
@@ -204,12 +217,15 @@ class Blockchain:
         Проверяет структуру и лимиты от спама: не более MAX_PENDING_TOTAL транзакций,
         у одного client_id не более MAX_PENDING_WORK_PER_CLIENT квитанций в pending.
         """
-        if not isinstance(transaction, dict) or transaction.get("type") not in ("reward", "work_receipt"):
-            raise ValueError("Invalid transaction: must be dict with type 'reward' or 'work_receipt'")
-        if transaction.get("type") == "reward" and not _is_valid_reward_tx(transaction):
+        if not isinstance(transaction, dict) or not isinstance(transaction.get("type"), str):
+            raise ValueError("Invalid transaction: must be dict with string field 'type'")
+        tx_type = transaction.get("type")
+        if tx_type == "reward" and not _is_valid_reward_tx(transaction):
             raise ValueError("Invalid reward transaction: need 'to' (non-empty str) and 'amount' (number >= 0)")
-        if transaction.get("type") == "work_receipt" and not _is_valid_work_receipt_tx(transaction):
+        elif tx_type == "work_receipt" and not _is_valid_work_receipt_tx(transaction):
             raise ValueError("Invalid work_receipt: need client_id, contract_id, work_units (number >= 0)")
+        elif tx_type not in ("reward", "work_receipt") and not is_valid_onchain_economic_tx(transaction):
+            raise ValueError(f"Invalid economic transaction type='{tx_type}'")
 
         # Защита от спама: общий лимит pending
         if len(self.pending_transactions) >= MAX_PENDING_TOTAL:
@@ -296,10 +312,10 @@ class Blockchain:
         if block.hash != block_dict.get("hash"):
             return False, "hash mismatch"
         # PoUW: проверка PoW (leading zeros) убрана — проверяем только целостность
-        # Проверка транзакций в блоке: все reward должны быть валидными (защита от подделки пира)
+        # Проверка транзакций в блоке: все поддерживаемые tx должны быть валидными
         for tx in block.transactions:
-            if tx.get("type") == "reward" and not _is_valid_reward_tx(tx):
-                return False, "invalid reward transaction in block"
+            if not _is_valid_chain_tx(tx):
+                return False, "invalid transaction in block"
         self.chain.append(block)
         _apply_block_transactions(block.transactions, self.balances)
         _save_chain_to_disk(self.chain)
@@ -369,11 +385,11 @@ class Blockchain:
                     return True, None
             # Наша цепочка остаётся (наш блок создан раньше или имеет меньший хеш)
             return False, "chain not longer (fork resolved in favor of local chain)"
-        # Проверка: все reward-транзакции в цепочке должны быть валидными
+        # Проверка: все транзакции в цепочке должны быть валидными
         for bi, block in enumerate(new_chain):
             for tx in block.transactions:
-                if tx.get("type") == "reward" and not _is_valid_reward_tx(tx):
-                    return False, f"invalid reward transaction in block {bi}"
+                if not _is_valid_chain_tx(tx):
+                    return False, f"invalid transaction in block {bi}"
         self.chain = new_chain
         self.pending_transactions = []
         self.balances = {}

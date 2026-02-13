@@ -14,7 +14,20 @@ from contract_market import (
     STATUS_PAUSED,
     SUPPORTED_BUDGET_CURRENCIES,
 )
-from market_economy import MarketEconomy, DEFAULT_CURRENCY as MARKET_DEFAULT_CURRENCY
+from onchain_accounting import (
+    DEFAULT_CURRENCY as MARKET_DEFAULT_CURRENCY,
+    convert_with_rules,
+    get_effective_fx_rules,
+    get_wallet_amount,
+    get_wallet_from_chain,
+    is_reward_settled,
+    list_audit_events,
+    list_contracts_onchain,
+    list_withdrawals_from_chain,
+    mask_card_number,
+    normalize_currency as onchain_normalize_currency,
+    now_ts,
+)
 import hashlib
 import uuid
 import random
@@ -44,8 +57,6 @@ _error_counts = {}
 blockchain = Blockchain()
 # Хранилище пользовательских контрактов поставщиков
 contract_market = ContractMarket()
-# Фиатная рыночная экономика (без криптовалют): кошельки, конверсия, вывод на карту
-market_economy = MarketEconomy()
 
 # --- Критическое исправление: блокировка при создании блока (защита от race condition) ---
 _block_creation_lock = threading.Lock()
@@ -462,10 +473,10 @@ def _build_dynamic_task_spec(contract_record):
 
 
 def _normalized_budget_currency(raw_currency):
-    currency = (raw_currency or MARKET_DEFAULT_CURRENCY).strip().upper()
-    if currency not in SUPPORTED_BUDGET_CURRENCIES:
+    normalized = onchain_normalize_currency(raw_currency or MARKET_DEFAULT_CURRENCY)
+    if not normalized:
         return None
-    return currency
+    return normalized
 
 
 def _reward_event_id(*, client_id, contract_id, result_data, nonce):
@@ -473,33 +484,71 @@ def _reward_event_id(*, client_id, contract_id, result_data, nonce):
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _credit_market_reward_if_missing(
+def _build_reward_settlement_tx(
     *,
     client_id,
+    provider_client_id,
     contract_id,
     result_data,
     nonce,
     reward_amount,
     reward_currency,
-    provider_client_id,
+    work_units_done,
 ):
-    if int(reward_amount or 0) <= 0:
-        return None
     reward_id = _reward_event_id(
         client_id=client_id,
         contract_id=contract_id,
         result_data=result_data,
         nonce=nonce,
     )
-    _, _, reward_err = market_economy.credit_reward_once(
-        reward_id=reward_id,
-        worker_client_id=client_id,
-        currency=reward_currency,
-        amount=reward_amount,
-        provider_client_id=provider_client_id,
-        contract_id=contract_id,
-    )
-    return reward_err
+    return {
+        "type": "contract_reward_settlement",
+        "reward_id": reward_id,
+        "provider_client_id": provider_client_id,
+        "worker_client_id": client_id,
+        "contract_id": contract_id,
+        "currency": reward_currency,
+        "amount": int(reward_amount),
+        "work_units": int(work_units_done),
+        "created_at": now_ts(),
+    }
+
+
+def _push_block_to_peer(new_block):
+    if not new_block or not PEER_URL:
+        return
+    try:
+        headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
+        response = requests.post(
+            f"{PEER_URL.rstrip('/')}/receive_block",
+            json=new_block.__dict__,
+            timeout=PEER_REQUEST_TIMEOUT,
+            headers=headers,
+        )
+        if response.status_code == 200 and response.json().get("accepted"):
+            logger.info("peer_accepted_block: index=%s", new_block.index)
+        else:
+            logger.warning("peer_rejected_block: index=%s error=%s", new_block.index, response.text[:200])
+            sync_chain_from_peer()
+    except requests.RequestException as e:
+        logger.warning("push_block_failed: %s", e)
+
+
+def _append_onchain_events(event_txs):
+    if not event_txs:
+        return None, None
+    try:
+        with _block_creation_lock:
+            for tx in event_txs:
+                blockchain.add_transaction(tx)
+            sync_pending_from_peer()
+            new_block = blockchain.mine_pending_transactions(mining_reward_address=None)
+    except ValueError as e:
+        return None, str(e)
+    if not new_block:
+        return None, "Failed to append on-chain events"
+    _push_block_to_peer(new_block)
+    return new_block, None
 
 
 def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
@@ -660,23 +709,27 @@ def submit_work():
                         or MARKET_DEFAULT_CURRENCY
                     )
                     provider_client_id = runtime["record"].get("provider_client_id")
-                reward_sync_err = _credit_market_reward_if_missing(
-                    client_id=client_id,
-                    contract_id=contract_id,
-                    result_data=result_data,
-                    nonce=nonce,
-                    reward_amount=reward_amount,
-                    reward_currency=reward_currency,
-                    provider_client_id=provider_client_id,
-                )
-                if reward_sync_err:
-                    logger.error(
-                        "submit_work_idempotent_reward_sync_failed: client_id=%s... contract_id=%s err=%s",
-                        client_id[:8],
-                        contract_id,
-                        reward_sync_err,
+                if runtime and provider_client_id and reward_amount > 0:
+                    reward_id = _reward_event_id(
+                        client_id=client_id,
+                        contract_id=contract_id,
+                        result_data=result_data,
+                        nonce=nonce,
                     )
-                    return jsonify({"error": "Reward settlement sync failed", "detail": reward_sync_err}), 500
+                    if not is_reward_settled(blockchain.chain, reward_id):
+                        settlement_tx = _build_reward_settlement_tx(
+                            client_id=client_id,
+                            provider_client_id=provider_client_id,
+                            contract_id=contract_id,
+                            result_data=result_data,
+                            nonce=nonce,
+                            reward_amount=reward_amount,
+                            reward_currency=reward_currency,
+                            work_units_done=runtime["spec"].get("work_units_required", 1),
+                        )
+                        _, settle_err = _append_onchain_events([settlement_tx])
+                        if settle_err:
+                            return jsonify({"error": settle_err}), 500
                 return jsonify({
                     "status": "success",
                     "reward_issued": reward_amount,
@@ -742,6 +795,9 @@ def submit_work():
             or MARKET_DEFAULT_CURRENCY
         )
         provider_client_id = runtime["record"].get("provider_client_id")
+    if not provider_client_id:
+        logger.warning("submit_work: provider_client_id missing for contract_id=%s", contract_id)
+        return jsonify({"error": "Contract provider is not configured"}), 500
     if reward_amount < FEE_PER_WORK_RECEIPT:
         logger.warning("Contract reward %s less than fee %s", reward_amount, FEE_PER_WORK_RECEIPT)
     logger.info(
@@ -774,6 +830,16 @@ def submit_work():
         "result_data": result_data,
         "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
     }
+    reward_settlement_tx = _build_reward_settlement_tx(
+        client_id=client_id,
+        provider_client_id=provider_client_id,
+        contract_id=contract_id,
+        result_data=result_data,
+        nonce=nonce,
+        reward_amount=reward_amount,
+        reward_currency=reward_currency,
+        work_units_done=work_units_done,
+    )
     
     # Критическое исправление: узел, принявший submit_work, всегда создаёт блок сам.
     # Раньше при "не лидер" транзакции отправлялись лидеру через add_pending_tx, но лидер никогда
@@ -804,6 +870,7 @@ def submit_work():
         try:
             blockchain.add_transaction(reward_tx)
             blockchain.add_transaction(work_receipt_tx)
+            blockchain.add_transaction(reward_settlement_tx)
         except ValueError as e:
             if dynamic_reservation:
                 contract_market.rollback_submission(contract_id=contract_id, reservation=dynamic_reservation)
@@ -818,41 +885,8 @@ def submit_work():
         new_balance = blockchain.get_balance(client_id)
         logger.info("block_created: client_id=%s... reward=%s new_balance=%s block_index=%s",
                     client_id[:8], reward_amount, new_balance, new_block.index)
-        reward_sync_err = _credit_market_reward_if_missing(
-            client_id=client_id,
-            contract_id=contract_id,
-            result_data=result_data,
-            nonce=nonce,
-            reward_amount=reward_amount,
-            reward_currency=reward_currency,
-            provider_client_id=provider_client_id,
-        )
-        if reward_sync_err:
-            logger.error(
-                "submit_work_reward_sync_failed: client_id=%s... contract_id=%s err=%s",
-                client_id[:8],
-                contract_id,
-                reward_sync_err,
-            )
-            return jsonify({"error": "Reward settlement sync failed", "detail": reward_sync_err}), 500
 
-    # Синхронизация с пиром: отправляем готовый блок
-    if new_block and PEER_URL:
-        try:
-            headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
-            response = requests.post(
-                f"{PEER_URL.rstrip('/')}/receive_block",
-                json=new_block.__dict__,
-                timeout=PEER_REQUEST_TIMEOUT,
-                headers=headers,
-            )
-            if response.status_code == 200 and response.json().get("accepted"):
-                logger.info("peer_accepted_block: index=%s", new_block.index)
-            else:
-                logger.warning("peer_rejected_block: index=%s error=%s", new_block.index, response.text[:200])
-                sync_chain_from_peer()  # Подтягиваем более длинную цепочку пира
-        except requests.RequestException as e:
-            logger.warning("push_block_failed: %s", e)
+    _push_block_to_peer(new_block)
 
     return jsonify({
         "status": "success", 
@@ -890,8 +924,8 @@ def me():
         pass
     # Получаем баланс из блокчейна
     out["balance"] = blockchain.get_balance(client_id)
-    # Фиатный кошелёк для реальной экономики (без криптовалют)
-    wallet_info = market_economy.get_wallet(client_id)
+    # Фиатный кошелёк on-chain (без отдельного off-chain хранилища)
+    wallet_info = get_wallet_from_chain(blockchain.chain, client_id)
     out["fiat_wallet"] = wallet_info.get("balances", {})
     out["fiat_total_rub_estimate"] = wallet_info.get("total_rub_estimate", 0)
     # Подсчитываем количество сданных работ по всей цепочке блоков
@@ -920,8 +954,33 @@ def get_balance(client_id):
 @app.route("/market/rates", methods=["GET"])
 @limiter.limit("120 per minute")
 def market_rates():
-    """Курсы валют и спред рыночной конвертации."""
-    return jsonify(market_economy.get_rates()), 200
+    """On-chain курсы валют и спред рыночной конвертации."""
+    return jsonify(get_effective_fx_rules(blockchain.chain)), 200
+
+
+@app.route("/market/rates/update", methods=["POST"])
+@require_node_secret
+@limiter.limit("20 per minute")
+def market_rates_update():
+    """
+    Обновление FX-правил on-chain.
+    Защищено X-Node-Secret: изменение возможно только доверенным узлом.
+    """
+    data = request.get_json(silent=True) or {}
+    rates_payload = data.get("rates_to_rub")
+    spread_payload = data.get("spread_percent")
+    if not isinstance(rates_payload, dict) and spread_payload is None:
+        return jsonify({"error": "rates_to_rub or spread_percent is required"}), 400
+    tx = {
+        "type": "fx_rules_update",
+        "rates_to_rub": rates_payload if isinstance(rates_payload, dict) else None,
+        "spread_percent": spread_payload,
+        "updated_at": now_ts(),
+    }
+    _, err = _append_onchain_events([tx])
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify(get_effective_fx_rules(blockchain.chain)), 200
 
 
 @app.route("/market/wallet", methods=["GET"])
@@ -931,70 +990,180 @@ def market_wallet():
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    return jsonify(market_economy.get_wallet(client_id)), 200
+    return jsonify(get_wallet_from_chain(blockchain.chain, client_id)), 200
 
 
 @app.route("/market/wallet/topup", methods=["POST"])
 @limiter.limit("30 per minute")
 def market_wallet_topup():
-    """Пополнение фиатного кошелька (имитация банковского пополнения)."""
+    """Пополнение фиатного кошелька (on-chain событие)."""
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     data = request.get_json(silent=True) or {}
-    wallet, err = market_economy.top_up_wallet(
-        client_id=client_id,
-        currency=data.get("currency"),
-        amount=data.get("amount"),
-        source=(data.get("source") or "bank_transfer"),
-    )
+    currency = _normalized_budget_currency(data.get("currency"))
+    try:
+        amount = int(data.get("amount", 0))
+    except (TypeError, ValueError):
+        amount = 0
+    if not currency:
+        return jsonify({"error": "Unsupported currency"}), 400
+    if amount <= 0:
+        return jsonify({"error": "amount must be > 0"}), 400
+    tx = {
+        "type": "fiat_topup",
+        "client_id": client_id,
+        "currency": currency,
+        "amount": amount,
+        "source": (data.get("source") or "bank_transfer"),
+        "created_at": now_ts(),
+    }
+    _, err = _append_onchain_events([tx])
     if err:
         return jsonify({"error": err}), 400
-    return jsonify({"wallet": wallet}), 200
+    return jsonify({"wallet": get_wallet_from_chain(blockchain.chain, client_id)}), 200
 
 
 @app.route("/market/convert", methods=["POST"])
 @limiter.limit("30 per minute")
 def market_convert():
-    """Конвертация валют внутри фиатного кошелька по рыночному курсу со спредом."""
+    """On-chain конвертация валют внутри кошелька."""
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     data = request.get_json(silent=True) or {}
-    conversion, err = market_economy.convert_currency(
-        client_id=client_id,
-        from_currency=data.get("from_currency"),
-        to_currency=data.get("to_currency"),
-        amount=data.get("amount"),
+    source_currency = _normalized_budget_currency(data.get("from_currency"))
+    target_currency = _normalized_budget_currency(data.get("to_currency"))
+    try:
+        source_amount = int(data.get("amount", 0))
+    except (TypeError, ValueError):
+        source_amount = 0
+    if not source_currency or not target_currency:
+        return jsonify({"error": "Unsupported currency"}), 400
+    if source_currency == target_currency:
+        return jsonify({"error": "from_currency and to_currency must differ"}), 400
+    if source_amount <= 0:
+        return jsonify({"error": "amount must be > 0"}), 400
+    wallet_amount = get_wallet_amount(blockchain.chain, client_id, source_currency)
+    if wallet_amount < source_amount:
+        return jsonify({"error": "Insufficient wallet balance"}), 409
+    rules = get_effective_fx_rules(blockchain.chain)
+    target_amount, convert_err = convert_with_rules(
+        rules=rules,
+        from_currency=source_currency,
+        to_currency=target_currency,
+        amount=source_amount,
     )
+    if convert_err:
+        return jsonify({"error": convert_err}), 400
+    tx = {
+        "type": "fiat_conversion",
+        "client_id": client_id,
+        "from_currency": source_currency,
+        "to_currency": target_currency,
+        "source_amount": source_amount,
+        "target_amount": int(target_amount),
+        "spread_percent": float(rules.get("spread_percent", 0)),
+        "created_at": now_ts(),
+    }
+    _, err = _append_onchain_events([tx])
     if err:
-        code = 409 if err == "Insufficient wallet balance" else 400
-        return jsonify({"error": err}), code
-    return jsonify(conversion), 200
+        return jsonify({"error": err}), 400
+    return jsonify({
+        "client_id": client_id,
+        "from_currency": source_currency,
+        "to_currency": target_currency,
+        "source_amount": source_amount,
+        "target_amount": int(target_amount),
+        "spread_percent": float(rules.get("spread_percent", 0)),
+        "balances": get_wallet_from_chain(blockchain.chain, client_id)["balances"],
+    }), 200
 
 
 @app.route("/market/withdrawals", methods=["GET", "POST"])
 @limiter.limit("30 per minute")
 def market_withdrawals():
-    """Заявки на вывод фиатных средств на банковскую карту."""
+    """On-chain заявки на вывод фиатных средств на банковскую карту."""
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     if request.method == "GET":
         limit = request.args.get("limit", 50)
-        rows = market_economy.list_withdrawals(client_id=client_id, limit=limit)
+        rows = list_withdrawals_from_chain(blockchain.chain, client_id=client_id, limit=limit)
         return jsonify({"withdrawals": rows}), 200
     data = request.get_json(silent=True) or {}
-    withdrawal, wallet, err = market_economy.request_withdrawal(
-        client_id=client_id,
-        currency=data.get("currency"),
-        amount=data.get("amount"),
-        card_number=data.get("card_number"),
-    )
+    currency = _normalized_budget_currency(data.get("currency"))
+    try:
+        amount = int(data.get("amount", 0))
+    except (TypeError, ValueError):
+        amount = 0
+    card_mask = mask_card_number(data.get("card_number"))
+    if not currency:
+        return jsonify({"error": "Unsupported currency"}), 400
+    if amount <= 0:
+        return jsonify({"error": "amount must be > 0"}), 400
+    if not card_mask:
+        return jsonify({"error": "Invalid card number format"}), 400
+    wallet_amount = get_wallet_amount(blockchain.chain, client_id, currency)
+    if wallet_amount < amount:
+        return jsonify({"error": "Insufficient wallet balance"}), 409
+    withdrawal_id = f"wd-{uuid.uuid4().hex[:16]}"
+    tx = {
+        "type": "fiat_withdrawal_request",
+        "withdrawal_id": withdrawal_id,
+        "client_id": client_id,
+        "currency": currency,
+        "amount": amount,
+        "payout_method": "bank_card",
+        "card_mask": card_mask,
+        "status": "queued",
+        "created_at": now_ts(),
+    }
+    _, err = _append_onchain_events([tx])
     if err:
-        code = 409 if err == "Insufficient wallet balance" else 400
-        return jsonify({"error": err}), code
-    return jsonify({"withdrawal": withdrawal, "wallet": wallet}), 201
+        return jsonify({"error": err}), 400
+    withdrawal = {
+        "withdrawal_id": withdrawal_id,
+        "client_id": client_id,
+        "currency": currency,
+        "amount": amount,
+        "card_mask": card_mask,
+        "status": "queued",
+    }
+    return jsonify({"withdrawal": withdrawal, "wallet": get_wallet_from_chain(blockchain.chain, client_id)}), 201
+
+
+@app.route("/market/audit", methods=["GET"])
+@limiter.limit("60 per minute")
+def market_audit():
+    """On-chain аудит экономических и контрактных событий."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    limit = request.args.get("limit", 200)
+    contract_id = (request.args.get("contract_id") or "").strip() or None
+    event_type = (request.args.get("event_type") or "").strip() or None
+    rows = list_audit_events(
+        blockchain.chain,
+        client_id=client_id,
+        contract_id=contract_id,
+        event_type=event_type,
+        limit=limit,
+    )
+    return jsonify({"events": rows}), 200
+
+
+@app.route("/market/contracts/onchain", methods=["GET"])
+@limiter.limit("60 per minute")
+def market_contracts_onchain():
+    """On-chain слепок контрактов (бюджеты, статусы, settled-метрики)."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    provider_only = request.args.get("provider_only") in ("1", "true", "yes")
+    provider_filter = client_id if provider_only else None
+    rows = list_contracts_onchain(blockchain.chain, provider_client_id=provider_filter)
+    return jsonify({"contracts": rows}), 200
 
 
 def _provider_contract_error_response(error):
@@ -1020,7 +1189,12 @@ def provider_contracts():
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
 
     if request.method == "GET":
-        return jsonify(contract_market.list_provider_contracts(provider_client_id)), 200
+        runtime_contracts = contract_market.list_provider_contracts(provider_client_id)
+        onchain_rows = list_contracts_onchain(blockchain.chain, provider_client_id=provider_client_id)
+        onchain_by_id = {row.get("contract_id"): row for row in onchain_rows}
+        for row in runtime_contracts:
+            row["onchain"] = onchain_by_id.get(row.get("contract_id"))
+        return jsonify(runtime_contracts), 200
 
     data = request.get_json(silent=True) or {}
     task_name = (data.get("task_name") or "").strip()
@@ -1056,18 +1230,10 @@ def provider_contracts():
     if initial_budget_tokens < 0:
         return jsonify({"error": "initial_budget_tokens must be >= 0"}), 400
 
-    wallet_debited = False
     if initial_budget_tokens > 0:
-        _, debit_err = market_economy.debit_wallet(
-            client_id=provider_client_id,
-            currency=budget_currency,
-            amount=initial_budget_tokens,
-            purpose="contract_create_funding",
-            meta={"task_name": task_name},
-        )
-        if debit_err:
-            return _provider_contract_error_response(debit_err)
-        wallet_debited = True
+        provider_amount = get_wallet_amount(blockchain.chain, provider_client_id, budget_currency)
+        if provider_amount < initial_budget_tokens:
+            return _provider_contract_error_response("Insufficient wallet balance")
 
     try:
         created = contract_market.create_contract(
@@ -1084,17 +1250,10 @@ def provider_contracts():
             budget_currency=budget_currency,
         )
     except ValueError as exc:
-        if wallet_debited:
-            market_economy.credit_wallet(
-                client_id=provider_client_id,
-                currency=budget_currency,
-                amount=initial_budget_tokens,
-                purpose="contract_create_rollback",
-                meta={"task_name": task_name},
-            )
         return jsonify({"error": str(exc)}), 400
 
     activate_now = data.get("activate_now") in (True, "true", "1", 1)
+    final_status = created.get("status", STATUS_DRAFT)
     if activate_now:
         updated, err = contract_market.set_status(
             contract_id=created["contract_id"],
@@ -1104,7 +1263,52 @@ def provider_contracts():
         if err:
             return _provider_contract_error_response(err)
         created = updated
-    wallet_info = market_economy.get_wallet(provider_client_id)
+        final_status = created.get("status", STATUS_ACTIVE)
+
+    created_ts = now_ts()
+    event_txs = [
+        {
+            "type": "contract_create_event",
+            "contract_id": created["contract_id"],
+            "provider_client_id": provider_client_id,
+            "task_name": task_name,
+            "task_category": task_category,
+            "computation_type": computation_type,
+            "reward_per_task": reward_per_task,
+            "budget_currency": budget_currency,
+            "status": STATUS_DRAFT,
+            "created_at": created_ts,
+        }
+    ]
+    if initial_budget_tokens > 0:
+        event_txs.append(
+            {
+                "type": "contract_budget_fund_event",
+                "contract_id": created["contract_id"],
+                "provider_client_id": provider_client_id,
+                "currency": budget_currency,
+                "amount": initial_budget_tokens,
+                "created_at": created_ts,
+            }
+        )
+    if final_status != STATUS_DRAFT:
+        event_txs.append(
+            {
+                "type": "contract_status_event",
+                "contract_id": created["contract_id"],
+                "provider_client_id": provider_client_id,
+                "status": final_status,
+                "updated_at": created_ts,
+            }
+        )
+    _, append_err = _append_onchain_events(event_txs)
+    if append_err:
+        contract_market.delete_contract(
+            contract_id=created["contract_id"],
+            provider_client_id=provider_client_id,
+        )
+        return jsonify({"error": append_err}), 500
+    wallet_info = get_wallet_from_chain(blockchain.chain, provider_client_id)
     return jsonify({"contract": created, "wallet": wallet_info}), 201
 
 
@@ -1117,7 +1321,11 @@ def provider_contract_details(contract_id):
         return jsonify({"error": "Contract not found"}), 404
     requester = get_client_id_from_auth()
     if requester == contract.get("provider_client_id") or contract.get("status") == STATUS_ACTIVE:
-        return jsonify(contract), 200
+        onchain_rows = list_contracts_onchain(blockchain.chain)
+        onchain = next((row for row in onchain_rows if row.get("contract_id") == contract_id), None)
+        payload = dict(contract)
+        payload["onchain"] = onchain
+        return jsonify(payload), 200
     return jsonify({"error": "Forbidden"}), 403
 
 
@@ -1149,30 +1357,33 @@ def provider_contract_fund(contract_id):
         if normalized_request_currency != budget_currency:
             return jsonify({"error": "Currency mismatch with contract budget"}), 400
 
-    _, debit_err = market_economy.debit_wallet(
-        client_id=provider_client_id,
-        currency=budget_currency,
-        amount=amount,
-        purpose="contract_funding",
-        meta={"contract_id": contract_id},
-    )
-    if debit_err:
-        return _provider_contract_error_response(debit_err)
+    provider_amount = get_wallet_amount(blockchain.chain, provider_client_id, budget_currency)
+    if provider_amount < amount:
+        return _provider_contract_error_response("Insufficient wallet balance")
     updated, err = contract_market.fund_contract(
         contract_id=contract_id,
         provider_client_id=provider_client_id,
         amount=amount,
     )
     if err:
-        market_economy.credit_wallet(
-            client_id=provider_client_id,
-            currency=budget_currency,
-            amount=amount,
-            purpose="contract_funding_rollback",
-            meta={"contract_id": contract_id},
-        )
         return _provider_contract_error_response(err)
-    wallet_info = market_economy.get_wallet(provider_client_id)
+    tx = {
+        "type": "contract_budget_fund_event",
+        "contract_id": contract_id,
+        "provider_client_id": provider_client_id,
+        "currency": budget_currency,
+        "amount": amount,
+        "created_at": now_ts(),
+    }
+    _, append_err = _append_onchain_events([tx])
+    if append_err:
+        contract_market.refund_contract(
+            contract_id=contract_id,
+            provider_client_id=provider_client_id,
+            amount=amount,
+        )
+        return jsonify({"error": append_err}), 500
+    wallet_info = get_wallet_from_chain(blockchain.chain, provider_client_id)
     return jsonify({"contract": updated, "wallet": wallet_info}), 200
 
 
@@ -1185,6 +1396,8 @@ def provider_contract_status(contract_id):
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     data = request.get_json(silent=True) or {}
     new_status = (data.get("status") or "").strip()
+    current = contract_market.get_contract(contract_id)
+    previous_status = current.get("status") if current else None
     updated, err = contract_market.set_status(
         contract_id=contract_id,
         provider_client_id=provider_client_id,
@@ -1192,6 +1405,22 @@ def provider_contract_status(contract_id):
     )
     if err:
         return _provider_contract_error_response(err)
+    tx = {
+        "type": "contract_status_event",
+        "contract_id": contract_id,
+        "provider_client_id": provider_client_id,
+        "status": new_status,
+        "updated_at": now_ts(),
+    }
+    _, append_err = _append_onchain_events([tx])
+    if append_err:
+        if previous_status and previous_status != new_status:
+            contract_market.set_status(
+                contract_id=contract_id,
+                provider_client_id=provider_client_id,
+                new_status=previous_status,
+            )
+        return jsonify({"error": append_err}), 500
     return jsonify(updated), 200
 
 
@@ -1217,18 +1446,25 @@ def provider_contract_refund(contract_id):
     if err:
         return _provider_contract_error_response(err)
     budget_currency = _normalized_budget_currency(updated.get("budget_currency") if updated else None) or MARKET_DEFAULT_CURRENCY
-    credit_err = None
     if refunded_amount and refunded_amount > 0:
-        _, credit_err = market_economy.credit_wallet(
-            client_id=provider_client_id,
-            currency=budget_currency,
-            amount=refunded_amount,
-            purpose="contract_refund",
-            meta={"contract_id": contract_id},
-        )
-    if credit_err:
-        return _provider_contract_error_response(credit_err)
-    wallet_info = market_economy.get_wallet(provider_client_id)
+        tx = {
+            "type": "contract_budget_refund_event",
+            "contract_id": contract_id,
+            "provider_client_id": provider_client_id,
+            "currency": budget_currency,
+            "amount": int(refunded_amount),
+            "created_at": now_ts(),
+        }
+        _, append_err = _append_onchain_events([tx])
+        if append_err:
+            # rollback refund in runtime storage
+            contract_market.fund_contract(
+                contract_id=contract_id,
+                provider_client_id=provider_client_id,
+                amount=int(refunded_amount),
+            )
+            return jsonify({"error": append_err}), 500
+    wallet_info = get_wallet_from_chain(blockchain.chain, provider_client_id)
     return jsonify({"contract": updated, "refunded_amount": refunded_amount, "wallet": wallet_info}), 200
 
 
@@ -1333,6 +1569,8 @@ def get_contracts():
     общий % выполнения, активные вычислители, свободный объём, вознаграждение за задачу.
     """
     chain_stats = blockchain.get_contract_stats()
+    onchain_rows = list_contracts_onchain(blockchain.chain)
+    onchain_by_id = {row.get("contract_id"): row for row in onchain_rows}
     out = []
     # Публичные контракты поставщиков (только активные)
     for contract_record in contract_market.list_active_contracts():
@@ -1344,6 +1582,7 @@ def get_contracts():
         completion_pct = min(100.0, (total_done / target * 100)) if target else 0.0
         remaining_volume = max(0, target - total_done)
         active_workers = _active_workers_count(cid)
+        onchain_row = onchain_by_id.get(cid) or {}
         out.append({
             "contract_id": cid,
             "work_units_required": wu_required,
@@ -1369,6 +1608,11 @@ def get_contracts():
             "budget_tokens_total": int(contract_record.get("budget_tokens_total", 0)),
             "budget_tokens_spent": int(contract_record.get("budget_tokens_spent", 0)),
             "budget_tokens_available": int(contract_record.get("budget_tokens_available", 0)),
+            "onchain_budget_total": int(onchain_row.get("budget_total", 0)),
+            "onchain_budget_spent": int(onchain_row.get("budget_spent", 0)),
+            "onchain_budget_refunded": int(onchain_row.get("budget_refunded", 0)),
+            "onchain_budget_available": int(onchain_row.get("budget_available", 0)),
+            "onchain_jobs_completed": int(onchain_row.get("jobs_completed", 0)),
         })
     return jsonify(out), 200
 

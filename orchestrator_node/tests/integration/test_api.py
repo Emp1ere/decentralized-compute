@@ -345,3 +345,36 @@ def test_market_currency_budget_and_withdrawal_flow(client, auth_headers):
     assert withdraw_payload["withdrawal"]["status"] == "queued"
     assert withdraw_payload["withdrawal"]["currency"] == "USD"
     assert withdraw_payload["wallet"]["balances"]["USD"] == 2
+
+    # 4) Проверяем аудит и on-chain сводку контракта.
+    audit_res = client.get("/market/audit?limit=200", headers=worker_headers)
+    assert audit_res.status_code == 200
+    events = audit_res.get_json()["events"]
+    assert any(e["tx"].get("type") == "contract_reward_settlement" for e in events)
+    assert any(e["tx"].get("type") == "fiat_withdrawal_request" for e in events)
+
+    provider_onchain_res = client.get("/market/contracts/onchain?provider_only=1", headers=provider_headers)
+    assert provider_onchain_res.status_code == 200
+    onchain_contracts = provider_onchain_res.get_json()["contracts"]
+    assert any(c.get("contract_id") == contract_id for c in onchain_contracts)
+
+
+def test_market_rates_update_is_stored_onchain(client, auth_headers):
+    headers, _ = auth_headers
+    update_res = client.post(
+        "/market/rates/update",
+        json={
+            "rates_to_rub": {"USD": 100.0, "EUR": 110.0, "RUB": 1.0},
+            "spread_percent": 2.0,
+        },
+    )
+    assert update_res.status_code == 200
+    rates = update_res.get_json()
+    assert rates["rates_to_rub"]["USD"] == 100.0
+    assert rates["spread_percent"] == 2.0
+
+    get_res = client.get("/market/rates", headers=headers)
+    assert get_res.status_code == 200
+    current = get_res.get_json()
+    assert current["rates_to_rub"]["USD"] == 100.0
+    assert current["spread_percent"] == 2.0

@@ -355,3 +355,19 @@ class ContractMarket:
                 _save_state(state)
         return created
 
+    def delete_contract(self, *, contract_id, provider_client_id):
+        """
+        Удаление контракта поставщика (используется для rollback при ошибках транзакций).
+        """
+        with _lock:
+            state = _load_state()
+            for idx, c in enumerate(state["contracts"]):
+                if c.get("contract_id") != contract_id:
+                    continue
+                if c.get("provider_client_id") != provider_client_id:
+                    return False, "Forbidden"
+                state["contracts"].pop(idx)
+                _save_state(state)
+                return True, None
+        return False, "Contract not found"
+
