@@ -13,6 +13,20 @@
       "client_id": "5c4fd466-bbc3-4209-894f-b29388259c96",
       "api_key": "3bDgDAeGz69txD9IRDNusg8Gm8XuilF07AhRnooMr0o",
       "nickname": "Blackgold"
+    },
+    {
+      "login": "first_provider",
+      "password_hash": "pbkdf2:sha256:1000000$vao8EWZDVkgnC5RO$80d548daf6b9f544dd434ffaebf8ce74314731d15b2a4eba32885f3b0d46c93c",
+      "client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "api_key": "UAEDmEDfTdBbdJNeo024udss4cLEgRxCQsoF9LqTHSs",
+      "nickname": "Первый поставщик"
+    },
+    {
+      "login": "first_provider",
+      "password_hash": "pbkdf2:sha256:1000000$zEJ15SkonUyagroU$66ff1771c0d604298a9390e1d4e51e1b2d9f6c1327cc3f6ab15253970e4e05bb",
+      "client_id": "ca32e8c5-a7be-4e79-a91c-6ffc65e0d659",
+      "api_key": "BYGX__3DU9qVrsRassUhIKDYE_3RQ0NZvSetD_QZuwQ",
+      "nickname": "Первый поставщик"
     }
   ]
 }
