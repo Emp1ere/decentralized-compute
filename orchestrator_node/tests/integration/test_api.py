@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import pytest
 from app import app, blockchain
+from fx_oracles import current_epoch_id, get_oracle_registry, sign_submission
 
 
 @pytest.fixture
@@ -378,3 +379,42 @@ def test_market_rates_update_is_stored_onchain(client, auth_headers):
     current = get_res.get_json()
     assert current["rates_to_rub"]["USD"] == 100.0
     assert current["spread_percent"] == 2.0
+
+
+def test_multi_oracle_fx_finalize_flow(client):
+    registry = get_oracle_registry()
+    epoch_id = current_epoch_id()
+    oracle_ids = sorted(list(registry.keys()))[:3]
+    payloads = [
+        {"RUB": 1.0, "USD": 95.0, "EUR": 101.0},
+        {"RUB": 1.0, "USD": 96.0, "EUR": 100.0},
+        {"RUB": 1.0, "USD": 94.5, "EUR": 102.0},
+    ]
+    for oracle_id, rates in zip(oracle_ids, payloads):
+        signature = sign_submission(registry[oracle_id], epoch_id, rates)
+        submit_res = client.post(
+            "/market/fx/oracle-submit",
+            json={
+                "oracle_id": oracle_id,
+                "epoch_id": epoch_id,
+                "rates_to_rub": rates,
+                "signature": signature,
+            },
+        )
+        assert submit_res.status_code == 201
+
+    finalize_res = client.post("/market/fx/finalize", json={"epoch_id": epoch_id})
+    assert finalize_res.status_code == 200
+    finalized = finalize_res.get_json()
+    assert finalized["status"] == "finalized"
+    epoch_info = finalized["epoch"]
+    assert epoch_info["is_finalized"] is True
+    assert epoch_info["finalization"] is not None
+    assert epoch_info["finalization"]["meta"]["source"] == "multi_oracle"
+    assert epoch_info["finalization"]["meta"]["epoch_id"] == epoch_id
+
+    rates_res = client.get("/market/rates")
+    assert rates_res.status_code == 200
+    rates = rates_res.get_json()
+    assert rates["rates_to_rub"]["USD"] > 0
+    assert rates["rates_to_rub"]["EUR"] > 0

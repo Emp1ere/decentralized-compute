@@ -31,6 +31,8 @@ CONTRACT_STATUSES = {"draft", "active", "paused", "closed"}
 
 ONCHAIN_ECONOMIC_TX_TYPES = {
     "fx_rules_update",
+    "fx_oracle_submit",
+    "fx_oracle_penalty",
     "fiat_topup",
     "fiat_conversion",
     "fiat_withdrawal_request",
@@ -131,6 +133,35 @@ def is_valid_onchain_economic_tx(tx: dict) -> bool:
         if spread is not None and _non_negative_float(spread) is None:
             return False
         return True
+
+    if tx_type == "fx_oracle_submit":
+        rates = tx.get("rates_to_rub")
+        if not isinstance(rates, dict):
+            return False
+        for c in SUPPORTED_BUDGET_CURRENCIES:
+            if c not in rates:
+                return False
+            if _non_negative_float(rates.get(c)) is None or float(rates.get(c)) <= 0:
+                return False
+        return (
+            isinstance(tx.get("oracle_id"), str)
+            and bool(tx.get("oracle_id"))
+            and isinstance(tx.get("epoch_id"), str)
+            and bool(tx.get("epoch_id"))
+            and isinstance(tx.get("signature"), str)
+            and bool(tx.get("signature"))
+        )
+
+    if tx_type == "fx_oracle_penalty":
+        return (
+            isinstance(tx.get("oracle_id"), str)
+            and bool(tx.get("oracle_id"))
+            and isinstance(tx.get("epoch_id"), str)
+            and bool(tx.get("epoch_id"))
+            and _positive_int(tx.get("penalty_points")) is not None
+            and isinstance(tx.get("reason"), str)
+            and bool(tx.get("reason"))
+        )
 
     if tx_type == "fiat_topup":
         return (
