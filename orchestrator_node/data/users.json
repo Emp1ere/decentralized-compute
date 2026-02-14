@@ -1,32 +1,25 @@
 {
   "users": [
     {
+      "login": "first_provider",
+      "password_hash": "pbkdf2:sha256:1000000$Z39XEWbO1RSzAPvC$695a6f5b3d66025634b74f99e2e2f9ef25abd81c8a694eedf6af127a797fc4fa",
+      "client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
+      "api_key": "mhU-ueCgLTo8Wvz5BJkmRPVrj1goVkgwKTQa2Sg7Bus",
+      "nickname": "Первый поставщик"
+    },
+    {
+      "login": "first_provider",
+      "password_hash": "pbkdf2:sha256:1000000$T4YiOgX8xvB4oTsN$06e3e1a35a3c7d714f1268a2c05a767a2c72fe14eb50c1d9a4ede348dad9cc62",
+      "client_id": "77254f28-5403-4864-84c3-d420c51840fd",
+      "api_key": "XhvA-E-vm9OwDni-5LBgRcfxb05JNEAsAZtrpEXwXAQ",
+      "nickname": "Первый поставщик"
+    },
+    {
       "login": "emp1re",
-      "password_hash": "pbkdf2:sha256:1000000$WbDVQabzQLMaGuRh$167df255e65437fecf1021a4465821a78cc6b59ee16e59e03e2f2e3a7427b154",
-      "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
-      "api_key": "Xq5ZcDDQgaiCAZwwL5CAsrz34o_xuEmND1mJDvoMzcM",
-      "nickname": "Empire"
-    },
-    {
-      "login": "blackgold",
-      "password_hash": "pbkdf2:sha256:1000000$yZNndEJcXPQE4dDv$755fcacb445cb7c25f371e5a5017dbb811b0bd1649a638d4d3334875b92bd23e",
-      "client_id": "5c4fd466-bbc3-4209-894f-b29388259c96",
-      "api_key": "3bDgDAeGz69txD9IRDNusg8Gm8XuilF07AhRnooMr0o",
-      "nickname": "Blackgold"
-    },
-    {
-      "login": "first_provider",
-      "password_hash": "pbkdf2:sha256:1000000$vao8EWZDVkgnC5RO$80d548daf6b9f544dd434ffaebf8ce74314731d15b2a4eba32885f3b0d46c93c",
-      "client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
-      "api_key": "UAEDmEDfTdBbdJNeo024udss4cLEgRxCQsoF9LqTHSs",
-      "nickname": "Первый поставщик"
-    },
-    {
-      "login": "first_provider",
-      "password_hash": "pbkdf2:sha256:1000000$zEJ15SkonUyagroU$66ff1771c0d604298a9390e1d4e51e1b2d9f6c1327cc3f6ab15253970e4e05bb",
-      "client_id": "ca32e8c5-a7be-4e79-a91c-6ffc65e0d659",
-      "api_key": "BYGX__3DU9qVrsRassUhIKDYE_3RQ0NZvSetD_QZuwQ",
-      "nickname": "Первый поставщик"
+      "password_hash": "pbkdf2:sha256:1000000$4uVxYOr2MhVflpBb$93a33a58549f769c6e3381689f914baf26822c5958628d48557133abf3d04ac3",
+      "client_id": "c5c0e0bd-ea20-4e52-ada5-b92cb0be1cb0",
+      "api_key": "eFOFcEd7Mpc0f4l5wsIEDnE71FGPF4sqU5DMZ5YcVsk",
+      "nickname": "emp1re"
     }
   ]
 }

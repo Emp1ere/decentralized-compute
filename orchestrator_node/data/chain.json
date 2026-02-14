@@ -54,5 +54,61 @@
     "previous_hash": "d8ee1df66251bb83209d22d99b4cb9f225fd6ebbfc3f7d611279c84771df580f",
     "nonce": 0,
     "hash": "d46784048f558dbbccb38c79e69b6963f0e7aca6c52ef2102041801d03587c48"
+  },
+  {
+    "index": 3,
+    "timestamp": 1771081336.5936863,
+    "transactions": [
+      {
+        "amount": 8,
+        "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "created_at": 1771081336,
+        "currency": "USD",
+        "source": "manual_dashboard_topup",
+        "type": "fiat_topup"
+      }
+    ],
+    "previous_hash": "d46784048f558dbbccb38c79e69b6963f0e7aca6c52ef2102041801d03587c48",
+    "nonce": 0,
+    "hash": "dfdea22727091d09c957b66cf2a2b7e33e9ed1f7698ecef1d349887235084555"
+  },
+  {
+    "index": 4,
+    "timestamp": 1771081353.099472,
+    "transactions": [
+      {
+        "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "created_at": 1771081353,
+        "from_currency": "USD",
+        "source_amount": 7,
+        "spread_percent": 1.5,
+        "target_amount": 634,
+        "to_currency": "RUB",
+        "type": "fiat_conversion"
+      }
+    ],
+    "previous_hash": "dfdea22727091d09c957b66cf2a2b7e33e9ed1f7698ecef1d349887235084555",
+    "nonce": 0,
+    "hash": "044c5e261970328e3c5ef44bb9407cba4f04ff8c661a2afb7020bda4c26718a6"
+  },
+  {
+    "index": 5,
+    "timestamp": 1771081425.4669497,
+    "transactions": [
+      {
+        "amount": 100,
+        "card_mask": "****2222",
+        "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "created_at": 1771081425,
+        "currency": "RUB",
+        "payout_method": "bank_card",
+        "status": "queued",
+        "type": "fiat_withdrawal_request",
+        "withdrawal_id": "wd-196bdeea4e194188"
+      }
+    ],
+    "previous_hash": "044c5e261970328e3c5ef44bb9407cba4f04ff8c661a2afb7020bda4c26718a6",
+    "nonce": 0,
+    "hash": "17f0e431ffb4db4494131119dd8cc8bc14b3afedabc04b8aff4c38dfc354bf1b"
   }
 ]

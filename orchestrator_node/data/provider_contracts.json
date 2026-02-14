@@ -2,13 +2,14 @@
   "contracts": [
     {
       "contract_id": "sc-000",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Быстрый тест",
       "task_description": "Найти хеш с 1 ведущим нулём (для быстрой проверки сдачи)",
       "task_category": "Тестовая",
       "computation_type": "simple_pow",
       "work_units_required": 100,
       "reward_per_task": 2,
+      "budget_currency": "RUB",
       "target_total_work_units": 1000,
       "difficulty": 1,
       "status": "active",
@@ -17,18 +18,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "sc-001",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Простая хеш-задача",
       "task_description": "Найти хеш с 3 ведущими нулями",
       "task_category": "Тестовая",
       "computation_type": "simple_pow",
       "work_units_required": 1000,
       "reward_per_task": 10,
+      "budget_currency": "RUB",
       "target_total_work_units": 10000,
       "difficulty": 3,
       "status": "active",
@@ -37,18 +39,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "sc-002",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Сложная хеш-задача",
       "task_description": "Найти хеш с 4 ведущими нулями",
       "task_category": "Тестовая",
       "computation_type": "simple_pow",
       "work_units_required": 5000,
       "reward_per_task": 50,
+      "budget_currency": "RUB",
       "target_total_work_units": 50000,
       "difficulty": 4,
       "status": "active",
@@ -57,18 +60,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "astro-001",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Космологическая симуляция",
       "task_description": "Моделирование крупномасштабной структуры Вселенной: гравитация, гидродинамика, звездообразование, обратная связь от чёрных дыр",
       "task_category": "Астрофизика",
       "computation_type": "cosmological",
       "work_units_required": 100000,
       "reward_per_task": 500,
+      "budget_currency": "USD",
       "target_total_work_units": 1000000,
       "difficulty": 5,
       "status": "active",
@@ -77,18 +81,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "astro-002",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Моделирование сверхновой",
       "task_description": "Радиационно-гидродинамическое моделирование взрыва сверхновой с учётом нейтринного транспорта",
       "task_category": "Астрофизика",
       "computation_type": "supernova",
       "work_units_required": 80000,
       "reward_per_task": 400,
+      "budget_currency": "USD",
       "target_total_work_units": 800000,
       "difficulty": 5,
       "status": "active",
@@ -97,18 +102,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "astro-003",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "МГД джетов и аккреции",
       "task_description": "Магнитогидродинамическое моделирование джетов и аккреционных дисков с адаптивными сетками",
       "task_category": "Астрофизика",
       "computation_type": "mhd",
       "work_units_required": 60000,
       "reward_per_task": 300,
+      "budget_currency": "EUR",
       "target_total_work_units": 600000,
       "difficulty": 4,
       "status": "active",
@@ -117,18 +123,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "astro-004",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Радиационный перенос",
       "task_description": "Решение уравнения переноса излучения в многомерных пространствах (распараллеливание по углам, частотам, координатам)",
       "task_category": "Астрофизика",
       "computation_type": "radiative",
       "work_units_required": 70000,
       "reward_per_task": 350,
+      "budget_currency": "EUR",
       "target_total_work_units": 700000,
       "difficulty": 4,
       "status": "active",
@@ -137,18 +144,19 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     },
     {
       "contract_id": "astro-005",
-      "provider_client_id": "f20fd2ac-2926-4a28-aa99-a78a2d5577b7",
+      "provider_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
       "task_name": "Гравитационные волны",
       "task_description": "Численное решение уравнений Эйнштейна для моделирования слияний нейтронных звёзд и чёрных дыр",
       "task_category": "Астрофизика",
       "computation_type": "gravitational_waves",
       "work_units_required": 150000,
       "reward_per_task": 750,
+      "budget_currency": "USD",
       "target_total_work_units": 1500000,
       "difficulty": 6,
       "status": "active",
@@ -157,8 +165,8 @@
       "budget_tokens_refunded": 0,
       "completed_work_units": 0,
       "jobs_completed": 0,
-      "created_at": 1771013086,
-      "updated_at": 1771013086
+      "created_at": 1771101828,
+      "updated_at": 1771101828
     }
   ]
 }
