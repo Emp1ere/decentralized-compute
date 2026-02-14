@@ -28,6 +28,19 @@ from onchain_accounting import (
     normalize_currency as onchain_normalize_currency,
     now_ts,
 )
+from fx_oracles import (
+    ORACLE_PENALTY_POINTS,
+    ORACLE_QUORUM,
+    build_oracle_scores,
+    calculate_median_rates,
+    current_epoch_id,
+    detect_outliers,
+    get_epoch_finalization,
+    get_epoch_submissions,
+    get_oracle_public_info,
+    normalize_rates_payload,
+    verify_submission_signature,
+)
 import hashlib
 import uuid
 import random
@@ -551,6 +564,24 @@ def _append_onchain_events(event_txs):
     return new_block, None
 
 
+def _oracle_epoch_summary(epoch_id):
+    submissions = get_epoch_submissions(blockchain.chain, epoch_id)
+    finalization = get_epoch_finalization(blockchain.chain, epoch_id)
+    median_rates = calculate_median_rates(submissions) if submissions else None
+    outliers = detect_outliers(submissions, median_rates) if submissions and median_rates else {}
+    return {
+        "epoch_id": epoch_id,
+        "oracle_config": get_oracle_public_info(),
+        "oracle_scores": list(build_oracle_scores(blockchain.chain).values()),
+        "submissions_count": len(submissions),
+        "submissions": sorted(list(submissions.values()), key=lambda x: x.get("oracle_id", "")),
+        "median_rates_preview": median_rates,
+        "outliers_preview": list(outliers.values()),
+        "finalization": finalization,
+        "is_finalized": finalization is not None,
+    }
+
+
 def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
     """
     Получить рантайм-описание пользовательского контракта поставщика.
@@ -981,6 +1012,134 @@ def market_rates_update():
     if err:
         return jsonify({"error": err}), 400
     return jsonify(get_effective_fx_rules(blockchain.chain)), 200
+
+
+@app.route("/market/fx/oracles", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_fx_oracles():
+    """Публичный статус oracle-пула и текущие on-chain scores."""
+    payload = get_oracle_public_info()
+    payload["scores"] = list(build_oracle_scores(blockchain.chain).values())
+    return jsonify(payload), 200
+
+
+@app.route("/market/fx/oracle-submit", methods=["POST"])
+@limiter.limit("120 per minute")
+def market_fx_oracle_submit():
+    """Подписанный submit курса от FX-оракула в заданную эпоху."""
+    data = request.get_json(silent=True) or {}
+    oracle_id = (data.get("oracle_id") or "").strip()
+    epoch_id = (data.get("epoch_id") or "").strip() or current_epoch_id()
+    rates_payload = data.get("rates_to_rub")
+    signature = (data.get("signature") or "").strip()
+
+    if not oracle_id:
+        return jsonify({"error": "oracle_id is required"}), 400
+    if not epoch_id:
+        return jsonify({"error": "epoch_id is required"}), 400
+    normalized_rates, normalize_err = normalize_rates_payload(rates_payload)
+    if normalize_err:
+        return jsonify({"error": normalize_err}), 400
+
+    valid, sign_err = verify_submission_signature(
+        oracle_id=oracle_id,
+        epoch_id=epoch_id,
+        rates_to_rub=normalized_rates,
+        signature=signature,
+    )
+    if not valid:
+        return jsonify({"error": sign_err}), 401
+
+    if get_epoch_finalization(blockchain.chain, epoch_id):
+        return jsonify({"error": "Epoch already finalized"}), 409
+    existing = get_epoch_submissions(blockchain.chain, epoch_id)
+    if oracle_id in existing:
+        return jsonify({"error": "Oracle already submitted for this epoch"}), 409
+
+    tx = {
+        "type": "fx_oracle_submit",
+        "oracle_id": oracle_id,
+        "epoch_id": epoch_id,
+        "rates_to_rub": normalized_rates,
+        "signature": signature,
+        "submitted_at": now_ts(),
+    }
+    _, err = _append_onchain_events([tx])
+    if err:
+        return jsonify({"error": err}), 400
+    summary = _oracle_epoch_summary(epoch_id)
+    summary["quorum_reached"] = summary["submissions_count"] >= ORACLE_QUORUM
+    return jsonify(summary), 201
+
+
+@app.route("/market/fx/finalize", methods=["POST"])
+@require_node_secret
+@limiter.limit("30 per minute")
+def market_fx_finalize():
+    """Финализация эпохи oracle-курсов: медиана, outlier, штрафы, запись on-chain."""
+    data = request.get_json(silent=True) or {}
+    epoch_id = (data.get("epoch_id") or "").strip() or current_epoch_id()
+
+    existing_final = get_epoch_finalization(blockchain.chain, epoch_id)
+    if existing_final:
+        return jsonify({"status": "already_finalized", "epoch": _oracle_epoch_summary(epoch_id)}), 200
+
+    submissions = get_epoch_submissions(blockchain.chain, epoch_id)
+    if len(submissions) < ORACLE_QUORUM:
+        return jsonify(
+            {
+                "error": "Not enough oracle submissions",
+                "epoch_id": epoch_id,
+                "submissions_count": len(submissions),
+                "required_quorum": ORACLE_QUORUM,
+            }
+        ), 409
+
+    median_rates = calculate_median_rates(submissions)
+    outliers = detect_outliers(submissions, median_rates)
+    current_rules = get_effective_fx_rules(blockchain.chain)
+    spread_percent = data.get("spread_percent")
+    if spread_percent is None:
+        spread_percent = current_rules.get("spread_percent")
+    txs = [
+        {
+            "type": "fx_rules_update",
+            "rates_to_rub": median_rates,
+            "spread_percent": spread_percent,
+            "updated_at": now_ts(),
+            "meta": {
+                "source": "multi_oracle",
+                "epoch_id": epoch_id,
+                "oracle_count": len(submissions),
+                "outliers": sorted(outliers.keys()),
+            },
+        }
+    ]
+    for oracle_id in sorted(outliers.keys()):
+        txs.append(
+            {
+                "type": "fx_oracle_penalty",
+                "oracle_id": oracle_id,
+                "epoch_id": epoch_id,
+                "penalty_points": ORACLE_PENALTY_POINTS,
+                "reason": "outlier",
+                "created_at": now_ts(),
+            }
+        )
+    _, err = _append_onchain_events(txs)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"status": "finalized", "epoch": _oracle_epoch_summary(epoch_id)}), 200
+
+
+@app.route("/market/fx/epoch/<epoch_id>", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_fx_epoch(epoch_id):
+    """Подробности oracle-эпохи: submit'ы, preview медианы, финализация."""
+    normalized_epoch = (epoch_id or "").strip()
+    if not normalized_epoch:
+        return jsonify({"error": "epoch_id required"}), 400
+    return jsonify(_oracle_epoch_summary(normalized_epoch)), 200
 
 
 @app.route("/market/wallet", methods=["GET"])
