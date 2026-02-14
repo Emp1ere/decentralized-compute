@@ -246,7 +246,7 @@
       </div>
       <div id="auth-profile" style="display:none;">
         <p><strong>Вы вошли как</strong> <span id="profile-nickname">-</span> <span id="profile-login" class="muted" style="font-size:0.9em;"></span></p>
-        <p>Баланс: <strong id="profile-balance">0</strong> токенов · Сдано работ: <strong id="profile-submissions">0</strong></p>
+        <p>Баланс в цепочке: <strong id="profile-balance">0</strong> баллов · Сдано работ: <strong id="profile-submissions">0</strong></p>
         <p class="muted" style="font-size:0.85em; margin-top:8px;">Баланс и сданные работы хранятся в блокчейне узла. Данные по всем вычислителям обновляются по кнопке «Обновить данные».</p>
         <button type="button" id="btn-auth-logout">Выйти</button>
       </div>
@@ -274,7 +274,7 @@
       <div id="work-run-in-worker" class="card" style="display:none; margin-bottom: 16px;">
       <div class="label">Выполнить задачу в воркере</div>
       <p class="muted" style="font-size:0.85em; margin-bottom:8px;">Воркер запускается с API-ключом выбранного вычислителя (вкладка «Обзор») и <strong>только для контракта текущей задачи</strong> (см. блок «Текущая задача» выше). Награда начислится на этого вычислителя. Перед запуском нажмите «Использовать» для нужного вычислителя и при необходимости «Обновить данные».</p>
-      <p class="muted" style="font-size:0.8em; margin-bottom:8px;">Если на баланс уже начислялись токены за другие контракты — вероятно, работал ещё один воркер (другой контейнер или запуск без выбора задачи). Остановите все контейнеры воркеров (<code>docker ps</code>, затем <code>docker stop &lt;id&gt;</code>), затем запустите воркер заново после получения нужной задачи.</p>
+      <p class="muted" style="font-size:0.8em; margin-bottom:8px;">Если на баланс уже начислялись выплаты за другие контракты — вероятно, работал ещё один воркер (другой контейнер или запуск без выбора задачи). Остановите все контейнеры воркеров (<code>docker ps</code>, затем <code>docker stop &lt;id&gt;</code>), затем запустите воркер заново после получения нужной задачи.</p>
       <div class="row" style="align-items:center; gap:16px; margin-bottom:12px; flex-wrap:wrap;">
         <span class="muted" style="font-size:0.9em;">Режим воркера:</span>
         <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
@@ -293,7 +293,7 @@
       <div id="work-worker-status-hint" style="display:none; margin-top:8px;">
         <button type="button" class="primary" id="btn-check-balance-after-worker">Проверить баланс</button>
         <span id="work-worker-balance-result" class="msg" style="display:none; margin-left:8px;"></span>
-        <p style="font-size:0.85em; color:var(--muted); margin:8px 0 0;">Через 10–60 сек воркер сдаст задачу. Вкладка «Задачи» - история сданных работ; «Обзор» → «Показать баланс» - начисленные токены.</p>
+        <p style="font-size:0.85em; color:var(--muted); margin:8px 0 0;">Через 10–60 сек воркер сдаст задачу. Вкладка «Задачи» - история сданных работ; «Профиль» - fiat-кошелёк и вывод.</p>
       </div>
       <p style="font-size:0.9em; color:var(--muted); margin:0 0 8px;">Или вручную в каталоге проекта:</p>
       <div class="row" style="align-items:center; gap:8px;">
@@ -345,6 +345,11 @@
       <div class="row">
         <input type="number" id="provider-work-units" min="1" step="1" placeholder="Ед. на сдачу" style="min-width:140px;">
         <input type="number" id="provider-reward" min="1" step="1" placeholder="Награда за сдачу" style="min-width:150px;">
+        <select id="provider-budget-currency" style="min-width:120px;">
+          <option value="RUB">RUB</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+        </select>
         <input type="number" id="provider-target" min="1" step="1" placeholder="Целевой объём" style="min-width:150px;">
         <input type="number" id="provider-difficulty" min="1" step="1" placeholder="Difficulty" style="min-width:120px;">
         <input type="number" id="provider-initial-budget" min="0" step="1" placeholder="Начальный бюджет" style="min-width:150px;">
@@ -422,7 +427,8 @@
           <div class="card"><div class="label">Никнейм</div><div id="profile-nickname-full" class="value">-</div></div>
           <div class="card"><div class="label">Логин</div><div id="profile-login-full" class="value">-</div></div>
           <div class="card"><div class="label">ID вычислителя</div><div id="profile-client-id" class="value mono" style="font-size:0.9rem; word-break:break-all;">-</div></div>
-          <div class="card"><div class="label">Баланс (токенов)</div><div id="profile-balance-full" class="value">-</div></div>
+          <div class="card"><div class="label">Баланс в цепочке (поинты)</div><div id="profile-balance-full" class="value">-</div></div>
+          <div class="card"><div class="label">Fiat-кошелёк</div><div id="profile-fiat-wallet" class="value" style="font-size:0.9rem;">-</div></div>
           <div class="card"><div class="label">Сдано работ</div><div id="profile-submissions-full" class="value">-</div></div>
         </div>
       </div>
@@ -434,17 +440,42 @@
         <p id="profile-worker-no-task" class="muted" style="display:none; margin-top:8px;">Нет активной задачи. Запустите воркер на вкладке «Работа».</p>
       </div>
       <div class="card" style="margin-bottom:20px;">
-        <div class="label">Вывод средств (симуляция)</div>
-        <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Конвертация токенов в рубли и вывод на карту. Это демонстрационный режим: реальные платежи не выполняются.</p>
-        <div class="row" style="align-items:center; gap:16px; margin-bottom:12px;">
-          <span class="muted">Курс:</span>
-          <strong id="profile-rate">1 токен = 10 ₽</strong>
+        <div class="label">Fiat-операции и вывод на карту</div>
+        <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Реальная модель без криптовалют: доход учитывается в валюте контракта (RUB/USD/EUR), доступна конвертация и заявка на вывод на банковскую карту.</p>
+        <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
+          <label for="profile-topup-currency">Пополнение:</label>
+          <select id="profile-topup-currency" style="min-width:110px;">
+            <option value="RUB">RUB</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+          <input type="number" id="profile-topup-amount" min="1" step="1" placeholder="Сумма" style="min-width:120px;">
+          <button type="button" class="primary" id="btn-profile-topup">Пополнить кошелёк</button>
         </div>
         <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
-          <label for="profile-withdraw-tokens">Сумма (токенов):</label>
-          <input type="number" id="profile-withdraw-tokens" min="1" step="1" placeholder="0" style="min-width:120px;">
-          <span class="muted">=</span>
-          <span id="profile-withdraw-rub">0</span> <span>₽</span>
+          <label for="profile-convert-from">Конвертация:</label>
+          <select id="profile-convert-from" style="min-width:90px;">
+            <option value="RUB">RUB</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+          <span>→</span>
+          <select id="profile-convert-to" style="min-width:90px;">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="RUB">RUB</option>
+          </select>
+          <input type="number" id="profile-convert-amount" min="1" step="1" placeholder="Сумма" style="min-width:120px;">
+          <button type="button" class="primary" id="btn-profile-convert">Конвертировать</button>
+        </div>
+        <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
+          <label for="profile-withdraw-currency">Вывод:</label>
+          <select id="profile-withdraw-currency" style="min-width:90px;">
+            <option value="RUB">RUB</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+          <input type="number" id="profile-withdraw-amount" min="1" step="1" placeholder="Сумма" style="min-width:120px;">
         </div>
         <div class="row" style="align-items:center; gap:12px; margin-bottom:12px;">
           <label for="profile-withdraw-card">Номер карты:</label>
@@ -714,7 +745,7 @@
         row.className = 'saved-client-row';
         const bal = c.balance != null ? c.balance : '-';
         const sub = c.submissions_count != null ? c.submissions_count : '-';
-        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> - баланс: ' + bal + ' токенов, сдано работ: ' + sub + '</span>' +
+        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> - chain-баланс: ' + bal + ' баллов, сдано работ: ' + sub + '</span>' +
           '<button type="button" class="primary" data-use="' + c.id + '">Использовать</button>' +
           '<button type="button" class="primary" data-sync-one="' + c.id + '">Обновить</button>' +
           '<button type="button" data-remove="' + c.id + '">Удалить</button>';
@@ -1161,6 +1192,29 @@
       radiative: 4,
       gravitational_waves: 6
     };
+    const SUPPORTED_BUDGET_CURRENCIES = ['RUB', 'USD', 'EUR'];
+    function formatWalletBalances(balances) {
+      const safe = balances || {};
+      return SUPPORTED_BUDGET_CURRENCIES.map(cur => cur + ': ' + (safe[cur] ?? 0)).join(' · ');
+    }
+    async function marketApi(path, { method = 'GET', payload = null } = {}) {
+      const apiKey = getApiKey();
+      if (!apiKey) throw new Error('Выберите вычислителя с API-ключом на вкладке «Обзор».');
+      const options = {
+        method,
+        headers: {
+          'Authorization': 'Bearer ' + apiKey
+        }
+      };
+      if (payload !== null) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(payload);
+      }
+      const response = await fetch(base + path, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
+      return data;
+    }
     /** Сброс вкладки «Работа» при смене вычислителя: задача и блок воркера скрыты, подсказка — получить задачу заново. */
     function clearWorkPanelForNewAccount() {
       currentTask = null;
@@ -1220,6 +1274,9 @@
       html += '<strong>Contract ID:</strong> ' + (task.contract_id || '') + '<br>';
       html += '<strong>Work units required:</strong> ' + (task.work_units_required ?? '') + '<br>';
       html += '<strong>Difficulty:</strong> ' + (task.difficulty ?? '') + '<br>';
+      if (task.reward_per_task != null) {
+        html += '<strong>Награда:</strong> ' + task.reward_per_task + ' ' + (task.reward_currency || 'RUB') + '<br>';
+      }
       if (task.computation_type) html += '<strong>Тип вычислений:</strong> ' + task.computation_type;
       bodyEl.innerHTML = html;
       
@@ -1387,7 +1444,7 @@
         if (!balRes.ok) throw new Error(balData.error || balRes.status);
         resultEl.className = 'msg ok';
         const bal = balData.balance ?? 0;
-        resultEl.textContent = 'Баланс: ' + bal + ' токенов.';
+        resultEl.textContent = 'Chain-баланс: ' + bal + ' баллов.';
         if (bal === 0) resultEl.textContent += ' Если воркер уже сдал задачу - подождите 30–60 сек и нажмите снова. Диагностика: docker logs orchestrator_node_1';
         resultEl.style.display = 'block';
       } catch (e) {
@@ -1523,7 +1580,8 @@
           throw new Error(errorMsg);
         }
         resultEl.className = 'msg ok';
-        resultEl.textContent = '✅ Работа принята. Начислено: ' + (subData.reward_issued ?? '') + ' токенов. Проверьте баланс на вкладке «Обзор».';
+        const rewardCurrency = subData.reward_currency || 'RUB';
+        resultEl.textContent = '✅ Работа принята. Начислено: ' + (subData.reward_issued ?? '') + ' ' + rewardCurrency + '. Проверьте fiat-кошелёк во вкладке «Профиль».';
         resultEl.style.display = 'block';
       } catch (e) {
         progressEl.style.display = 'none';
@@ -1543,14 +1601,13 @@
         const meRes = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
         const meData = await meRes.json();
         if (!meRes.ok) throw new Error(meData.error || meRes.status);
-        const clientId = meData.client_id;
-        const balRes = await fetch(base + '/get_balance/' + encodeURIComponent(clientId), {
+        const walletRes = await fetch(base + '/market/wallet', {
           headers: { 'Authorization': 'Bearer ' + key }
         });
-        const balData = await balRes.json();
-        if (!balRes.ok) throw new Error(balData.error || balRes.status);
+        const walletData = await walletRes.json();
+        if (!walletRes.ok) throw new Error(walletData.error || walletRes.status);
         msg.className = 'msg ok';
-        msg.textContent = 'Баланс: ' + (balData.balance ?? 0);
+        msg.textContent = 'Chain points: ' + (meData.balance ?? 0) + ' · Wallet: ' + formatWalletBalances(walletData.balances);
         msg.style.display = 'block';
       } catch (e) {
         msg.className = 'msg err';
@@ -1608,14 +1665,15 @@
         const progress = contract.completion_pct != null ? contract.completion_pct + '%' : '-';
         const budget = contract.budget_tokens_available != null ? contract.budget_tokens_available : '-';
         const reward = contract.reward_per_task != null ? contract.reward_per_task : '-';
+        const currency = contract.budget_currency || contract.reward_currency || 'RUB';
         const row = document.createElement('tr');
         row.innerHTML =
           '<td class="mono">' + (contract.contract_id || '-') + '</td>' +
           '<td><strong>' + (contract.task_name || '-') + '</strong></td>' +
           '<td>' + (contract.status || '-') + '</td>' +
-          '<td>' + reward + '</td>' +
+          '<td>' + reward + ' ' + currency + '</td>' +
           '<td>' + progress + '</td>' +
-          '<td>' + budget + '</td>' +
+          '<td>' + budget + ' ' + currency + '</td>' +
           '<td>' +
             '<div class="row" style="gap:6px;">' +
               '<select data-provider-status style="min-width:120px;">' +
@@ -1627,7 +1685,7 @@
               '<button type="button" class="primary" data-provider-apply-status>Статус</button>' +
             '</div>' +
             '<div class="row" style="gap:6px; margin-top:6px;">' +
-              '<input type="number" min="1" step="1" placeholder="Токены" data-provider-fund style="min-width:100px;">' +
+              '<input type="number" min="1" step="1" placeholder="Сумма (' + currency + ')" data-provider-fund style="min-width:120px;">' +
               '<button type="button" class="primary" data-provider-fund-btn>Пополнить</button>' +
               '<button type="button" data-provider-refund-btn>Вернуть</button>' +
             '</div>' +
@@ -1658,7 +1716,7 @@
           try {
             await providerApi('/provider/contracts/' + encodeURIComponent(contract.contract_id) + '/fund', {
               method: 'POST',
-              payload: { amount }
+              payload: { amount, currency }
             });
             fundInput.value = '';
             await loadProviderContracts();
@@ -1726,6 +1784,7 @@
       const computationType = document.getElementById('provider-computation-type').value;
       const workUnits = parseInt(document.getElementById('provider-work-units').value, 10);
       const reward = parseInt(document.getElementById('provider-reward').value, 10);
+      const budgetCurrency = document.getElementById('provider-budget-currency').value;
       const targetRaw = parseInt(document.getElementById('provider-target').value, 10);
       const difficultyRaw = parseInt(document.getElementById('provider-difficulty').value, 10);
       const budgetRaw = parseInt(document.getElementById('provider-initial-budget').value, 10);
@@ -1749,6 +1808,7 @@
         computation_type: computationType,
         work_units_required: workUnits,
         reward_per_task: reward,
+        budget_currency: budgetCurrency,
         target_total_work_units: targetTotal,
         difficulty,
         initial_budget_tokens: initialBudget,
@@ -1758,8 +1818,11 @@
       this.disabled = true;
       setInlineMsg(msgEl, 'info', 'Создание контракта...');
       try {
-        const created = await providerApi('/provider/contracts', { method: 'POST', payload });
-        setInlineMsg(msgEl, 'ok', 'Контракт создан: ' + (created.contract_id || ''));
+        const response = await providerApi('/provider/contracts', { method: 'POST', payload });
+        const created = response.contract || response;
+        const wallet = response.wallet || null;
+        const walletHint = wallet ? ' · кошелёк: ' + formatWalletBalances(wallet.balances) : '';
+        setInlineMsg(msgEl, 'ok', 'Контракт создан: ' + (created.contract_id || '') + walletHint);
         document.getElementById('provider-task-name').value = '';
         document.getElementById('provider-task-description').value = '';
         document.getElementById('provider-target').value = '';
@@ -1791,6 +1854,7 @@
             const active = c.active_workers != null ? c.active_workers : '-';
             const freeVol = (c.remaining_volume != null ? c.remaining_volume : c.free_volume) ?? (c.work_units_required ?? '-');
             const reward = c.reward_per_task != null ? c.reward_per_task : (c.reward ?? '-');
+            const rewardCurrency = c.reward_currency || c.budget_currency || 'RUB';
             const takeBtn = key
               ? '<button type="button" class="primary btn-take-task" data-contract-id="' + (c.contract_id || '') + '">Взять задачу</button>'
               : '<span class="muted">Войдите</span>';
@@ -1802,7 +1866,7 @@
               '<td><span class="progress-pct">' + pct + '%</span></td>' +
               '<td>' + active + '</td>' +
               '<td>' + freeVol + '</td>' +
-              '<td><strong>' + reward + '</strong></td>' +
+              '<td><strong>' + reward + ' ' + rewardCurrency + '</strong></td>' +
               '<td>' + takeBtn + '</td>';
             tbody.appendChild(tr);
             const btn = tr.querySelector('.btn-take-task');
@@ -1889,8 +1953,15 @@
         });
     }
 
-    const PROFILE_TOKEN_RATE_RUB = 10;
     let profileData = null;
+    let profileWallet = null;
+
+    function applyWalletToProfile(walletInfo) {
+      const balances = walletInfo?.balances || {};
+      profileWallet = balances;
+      const walletEl = document.getElementById('profile-fiat-wallet');
+      if (walletEl) walletEl.textContent = formatWalletBalances(balances);
+    }
 
     function loadProfile() {
       const key = getApiKey();
@@ -1918,7 +1989,16 @@
           document.getElementById('profile-client-id').title = d.client_id || '';
           document.getElementById('profile-balance-full').textContent = d.balance ?? 0;
           document.getElementById('profile-submissions-full').textContent = d.submissions_count ?? 0;
-          updateProfileWithdrawRub();
+          applyWalletToProfile({ balances: d.fiat_wallet || {} });
+          return fetch(base + '/market/wallet', { headers: { 'Authorization': 'Bearer ' + key } });
+        })
+        .then(r => {
+          if (!r) return null;
+          if (!r.ok) throw new Error('Не удалось загрузить fiat-кошелёк');
+          return r.json();
+        })
+        .then(wallet => {
+          if (wallet) applyWalletToProfile(wallet);
         })
         .catch(() => {
           loginRequired.style.display = 'block';
@@ -1926,15 +2006,68 @@
         });
     }
 
-    function updateProfileWithdrawRub() {
-      const el = document.getElementById('profile-withdraw-tokens');
-      const rubEl = document.getElementById('profile-withdraw-rub');
-      if (!el || !rubEl) return;
-      const tokens = parseInt(el.value, 10) || 0;
-      rubEl.textContent = (tokens * PROFILE_TOKEN_RATE_RUB).toLocaleString('ru-RU');
-    }
+    document.getElementById('btn-profile-topup').onclick = async function() {
+      const msgEl = document.getElementById('profile-withdraw-msg');
+      const currency = document.getElementById('profile-topup-currency').value;
+      const amount = parseInt(document.getElementById('profile-topup-amount').value, 10);
+      msgEl.style.display = 'none';
+      if (!amount || amount < 1) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Укажите сумму пополнения (>= 1).';
+        msgEl.style.display = 'block';
+        return;
+      }
+      try {
+        const res = await marketApi('/market/wallet/topup', {
+          method: 'POST',
+          payload: { currency, amount, source: 'manual_dashboard_topup' }
+        });
+        applyWalletToProfile(res.wallet || {});
+        document.getElementById('profile-topup-amount').value = '';
+        msgEl.className = 'msg ok';
+        msgEl.textContent = 'Кошелёк пополнен: +' + amount + ' ' + currency;
+        msgEl.style.display = 'block';
+      } catch (e) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Ошибка пополнения: ' + e.message;
+        msgEl.style.display = 'block';
+      }
+    };
 
-    document.getElementById('profile-withdraw-tokens').addEventListener('input', updateProfileWithdrawRub);
+    document.getElementById('btn-profile-convert').onclick = async function() {
+      const msgEl = document.getElementById('profile-withdraw-msg');
+      const fromCurrency = document.getElementById('profile-convert-from').value;
+      const toCurrency = document.getElementById('profile-convert-to').value;
+      const amount = parseInt(document.getElementById('profile-convert-amount').value, 10);
+      msgEl.style.display = 'none';
+      if (!amount || amount < 1) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Укажите сумму конвертации (>= 1).';
+        msgEl.style.display = 'block';
+        return;
+      }
+      if (fromCurrency === toCurrency) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Выберите разные валюты для конвертации.';
+        msgEl.style.display = 'block';
+        return;
+      }
+      try {
+        const conversion = await marketApi('/market/convert', {
+          method: 'POST',
+          payload: { from_currency: fromCurrency, to_currency: toCurrency, amount }
+        });
+        applyWalletToProfile({ balances: conversion.balances || {} });
+        document.getElementById('profile-convert-amount').value = '';
+        msgEl.className = 'msg ok';
+        msgEl.textContent = 'Конвертация выполнена: ' + conversion.source_amount + ' ' + conversion.from_currency + ' -> ' + conversion.target_amount + ' ' + conversion.to_currency;
+        msgEl.style.display = 'block';
+      } catch (e) {
+        msgEl.className = 'msg err';
+        msgEl.textContent = 'Ошибка конвертации: ' + e.message;
+        msgEl.style.display = 'block';
+      }
+    };
 
     document.getElementById('btn-profile-withdraw').onclick = function() {
       const key = getApiKey();
@@ -1946,17 +2079,19 @@
         msgEl.style.display = 'block';
         return;
       }
-      const tokens = parseInt(document.getElementById('profile-withdraw-tokens').value, 10);
+      const currency = document.getElementById('profile-withdraw-currency').value;
+      const amount = parseInt(document.getElementById('profile-withdraw-amount').value, 10);
       const card = (document.getElementById('profile-withdraw-card').value || '').replace(/\s/g, '');
-      if (!tokens || tokens < 1) {
+      if (!amount || amount < 1) {
         msgEl.className = 'msg err';
-        msgEl.textContent = 'Укажите сумму в токенах (не менее 1).';
+        msgEl.textContent = 'Укажите сумму для вывода (не менее 1).';
         msgEl.style.display = 'block';
         return;
       }
-      if (tokens > (profileData.balance || 0)) {
+      const available = (profileWallet && typeof profileWallet[currency] === 'number') ? profileWallet[currency] : 0;
+      if (amount > available) {
         msgEl.className = 'msg err';
-        msgEl.textContent = 'Недостаточно токенов на балансе.';
+        msgEl.textContent = 'Недостаточно средств в валюте ' + currency + '.';
         msgEl.style.display = 'block';
         return;
       }
@@ -1968,13 +2103,27 @@
         msgEl.style.display = 'block';
         return;
       }
-      const rub = tokens * PROFILE_TOKEN_RATE_RUB;
-      msgEl.className = 'msg ok';
-      msgEl.textContent = 'Заявка на вывод принята (симуляция). ' + tokens + ' токенов = ' + rub + ' ₽ на карту ****' + card.slice(-4) + '. В реальной системе средства поступили бы в течение 1-3 рабочих дней.';
-      msgEl.style.display = 'block';
-      document.getElementById('profile-withdraw-tokens').value = '';
-      document.getElementById('profile-withdraw-card').value = '';
-      updateProfileWithdrawRub();
+      marketApi('/market/withdrawals', {
+        method: 'POST',
+        payload: {
+          currency: currency,
+          amount: amount,
+          card_number: cardDigits
+        }
+      })
+        .then(resp => {
+          applyWalletToProfile(resp.wallet || {});
+          msgEl.className = 'msg ok';
+          msgEl.textContent = 'Заявка на вывод создана: ' + amount + ' ' + currency + ' на карту ****' + card.slice(-4) + '. Статус: queued.';
+          msgEl.style.display = 'block';
+          document.getElementById('profile-withdraw-amount').value = '';
+          document.getElementById('profile-withdraw-card').value = '';
+        })
+        .catch(e => {
+          msgEl.className = 'msg err';
+          msgEl.textContent = 'Ошибка вывода: ' + e.message;
+          msgEl.style.display = 'block';
+        });
     };
 
     // Инициализация при загрузке страницы
