@@ -202,7 +202,7 @@
     <button type="button" data-tab="overview" class="active">Обзор</button>
     <button type="button" data-tab="work">Работа</button>
     <button type="button" data-tab="contracts">Контракты</button>
-    <button type="button" data-tab="provider">Поставщик</button>
+    <button type="button" data-tab="provider">Мой Сектор</button>
     <button type="button" data-tab="tasks">Задачи</button>
     <button type="button" data-tab="chain">Блокчейн</button>
     <button type="button" data-tab="stats">Статистика</button>
@@ -253,6 +253,14 @@
       <div class="row" style="margin-top:12px;">
         <button type="button" class="primary" id="btn-balance">Показать баланс текущего</button>
         <span id="balance-msg" class="msg" style="display:none;"></span>
+      </div>
+      <div class="row" style="margin-top:14px; align-items:center;">
+        <a
+          class="primary"
+          href="/download/desktop-agent"
+          style="text-decoration:none; display:inline-block; padding:14px 22px; border-radius:10px; font-size:1.05rem; font-weight:700; background:#2f7df6; color:#fff; box-shadow:0 8px 24px rgba(47,125,246,0.35);"
+        >Скачать Desktop Agent</a>
+        <span class="muted" style="font-size:0.9em;">Скачивается zip-архив: распакуйте и запустите <code>python desktop_agent_app.py</code> в папке <code>desktop_agent</code>.</span>
       </div>
     </div>
   </div>
@@ -326,10 +334,46 @@
   </div>
 
   <div id="panel-provider" class="panel">
-    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Управление контрактами поставщика: создание, пополнение бюджета, смена статуса (active/paused/closed) и возврат остатка.</p>
-    <p id="provider-auth-required" class="msg info" style="display:none;">Выберите вычислителя (API-ключ) на вкладке «Обзор». Его аккаунт будет использован как поставщик.</p>
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">Порядок работы: 1) создать сектор, 2) выбрать сектор, 3) создать и просматривать контракты внутри выбранного сектора. На этой вкладке доступны только ваши секторы и ваши контракты.</p>
+    <p id="provider-auth-required" class="msg info" style="display:none;">Выберите вычислителя (API-ключ) на вкладке «Обзор». Его аккаунт будет использован как владелец ваших секторов.</p>
     <div class="card" style="margin-bottom:16px;">
-      <div class="label">Создать контракт поставщика</div>
+      <div class="label">1) Выбор сектора</div>
+      <div class="row">
+        <label for="provider-sector-select" class="muted">Текущий сектор:</label>
+        <select id="provider-sector-select" style="min-width:220px;"></select>
+        <button type="button" class="primary" id="btn-provider-sectors-refresh">Обновить секторы</button>
+      </div>
+      <div class="row">
+        <span id="provider-sector-msg" class="msg" style="display:none;"></span>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="label">2) Регистрация нового сектора</div>
+      <div class="row">
+        <input type="text" id="provider-sector-name" placeholder="Название сектора" style="min-width:220px;">
+        <input type="text" id="provider-sector-org" placeholder="Организация/институт/частное лицо" style="min-width:260px;">
+        <input type="text" id="provider-sector-domain" placeholder="Целевая область вычислений" style="min-width:220px;">
+      </div>
+      <div class="row">
+        <input type="text" id="provider-sector-description" placeholder="Описание сектора (опционально)" style="min-width:460px;">
+      </div>
+      <div class="row">
+        <button type="button" class="primary" id="btn-provider-sector-create">Создать сектор</button>
+      </div>
+    </div>
+    <div id="provider-sector-info-card" class="card" style="margin-bottom:16px; display:none;">
+      <div class="label">3) Выбранный сектор: сводка</div>
+      <div class="overview-grid" style="margin-top:12px;">
+        <div class="card"><div class="label">Название</div><div id="provider-sector-info-name" class="value">-</div></div>
+        <div class="card"><div class="label">Организация</div><div id="provider-sector-info-org" class="value">-</div></div>
+        <div class="card"><div class="label">Область</div><div id="provider-sector-info-domain" class="value">-</div></div>
+        <div class="card"><div class="label">Контрактов</div><div id="provider-sector-info-contracts" class="value">0</div></div>
+        <div class="card"><div class="label">Активных</div><div id="provider-sector-info-active" class="value">0</div></div>
+        <div class="card"><div class="label">Бюджет доступно</div><div id="provider-sector-info-budget" class="value">0</div></div>
+      </div>
+    </div>
+    <div id="provider-contract-create-card" class="card" style="margin-bottom:16px; display:none;">
+      <div class="label">4) Создать контракт в выбранном секторе</div>
       <div class="row">
         <input type="text" id="provider-task-name" placeholder="Название задачи" style="min-width:200px;">
         <input type="text" id="provider-task-category" placeholder="Категория (опционально)" style="min-width:180px;">
@@ -371,16 +415,17 @@
         <span id="provider-create-msg" class="msg" style="display:none;"></span>
       </div>
     </div>
+      <p id="provider-sector-required-msg" class="msg info" style="display:none; margin-bottom:16px;">Сначала создайте и выберите сектор из своих. После этого станет доступно создание контрактов внутри него.</p>
     <div class="card">
       <div class="row" style="justify-content:space-between; align-items:center;">
-        <div class="label">Мои контракты</div>
+        <div class="label">5) Контракты выбранного сектора</div>
         <button type="button" class="primary" id="btn-provider-refresh">Обновить</button>
       </div>
       <p class="loading" id="provider-load">Загрузка…</p>
       <p id="provider-empty" class="muted" style="display:none;">Контрактов пока нет.</p>
       <div class="table-responsive">
         <table id="table-provider-contracts" style="display:none;">
-          <thead><tr><th>ID</th><th>Название</th><th>Статус</th><th>Награда</th><th>Прогресс</th><th>Бюджет (доступно)</th><th>Управление</th></tr></thead>
+          <thead><tr><th>ID</th><th>Сектор</th><th>Название</th><th>Статус</th><th>Награда</th><th>Прогресс</th><th>Бюджет (доступно)</th><th>Управление</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -441,6 +486,32 @@
         <p id="profile-worker-progress-text" class="muted" style="margin:8px 0 4px 0;">Вычисление…</p>
         <progress id="profile-worker-progress-bar" value="0" max="100" style="width:100%; height:12px; border-radius:6px;"></progress>
         <p id="profile-worker-no-task" class="muted" style="display:none; margin-top:8px;">Нет активной задачи. Запустите воркер на вкладке «Работа».</p>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <div class="label">Мои задания (desktop-agent)</div>
+          <button type="button" class="primary" id="btn-profile-jobs-refresh">Обновить</button>
+        </div>
+        <p id="profile-jobs-empty" class="muted" style="display:none;">Заданий пока нет.</p>
+        <div class="table-responsive">
+          <table id="table-profile-jobs" style="display:none;">
+            <thead><tr><th>Job</th><th>Контракт</th><th>Статус</th><th>Переназначений</th><th>Обновлено</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <div class="label">Мои устройства</div>
+          <button type="button" class="primary" id="btn-profile-devices-refresh">Обновить</button>
+        </div>
+        <p id="profile-devices-empty" class="muted" style="display:none;">Устройств пока нет.</p>
+        <div class="table-responsive">
+          <table id="table-profile-devices" style="display:none;">
+            <thead><tr><th>ID</th><th>Имя</th><th>Версия</th><th>Статус</th><th>Причина</th><th>Последняя синхронизация</th><th>Управление</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
       <div class="card" style="margin-bottom:20px;">
         <div class="label">Fiat-операции и вывод на карту</div>
@@ -1641,6 +1712,8 @@
       }
     };
 
+    let providerSectors = [];
+
     async function providerApi(path, { method = 'GET', payload = null } = {}) {
       const apiKey = getApiKey();
       if (!apiKey) throw new Error('Выберите вычислителя с API-ключом на вкладке «Обзор».');
@@ -1660,25 +1733,128 @@
       return data;
     }
 
+    function getSelectedSectorId() {
+      const select = document.getElementById('provider-sector-select');
+      if (!select) return '';
+      return (select.value || '').trim();
+    }
+
+    function getSelectedSectorRecord() {
+      const sectorId = getSelectedSectorId();
+      if (!sectorId) return null;
+      return (providerSectors || []).find((s) => s.sector_id === sectorId) || null;
+    }
+
+    function renderProviderSectorInfo(contractsList = null) {
+      const infoCard = document.getElementById('provider-sector-info-card');
+      const nameEl = document.getElementById('provider-sector-info-name');
+      const orgEl = document.getElementById('provider-sector-info-org');
+      const domainEl = document.getElementById('provider-sector-info-domain');
+      const contractsEl = document.getElementById('provider-sector-info-contracts');
+      const activeEl = document.getElementById('provider-sector-info-active');
+      const budgetEl = document.getElementById('provider-sector-info-budget');
+      const sector = getSelectedSectorRecord();
+      if (!sector) {
+        if (infoCard) infoCard.style.display = 'none';
+        return;
+      }
+      if (infoCard) infoCard.style.display = 'block';
+      if (nameEl) nameEl.textContent = sector.sector_name || sector.sector_id || '-';
+      if (orgEl) orgEl.textContent = sector.organization_name || '-';
+      if (domainEl) domainEl.textContent = sector.compute_domain || '-';
+
+      const list = Array.isArray(contractsList) ? contractsList : [];
+      const activeCount = list.filter((c) => c.status === 'active').length;
+      const budgetByCurrency = {};
+      list.forEach((c) => {
+        const currency = c.budget_currency || c.reward_currency || 'RUB';
+        const amount = Number(c.budget_tokens_available || 0);
+        budgetByCurrency[currency] = (budgetByCurrency[currency] || 0) + amount;
+      });
+      const budgetText = Object.keys(budgetByCurrency).length
+        ? Object.entries(budgetByCurrency).map(([cur, value]) => `${value} ${cur}`).join(' · ')
+        : '0';
+      if (contractsEl) contractsEl.textContent = String(list.length);
+      if (activeEl) activeEl.textContent = String(activeCount);
+      if (budgetEl) budgetEl.textContent = budgetText;
+    }
+
+    function renderSectorOptions(sectors) {
+      const select = document.getElementById('provider-sector-select');
+      if (!select) return;
+      const prev = (select.value || '').trim();
+      select.innerHTML = '';
+      if (!sectors || !sectors.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Сначала создайте сектор';
+        select.appendChild(opt);
+        select.value = '';
+        return;
+      }
+      sectors.forEach((sector) => {
+        const opt = document.createElement('option');
+        opt.value = sector.sector_id;
+        const domain = sector.compute_domain ? (' · ' + sector.compute_domain) : '';
+        opt.textContent = (sector.sector_name || sector.sector_id) + domain;
+        select.appendChild(opt);
+      });
+      const hasPrev = sectors.some((s) => s.sector_id === prev);
+      select.value = hasPrev ? prev : sectors[0].sector_id;
+    }
+
+    function refreshProviderCreateVisibility() {
+      const sectorId = getSelectedSectorId();
+      const createCard = document.getElementById('provider-contract-create-card');
+      const requiredMsg = document.getElementById('provider-sector-required-msg');
+      const createBtn = document.getElementById('btn-provider-create');
+      const hasSector = !!sectorId;
+      if (createCard) createCard.style.display = hasSector ? 'block' : 'none';
+      if (requiredMsg) requiredMsg.style.display = hasSector ? 'none' : 'block';
+      if (createBtn) createBtn.disabled = !hasSector || !getApiKey();
+      renderProviderSectorInfo();
+    }
+
+    async function loadProviderSectors(showMessage = false) {
+      const msgEl = document.getElementById('provider-sector-msg');
+      try {
+        providerSectors = await providerApi('/provider/sectors');
+        renderSectorOptions(providerSectors || []);
+        refreshProviderCreateVisibility();
+        if (showMessage) setInlineMsg(msgEl, 'ok', 'Секторы обновлены.');
+      } catch (e) {
+        providerSectors = [];
+        renderSectorOptions([]);
+        refreshProviderCreateVisibility();
+        if (showMessage) setInlineMsg(msgEl, 'err', 'Ошибка загрузки секторов: ' + e.message);
+      }
+    }
+
     function loadProviderPanel() {
       const hasKey = !!getApiKey();
       const authRequired = document.getElementById('provider-auth-required');
       const createBtn = document.getElementById('btn-provider-create');
       const refreshBtn = document.getElementById('btn-provider-refresh');
+      const createSectorBtn = document.getElementById('btn-provider-sector-create');
+      const refreshSectorsBtn = document.getElementById('btn-provider-sectors-refresh');
       if (authRequired) authRequired.style.display = hasKey ? 'none' : 'block';
       if (createBtn) createBtn.disabled = !hasKey;
       if (refreshBtn) refreshBtn.disabled = !hasKey;
+      if (createSectorBtn) createSectorBtn.disabled = !hasKey;
+      if (refreshSectorsBtn) refreshSectorsBtn.disabled = !hasKey;
       if (!hasKey) {
+        refreshProviderCreateVisibility();
         const loadEl = document.getElementById('provider-load');
         const emptyEl = document.getElementById('provider-empty');
         const table = document.getElementById('table-provider-contracts');
         if (loadEl) loadEl.style.display = 'none';
         if (emptyEl) emptyEl.style.display = 'block';
         if (table) table.style.display = 'none';
-        if (emptyEl) emptyEl.textContent = 'Для просмотра контрактов выберите поставщика на вкладке «Обзор».';
+        if (emptyEl) emptyEl.textContent = 'Для просмотра ваших секторов и контрактов выберите аккаунт на вкладке «Обзор».';
+        renderProviderSectorInfo([]);
         return;
       }
-      loadProviderContracts();
+      loadProviderSectors().then(loadProviderContracts);
     }
 
     function renderProviderContracts(list) {
@@ -1694,6 +1870,7 @@
         const row = document.createElement('tr');
         row.innerHTML =
           '<td class="mono">' + (contract.contract_id || '-') + '</td>' +
+          '<td>' + (contract.sector_name || contract.sector_id || '-') + '</td>' +
           '<td><strong>' + (contract.task_name || '-') + '</strong></td>' +
           '<td>' + (contract.status || '-') + '</td>' +
           '<td>' + reward + ' ' + currency + '</td>' +
@@ -1767,6 +1944,7 @@
       table.style.display = list && list.length ? 'table' : 'none';
       emptyEl.style.display = list && list.length ? 'none' : 'block';
       if (!list || !list.length) emptyEl.textContent = 'Контрактов пока нет.';
+      renderProviderSectorInfo(list || []);
     }
 
     async function loadProviderContracts() {
@@ -1778,7 +1956,16 @@
       emptyEl.style.display = 'none';
       table.style.display = 'none';
       try {
-        const list = await providerApi('/provider/contracts');
+        const sectorId = getSelectedSectorId();
+        if (!sectorId) {
+          loadEl.style.display = 'none';
+          emptyEl.style.display = 'block';
+          emptyEl.textContent = 'Сначала создайте и выберите сектор.';
+          renderProviderSectorInfo([]);
+          return;
+        }
+        const path = '/provider/contracts?sector_id=' + encodeURIComponent(sectorId);
+        const list = await providerApi(path);
         loadEl.style.display = 'none';
         renderProviderContracts(list || []);
       } catch (e) {
@@ -1804,8 +1991,52 @@
       loadProviderPanel();
     };
 
+    document.getElementById('btn-provider-sectors-refresh').onclick = function() {
+      loadProviderSectors(true).then(loadProviderContracts);
+    };
+
+    document.getElementById('btn-provider-sector-create').onclick = async function() {
+      const msgEl = document.getElementById('provider-sector-msg');
+      const sectorName = (document.getElementById('provider-sector-name').value || '').trim();
+      const organizationName = (document.getElementById('provider-sector-org').value || '').trim();
+      const computeDomain = (document.getElementById('provider-sector-domain').value || '').trim();
+      const description = (document.getElementById('provider-sector-description').value || '').trim();
+      if (!sectorName) { setInlineMsg(msgEl, 'err', 'Укажите название сектора.'); return; }
+      this.disabled = true;
+      try {
+        const sector = await providerApi('/provider/sectors', {
+          method: 'POST',
+          payload: {
+            sector_name: sectorName,
+            organization_name: organizationName,
+            compute_domain: computeDomain,
+            description
+          }
+        });
+        setInlineMsg(msgEl, 'ok', 'Сектор создан: ' + (sector.sector_name || sector.sector_id));
+        document.getElementById('provider-sector-name').value = '';
+        document.getElementById('provider-sector-org').value = '';
+        document.getElementById('provider-sector-domain').value = '';
+        document.getElementById('provider-sector-description').value = '';
+        await loadProviderSectors();
+        const select = document.getElementById('provider-sector-select');
+        if (select && sector && sector.sector_id) select.value = sector.sector_id;
+        await loadProviderContracts();
+      } catch (e) {
+        setInlineMsg(msgEl, 'err', 'Ошибка создания сектора: ' + e.message);
+      } finally {
+        this.disabled = false;
+      }
+    };
+
+    document.getElementById('provider-sector-select').onchange = function() {
+      refreshProviderCreateVisibility();
+      loadProviderContracts();
+    };
+
     document.getElementById('btn-provider-create').onclick = async function() {
       const msgEl = document.getElementById('provider-create-msg');
+      const sectorId = getSelectedSectorId();
       const taskName = (document.getElementById('provider-task-name').value || '').trim();
       const selectedCategory = document.getElementById('provider-computation-type').value;
       const preset = PROVIDER_CATEGORY_PRESETS[selectedCategory] || PROVIDER_CATEGORY_PRESETS.data_analysis;
@@ -1820,6 +2051,7 @@
       const budgetRaw = parseInt(document.getElementById('provider-initial-budget').value, 10);
       const activateNow = !!document.getElementById('provider-activate-now').checked;
 
+      if (!sectorId) { setInlineMsg(msgEl, 'err', 'Сначала выберите или создайте сектор.'); return; }
       if (!taskName) { setInlineMsg(msgEl, 'err', 'Укажите название задачи.'); return; }
       if (!workUnits || workUnits < 1) { setInlineMsg(msgEl, 'err', 'Ед. на сдачу должны быть >= 1.'); return; }
       if (!reward || reward < 1) { setInlineMsg(msgEl, 'err', 'Награда должна быть >= 1.'); return; }
@@ -1832,6 +2064,7 @@
       const initialBudget = Number.isFinite(budgetRaw) ? Math.max(0, budgetRaw) : (reward * jobsEstimate);
 
       const payload = {
+        sector_id: sectorId,
         task_name: taskName,
         task_description: taskDescription,
         task_category: taskCategory,
@@ -1886,7 +2119,7 @@
             const reward = c.reward_per_task != null ? c.reward_per_task : (c.reward ?? '-');
             const rewardCurrency = c.reward_currency || c.budget_currency || 'RUB';
             const takeBtn = key
-              ? '<button type="button" class="primary btn-take-task" data-contract-id="' + (c.contract_id || '') + '">Взять задачу</button>'
+              ? '<button type="button" class="primary btn-take-task" data-contract-id="' + (c.contract_id || '') + '" data-sector-id="' + (c.sector_id || '') + '">Взять в работу (через ПО)</button>'
               : '<span class="muted">Войдите</span>';
             tr.innerHTML =
               '<td><strong>' + (name || '') + '</strong><br><small style="color:#888;">' + (c.contract_id || '') + '</small></td>' +
@@ -1904,15 +2137,12 @@
               btn.onclick = async () => {
                 const apiKey = getApiKey();
                 if (!apiKey) { alert('Выберите вычислителя или введите API-ключ.'); return; }
-                try {
-                  const r = await fetch(base + '/get_task?contract_id=' + encodeURIComponent(c.contract_id), { headers: { 'Authorization': 'Bearer ' + apiKey } });
-                  const task = await r.json();
-                  if (!r.ok) throw new Error(task.error || r.status);
-                  setCurrentTask(task);
-                  showPanel('work');
-                } catch (e) {
-                  alert('Ошибка: ' + e.message);
-                }
+                const sectorPart = c.sector_name ? ('Сектор: ' + c.sector_name + '. ') : '';
+                alert(
+                  sectorPart +
+                  'Для старта вычислений скачайте Desktop Agent, затем выберите этот сектор/контракт в приложении.'
+                );
+                window.location.href = '/download/desktop-agent';
               };
             }
           });
@@ -1993,6 +2223,95 @@
       if (walletEl) walletEl.textContent = formatWalletBalances(balances);
     }
 
+    async function loadProfileJobs() {
+      const key = getApiKey();
+      const table = document.getElementById('table-profile-jobs');
+      const emptyEl = document.getElementById('profile-jobs-empty');
+      if (!key || !table || !emptyEl) return;
+      try {
+        const r = await fetch(base + '/jobs/my?limit=50', { headers: { 'Authorization': 'Bearer ' + key } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const payload = await r.json();
+        const list = payload.jobs || [];
+        const tbody = table.querySelector('tbody');
+        tbody.innerHTML = '';
+        list.forEach((job) => {
+          const tr = document.createElement('tr');
+          const updatedAt = job.updated_at ? new Date(job.updated_at * 1000).toLocaleString() : '-';
+          tr.innerHTML =
+            '<td class="mono">' + (job.job_id || '-') + '</td>' +
+            '<td>' + (job.contract_id || '-') + '</td>' +
+            '<td>' + (job.status || '-') + '</td>' +
+            '<td>' + (job.reassign_count ?? 0) + '</td>' +
+            '<td>' + updatedAt + '</td>';
+          tbody.appendChild(tr);
+        });
+        table.style.display = list.length ? 'table' : 'none';
+        emptyEl.style.display = list.length ? 'none' : 'block';
+        if (!list.length) emptyEl.textContent = 'Заданий пока нет.';
+      } catch (e) {
+        table.style.display = 'none';
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = 'Ошибка загрузки заданий: ' + e.message;
+      }
+    }
+
+    async function loadProfileDevices() {
+      const key = getApiKey();
+      const table = document.getElementById('table-profile-devices');
+      const emptyEl = document.getElementById('profile-devices-empty');
+      if (!key || !table || !emptyEl) return;
+      try {
+        const r = await fetch(base + '/agent/devices/my', { headers: { 'Authorization': 'Bearer ' + key } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const payload = await r.json();
+        const list = payload.devices || [];
+        const tbody = table.querySelector('tbody');
+        tbody.innerHTML = '';
+        list.forEach((device) => {
+          const tr = document.createElement('tr');
+          const lastSeen = device.last_seen_at ? new Date(device.last_seen_at * 1000).toLocaleString() : '-';
+          const toggleLabel = device.is_disabled ? 'Включить' : 'Отключить';
+          tr.innerHTML =
+            '<td class="mono">' + (device.device_id || '-') + '</td>' +
+            '<td>' + (device.device_name || '-') + '</td>' +
+            '<td>' + (device.agent_version || '-') + '</td>' +
+            '<td>' + (device.status || '-') + (device.is_disabled ? ' (disabled)' : '') + '</td>' +
+            '<td>' + (device.status_reason || '-') + '</td>' +
+            '<td>' + lastSeen + '</td>' +
+            '<td><button type="button" data-device-toggle>' + toggleLabel + '</button></td>';
+          tbody.appendChild(tr);
+          const btn = tr.querySelector('[data-device-toggle]');
+          if (btn) {
+            btn.onclick = async () => {
+              try {
+                const res = await fetch(base + '/agent/devices/' + encodeURIComponent(device.device_id) + '/disable', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': 'Bearer ' + key,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ is_disabled: !device.is_disabled })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                await loadProfileDevices();
+              } catch (e) {
+                alert('Ошибка управления устройством: ' + e.message);
+              }
+            };
+          }
+        });
+        table.style.display = list.length ? 'table' : 'none';
+        emptyEl.style.display = list.length ? 'none' : 'block';
+        if (!list.length) emptyEl.textContent = 'Устройств пока нет.';
+      } catch (e) {
+        table.style.display = 'none';
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = 'Ошибка загрузки устройств: ' + e.message;
+      }
+    }
+
     function loadProfile() {
       const key = getApiKey();
       const loginRequired = document.getElementById('profile-login-required');
@@ -2029,6 +2348,7 @@
         })
         .then(wallet => {
           if (wallet) applyWalletToProfile(wallet);
+          return Promise.all([loadProfileJobs(), loadProfileDevices()]);
         })
         .catch(() => {
           loginRequired.style.display = 'block';
@@ -2154,6 +2474,14 @@
           msgEl.textContent = 'Ошибка вывода: ' + e.message;
           msgEl.style.display = 'block';
         });
+    };
+
+    document.getElementById('btn-profile-jobs-refresh').onclick = function() {
+      loadProfileJobs();
+    };
+
+    document.getElementById('btn-profile-devices-refresh').onclick = function() {
+      loadProfileDevices();
     };
 
     // Инициализация при загрузке страницы

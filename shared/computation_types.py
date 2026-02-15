@@ -227,7 +227,7 @@ def compute_gravitational_waves(client_id, contract_id, work_units, seed=None, p
     return result_hash, str(seed)
 
 
-def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None):
+def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None, progress_callback=None):
     """Простой PoW: поиск хеша с нужным префиксом. Порядок перебора nonce зависит от seed — разный task_seed даёт разный результат (защита от replay). Result уже привязан к client_id (text = client_id-contract_id-nonce)."""
     target_prefix = "0" * difficulty
     final_result, solution_nonce = None, None
@@ -239,6 +239,8 @@ def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None
             s = 0
         max_nonce = max(work_units * 2, 10000)
         for i in range(work_units):
+            if i and i % 1000 == 0 and progress_callback:
+                progress_callback(i, work_units)
             nonce = 1 + (s * 31 + i) % max_nonce
             # client_id в строке хеша — proof уникален на клиента (как и у остальных контрактов).
             text = f"{client_id}-{contract_id}-{nonce}"
@@ -249,6 +251,8 @@ def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None
                 break
     else:
         for nonce in range(1, work_units + 1):
+            if nonce and nonce % 1000 == 0 and progress_callback:
+                progress_callback(nonce, work_units)
             # client_id в строке хеша — proof уникален на клиента.
             text = f"{client_id}-{contract_id}-{nonce}"
             hash_result = hashlib.sha256(text.encode()).hexdigest()

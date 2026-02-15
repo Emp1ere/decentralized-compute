@@ -20,8 +20,8 @@ services:
     environment:
       - PEER_URL=http://orchestrator_node_2:5000
       - SYNC_INTERVAL=30
-      # Секрет для запросов между узлами (receive_block, receive_chain) — задайте свой в продакшене
-      - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+      # Секрет для запросов между узлами (receive_block, receive_chain) — обязателен.
+      - NODE_SECRET=${NODE_SECRET:?NODE_SECRET is required}
       # Bootstrap первого поставщика: его аккаунт используется для мигрированных базовых контрактов
       - BOOTSTRAP_PROVIDER_LOGIN=${BOOTSTRAP_PROVIDER_LOGIN:-first_provider}
       - BOOTSTRAP_PROVIDER_PASSWORD=${BOOTSTRAP_PROVIDER_PASSWORD:-first_provider_change_me}
@@ -51,7 +51,7 @@ services:
     environment:
       - PEER_URL=http://orchestrator_node_1:5000
       - SYNC_INTERVAL=30
-      - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+      - NODE_SECRET=${NODE_SECRET:?NODE_SECRET is required}
       - BOOTSTRAP_PROVIDER_LOGIN=${BOOTSTRAP_PROVIDER_LOGIN:-first_provider}
       - BOOTSTRAP_PROVIDER_PASSWORD=${BOOTSTRAP_PROVIDER_PASSWORD:-first_provider_change_me}
       - BOOTSTRAP_PROVIDER_NICKNAME=${BOOTSTRAP_PROVIDER_NICKNAME:-Первый поставщик}
@@ -75,7 +75,7 @@ services:
   #   environment:
   #     - PEER_URL=http://orchestrator_node_1:5000
   #     - SYNC_INTERVAL=30
-  #     - NODE_SECRET=${NODE_SECRET:-node-secret-change-me}
+  #     - NODE_SECRET=${NODE_SECRET:?NODE_SECRET is required}
   #   depends_on:
   #     - orchestrator_node_1
   #   # restart: unless-stopped

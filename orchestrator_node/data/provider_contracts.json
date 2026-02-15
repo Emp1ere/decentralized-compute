@@ -1,4 +1,28 @@
 {
+  "sectors": [
+    {
+      "sector_id": "sec-d56b154e8703",
+      "owner_client_id": "ac7b63a5-7ddf-4e44-9360-ae870704848b",
+      "sector_name": "Legacy sector",
+      "organization_name": "",
+      "compute_domain": "legacy",
+      "description": "Auto-migrated from legacy provider contracts",
+      "is_archived": false,
+      "created_at": 1771174418,
+      "updated_at": 1771174418
+    },
+    {
+      "sector_id": "sec-85ef977e1c95",
+      "owner_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+      "sector_name": "PrivateAstrophysics",
+      "organization_name": "",
+      "compute_domain": "Астрофизические вычисления",
+      "description": "Астрофизические вычисления для частных исследований",
+      "is_archived": false,
+      "created_at": 1771177684,
+      "updated_at": 1771177684
+    }
+  ],
   "contracts": [
     {
       "contract_id": "sc-000",
@@ -19,7 +43,8 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "sc-001",
@@ -40,7 +65,8 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "sc-002",
@@ -61,7 +87,8 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "astro-001",
@@ -82,7 +109,8 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "astro-002",
@@ -103,7 +131,8 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "astro-003",
@@ -124,7 +153,8 @@
       "completed_work_units": 300000,
       "jobs_completed": 5,
       "created_at": 1771101828,
-      "updated_at": 1771124938
+      "updated_at": 1771124938,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "astro-004",
@@ -145,7 +175,8 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
     },
     {
       "contract_id": "astro-005",
@@ -166,7 +197,30 @@
       "completed_work_units": 0,
       "jobs_completed": 0,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771101828,
+      "sector_id": "sec-d56b154e8703"
+    },
+    {
+      "contract_id": "usr-9a5465741e54",
+      "provider_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+      "sector_id": "sec-85ef977e1c95",
+      "task_name": "Моделирование движения N  тел под воздействием сил гравитации",
+      "task_description": "Смоделировать движение N-ых тел по известным местоположению, начальным скоростям и массам с учетом их взаимного гравитационного взаимодействия.",
+      "task_category": "Астрофизика",
+      "computation_type": "cosmological",
+      "work_units_required": 1000,
+      "reward_per_task": 1000,
+      "budget_currency": "RUB",
+      "target_total_work_units": 100000,
+      "difficulty": 3,
+      "status": "active",
+      "budget_tokens_total": 100000,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771178315,
+      "updated_at": 1771178315
     }
   ]
 }

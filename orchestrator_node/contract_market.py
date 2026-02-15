@@ -1,8 +1,8 @@
 """
-Хранилище пользовательских контрактов поставщиков (provider contracts).
+Хранилище секторов и пользовательских контрактов.
 
-Контракты хранятся в data/provider_contracts.json и имеют жизненный цикл:
-draft -> active -> paused -> closed.
+Сектор — внешний проект (организация/институт/частное лицо) с целевой областью
+вычислений и пулом контрактов-задач.
 """
 import copy
 import json
@@ -31,15 +31,19 @@ def _ensure_dir():
 def _load_state():
     _ensure_dir()
     if not os.path.exists(MARKET_FILE):
-        return {"contracts": []}
+        return {"sectors": [], "contracts": []}
     try:
         with open(MARKET_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict) and isinstance(data.get("contracts"), list):
-            return data
+            sectors = data.get("sectors")
+            if not isinstance(sectors, list):
+                sectors = []
+            normalized = {"sectors": sectors, "contracts": data["contracts"]}
+            return _migrate_legacy_contracts(normalized)
     except (json.JSONDecodeError, OSError):
         pass
-    return {"contracts": []}
+    return {"sectors": [], "contracts": []}
 
 
 def _save_state(state):
@@ -68,6 +72,53 @@ def _remaining_work_units(rec):
     )
 
 
+def _enrich_sector(rec):
+    out = copy.deepcopy(rec)
+    out["sector_name"] = (rec.get("sector_name") or "").strip() or "Unnamed sector"
+    out["organization_name"] = (rec.get("organization_name") or "").strip()
+    out["compute_domain"] = (rec.get("compute_domain") or "").strip()
+    out["description"] = (rec.get("description") or "").strip()
+    out["is_archived"] = bool(rec.get("is_archived", False))
+    return out
+
+
+def _migrate_legacy_contracts(state):
+    sectors = state["sectors"]
+    contracts = state["contracts"]
+    sector_by_owner = {s.get("owner_client_id"): s for s in sectors if s.get("owner_client_id")}
+    changed = False
+    now = _now()
+    for rec in contracts:
+        if rec.get("sector_id"):
+            continue
+        owner_id = rec.get("provider_client_id")
+        if not owner_id:
+            owner_id = "legacy-owner"
+            rec["provider_client_id"] = owner_id
+            changed = True
+        sector = sector_by_owner.get(owner_id)
+        if not sector:
+            sector = {
+                "sector_id": f"sec-{uuid.uuid4().hex[:12]}",
+                "owner_client_id": owner_id,
+                "sector_name": "Legacy sector",
+                "organization_name": "",
+                "compute_domain": "legacy",
+                "description": "Auto-migrated from legacy provider contracts",
+                "is_archived": False,
+                "created_at": now,
+                "updated_at": now,
+            }
+            sectors.append(sector)
+            sector_by_owner[owner_id] = sector
+            changed = True
+        rec["sector_id"] = sector["sector_id"]
+        changed = True
+    if changed:
+        _save_state(state)
+    return state
+
+
 def _enrich_contract(rec):
     out = copy.deepcopy(rec)
     budget_currency = (rec.get("budget_currency") or DEFAULT_BUDGET_CURRENCY).upper()
@@ -77,14 +128,91 @@ def _enrich_contract(rec):
     out["reward_currency"] = budget_currency
     out["budget_tokens_available"] = _budget_available(rec)
     out["remaining_work_units"] = _remaining_work_units(rec)
+    out["sector_id"] = rec.get("sector_id")
+    out["sector_name"] = rec.get("sector_name")
     return out
 
 
 class ContractMarket:
+    def create_sector(
+        self,
+        *,
+        owner_client_id,
+        sector_name,
+        organization_name="",
+        compute_domain="",
+        description="",
+        sector_id=None,
+    ):
+        normalized_name = (sector_name or "").strip()
+        if not normalized_name:
+            raise ValueError("sector_name is required")
+        now = _now()
+        normalized_sector_id = (sector_id or "").strip() or f"sec-{uuid.uuid4().hex[:12]}"
+        record = {
+            "sector_id": normalized_sector_id,
+            "owner_client_id": owner_client_id,
+            "sector_name": normalized_name,
+            "organization_name": (organization_name or "").strip(),
+            "compute_domain": (compute_domain or "").strip(),
+            "description": (description or "").strip(),
+            "is_archived": False,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with _lock:
+            state = _load_state()
+            if any(s.get("sector_id") == normalized_sector_id for s in state["sectors"]):
+                raise ValueError("Sector ID already exists")
+            state["sectors"].append(record)
+            _save_state(state)
+        return _enrich_sector(record)
+
+    def list_owner_sectors(self, owner_client_id, *, include_archived=False):
+        with _lock:
+            state = _load_state()
+            rows = []
+            for rec in state["sectors"]:
+                if rec.get("owner_client_id") != owner_client_id:
+                    continue
+                if (not include_archived) and rec.get("is_archived", False):
+                    continue
+                rows.append(_enrich_sector(rec))
+        return sorted(rows, key=lambda x: x.get("created_at", 0), reverse=True)
+
+    def get_sector(self, sector_id):
+        with _lock:
+            state = _load_state()
+            for rec in state["sectors"]:
+                if rec.get("sector_id") == sector_id:
+                    return _enrich_sector(rec)
+        return None
+
+    def _resolve_sector_for_owner(self, state, owner_client_id, sector_id):
+        if sector_id:
+            for rec in state["sectors"]:
+                if rec.get("sector_id") == sector_id:
+                    if rec.get("owner_client_id") != owner_client_id:
+                        return None, "Forbidden"
+                    if rec.get("is_archived", False):
+                        return None, "Sector is archived"
+                    return rec, None
+            return None, "Sector not found"
+        owner_sectors = [
+            s for s in state["sectors"]
+            if s.get("owner_client_id") == owner_client_id and not s.get("is_archived", False)
+        ]
+        if not owner_sectors:
+            return None, "Sector is required: create sector first"
+        if len(owner_sectors) > 1:
+            return None, "sector_id is required when owner has multiple sectors"
+        return owner_sectors[0], None
+
     def create_contract(
         self,
         *,
         provider_client_id,
+        sector_id,
         task_name,
         task_description,
         task_category,
@@ -103,53 +231,80 @@ class ContractMarket:
         normalized_currency = (budget_currency or DEFAULT_BUDGET_CURRENCY).upper()
         if normalized_currency not in SUPPORTED_BUDGET_CURRENCIES:
             raise ValueError("Unsupported budget currency")
-        now = _now()
-        normalized_contract_id = (contract_id or "").strip() or f"usr-{uuid.uuid4().hex[:12]}"
-        record = {
-            "contract_id": normalized_contract_id,
-            "provider_client_id": provider_client_id,
-            "task_name": task_name,
-            "task_description": task_description,
-            "task_category": task_category,
-            "computation_type": computation_type,
-            "work_units_required": int(work_units_required),
-            "reward_per_task": int(reward_per_task),
-            "budget_currency": normalized_currency,
-            "target_total_work_units": int(target_total_work_units),
-            "difficulty": int(difficulty),
-            "status": status,
-            "budget_tokens_total": int(initial_budget_tokens),
-            "budget_tokens_spent": 0,
-            "budget_tokens_refunded": 0,
-            "completed_work_units": 0,
-            "jobs_completed": 0,
-            "created_at": now,
-            "updated_at": now,
-        }
         with _lock:
             state = _load_state()
+            sector, sector_err = self._resolve_sector_for_owner(state, provider_client_id, sector_id)
+            if sector_err:
+                raise ValueError(sector_err)
+            now = _now()
+            normalized_contract_id = (contract_id or "").strip() or f"usr-{uuid.uuid4().hex[:12]}"
+            record = {
+                "contract_id": normalized_contract_id,
+                "provider_client_id": provider_client_id,
+                "sector_id": sector["sector_id"],
+                "task_name": task_name,
+                "task_description": task_description,
+                "task_category": task_category,
+                "computation_type": computation_type,
+                "work_units_required": int(work_units_required),
+                "reward_per_task": int(reward_per_task),
+                "budget_currency": normalized_currency,
+                "target_total_work_units": int(target_total_work_units),
+                "difficulty": int(difficulty),
+                "status": status,
+                "budget_tokens_total": int(initial_budget_tokens),
+                "budget_tokens_spent": 0,
+                "budget_tokens_refunded": 0,
+                "completed_work_units": 0,
+                "jobs_completed": 0,
+                "created_at": now,
+                "updated_at": now,
+            }
             if any(c.get("contract_id") == normalized_contract_id for c in state["contracts"]):
                 raise ValueError("Contract ID already exists")
             state["contracts"].append(record)
             _save_state(state)
-        return _enrich_contract(record)
+        out = _enrich_contract(record)
+        out["sector_name"] = sector.get("sector_name")
+        return out
 
-    def list_provider_contracts(self, provider_client_id):
+    def list_provider_contracts(self, provider_client_id, *, sector_id=None):
         with _lock:
             state = _load_state()
+            allowed_sector_ids = {
+                s.get("sector_id")
+                for s in state["sectors"]
+                if s.get("owner_client_id") == provider_client_id
+            }
+            if sector_id:
+                if sector_id not in allowed_sector_ids:
+                    return []
+                allowed_sector_ids = {sector_id}
+            sector_name_by_id = {
+                s.get("sector_id"): s.get("sector_name", "")
+                for s in state["sectors"]
+            }
             result = [
                 _enrich_contract(c)
                 for c in state["contracts"]
                 if c.get("provider_client_id") == provider_client_id
+                and c.get("sector_id") in allowed_sector_ids
             ]
+            for row in result:
+                row["sector_name"] = sector_name_by_id.get(row.get("sector_id"), row.get("sector_name"))
         return sorted(result, key=lambda x: x.get("created_at", 0), reverse=True)
 
     def list_active_contracts(self):
         with _lock:
             state = _load_state()
+            sector_name_by_id = {
+                s.get("sector_id"): s.get("sector_name", "")
+                for s in state["sectors"]
+            }
             result = []
             for c in state["contracts"]:
                 ec = _enrich_contract(c)
+                ec["sector_name"] = sector_name_by_id.get(ec.get("sector_id"), ec.get("sector_name"))
                 if self.is_assignable(ec):
                     result.append(ec)
         return result
@@ -157,9 +312,15 @@ class ContractMarket:
     def get_contract(self, contract_id):
         with _lock:
             state = _load_state()
+            sector_name_by_id = {
+                s.get("sector_id"): s.get("sector_name", "")
+                for s in state["sectors"]
+            }
             for c in state["contracts"]:
                 if c.get("contract_id") == contract_id:
-                    return _enrich_contract(c)
+                    out = _enrich_contract(c)
+                    out["sector_name"] = sector_name_by_id.get(out.get("sector_id"), out.get("sector_name"))
+                    return out
         return None
 
     def set_status(self, *, contract_id, provider_client_id, new_status):
@@ -172,6 +333,9 @@ class ContractMarket:
                     continue
                 if c.get("provider_client_id") != provider_client_id:
                     return None, "Forbidden"
+                sector = next((s for s in state["sectors"] if s.get("sector_id") == c.get("sector_id")), None)
+                if not sector or sector.get("owner_client_id") != provider_client_id:
+                    return None, "Forbidden"
                 old_status = c.get("status")
                 if old_status == STATUS_CLOSED and new_status != STATUS_CLOSED:
                     return None, "Closed contract cannot be reopened"
@@ -183,7 +347,9 @@ class ContractMarket:
                 c["status"] = new_status
                 c["updated_at"] = _now()
                 _save_state(state)
-                return _enrich_contract(c), None
+                out = _enrich_contract(c)
+                out["sector_name"] = sector.get("sector_name", "")
+                return out, None
         return None, "Contract not found"
 
     def fund_contract(self, *, contract_id, provider_client_id, amount):
@@ -197,12 +363,17 @@ class ContractMarket:
                     continue
                 if c.get("provider_client_id") != provider_client_id:
                     return None, "Forbidden"
+                sector = next((s for s in state["sectors"] if s.get("sector_id") == c.get("sector_id")), None)
+                if not sector or sector.get("owner_client_id") != provider_client_id:
+                    return None, "Forbidden"
                 if c.get("status") == STATUS_CLOSED:
                     return None, "Closed contract cannot be funded"
                 c["budget_tokens_total"] = int(c.get("budget_tokens_total", 0)) + amount
                 c["updated_at"] = _now()
                 _save_state(state)
-                return _enrich_contract(c), None
+                out = _enrich_contract(c)
+                out["sector_name"] = sector.get("sector_name", "")
+                return out, None
         return None, "Contract not found"
 
     def refund_contract(self, *, contract_id, provider_client_id, amount=None):
@@ -212,6 +383,9 @@ class ContractMarket:
                 if c.get("contract_id") != contract_id:
                     continue
                 if c.get("provider_client_id") != provider_client_id:
+                    return None, None, "Forbidden"
+                sector = next((s for s in state["sectors"] if s.get("sector_id") == c.get("sector_id")), None)
+                if not sector or sector.get("owner_client_id") != provider_client_id:
                     return None, None, "Forbidden"
                 available = _budget_available(c)
                 if available <= 0:
@@ -229,7 +403,9 @@ class ContractMarket:
                     c["status"] = STATUS_PAUSED
                 c["updated_at"] = _now()
                 _save_state(state)
-                return _enrich_contract(c), refund_amount, None
+                out = _enrich_contract(c)
+                out["sector_name"] = sector.get("sector_name", "")
+                return out, refund_amount, None
         return None, None, "Contract not found"
 
     def reserve_submission(self, *, contract_id, reward_amount, work_units_done):
@@ -305,7 +481,7 @@ class ContractMarket:
             return False
         return True
 
-    def upsert_seed_contracts(self, *, provider_client_id, templates):
+    def upsert_seed_contracts(self, *, provider_client_id, templates, sector_id=None):
         """
         Инициализация/миграция стартовых контрактов в формат пользовательских.
         Не изменяет существующие контракты, если contract_id уже есть.
@@ -313,6 +489,23 @@ class ContractMarket:
         created = []
         with _lock:
             state = _load_state()
+            sector, sector_err = self._resolve_sector_for_owner(state, provider_client_id, sector_id)
+            if sector_err:
+                if sector_err.startswith("Sector is required"):
+                    sector = {
+                        "sector_id": f"sec-{uuid.uuid4().hex[:12]}",
+                        "owner_client_id": provider_client_id,
+                        "sector_name": "System sector",
+                        "organization_name": "Distributed Compute",
+                        "compute_domain": "system",
+                        "description": "System bootstrap contracts",
+                        "is_archived": False,
+                        "created_at": _now(),
+                        "updated_at": _now(),
+                    }
+                    state["sectors"].append(sector)
+                else:
+                    return []
             existing_ids = {c.get("contract_id") for c in state["contracts"]}
             now = _now()
             for tpl in templates:
@@ -330,6 +523,7 @@ class ContractMarket:
                 rec = {
                     "contract_id": cid,
                     "provider_client_id": provider_client_id,
+                    "sector_id": sector["sector_id"],
                     "task_name": tpl.get("task_name", cid),
                     "task_description": tpl.get("task_description", ""),
                     "task_category": tpl.get("task_category", "Пользовательская"),
@@ -350,7 +544,9 @@ class ContractMarket:
                 }
                 state["contracts"].append(rec)
                 existing_ids.add(cid)
-                created.append(_enrich_contract(rec))
+                out = _enrich_contract(rec)
+                out["sector_name"] = sector.get("sector_name", "")
+                created.append(out)
             if created:
                 _save_state(state)
         return created
@@ -365,6 +561,9 @@ class ContractMarket:
                 if c.get("contract_id") != contract_id:
                     continue
                 if c.get("provider_client_id") != provider_client_id:
+                    return False, "Forbidden"
+                sector = next((s for s in state["sectors"] if s.get("sector_id") == c.get("sector_id")), None)
+                if not sector or sector.get("owner_client_id") != provider_client_id:
                     return False, "Forbidden"
                 state["contracts"].pop(idx)
                 _save_state(state)

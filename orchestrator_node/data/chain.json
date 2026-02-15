@@ -118,5 +118,59 @@
     "previous_hash": "0c92a49e5c8b3a6427a9cdbcc907b5d3abc0719379eb6301b1a3f2e7ff8e52e5",
     "nonce": 0,
     "hash": "ef8a7cc020738ec7ce461380310838a36a09d3a7edced7ca170656279cac52a8"
+  },
+  {
+    "index": 5,
+    "timestamp": 1771178302.594269,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "currency": "RUB",
+        "amount": 100000,
+        "source": "manual_dashboard_topup",
+        "created_at": 1771178302
+      }
+    ],
+    "previous_hash": "ef8a7cc020738ec7ce461380310838a36a09d3a7edced7ca170656279cac52a8",
+    "nonce": 0,
+    "hash": "2de10711531ce2bf6ca0eaf065e7af4071fb0c271f63a843cbbbb202b693e59c"
+  },
+  {
+    "index": 6,
+    "timestamp": 1771178315.3606033,
+    "transactions": [
+      {
+        "type": "contract_create_event",
+        "contract_id": "usr-9a5465741e54",
+        "provider_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "sector_id": "sec-85ef977e1c95",
+        "task_name": "Моделирование движения N  тел под воздействием сил гравитации",
+        "task_category": "Астрофизика",
+        "computation_type": "cosmological",
+        "reward_per_task": 1000,
+        "budget_currency": "RUB",
+        "status": "draft",
+        "created_at": 1771178315
+      },
+      {
+        "type": "contract_budget_fund_event",
+        "contract_id": "usr-9a5465741e54",
+        "provider_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "currency": "RUB",
+        "amount": 100000,
+        "created_at": 1771178315
+      },
+      {
+        "type": "contract_status_event",
+        "contract_id": "usr-9a5465741e54",
+        "provider_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "status": "active",
+        "updated_at": 1771178315
+      }
+    ],
+    "previous_hash": "2de10711531ce2bf6ca0eaf065e7af4071fb0c271f63a843cbbbb202b693e59c",
+    "nonce": 0,
+    "hash": "a894d70f3d77ffcdc97cdbd6405eaefcd1f5cfff6433784410dd2a4a17ceb83d"
   }
 ]

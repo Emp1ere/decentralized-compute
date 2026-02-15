@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from blockchain import Blockchain, FEE_PER_WORK_RECEIPT, MAX_PENDING_WORK_PER_CLIENT, MAX_PENDING_TOTAL
 from contracts import (
     SYSTEM_CONTRACT_TEMPLATES,
@@ -41,10 +41,18 @@ from fx_oracles import (
     normalize_rates_payload,
     verify_submission_signature,
 )
+from device_registry import (
+    register_or_update_device,
+    heartbeat_device,
+    list_devices_for_client,
+    set_device_disabled,
+)
 import hashlib
 import uuid
 import random
 import os
+import io
+import zipfile
 import requests
 import threading
 import time
@@ -104,6 +112,141 @@ except Exception as e:
 _active_task_takers = {}  # (contract_id, client_id) -> timestamp
 ACTIVE_WORKER_TTL = 900  # 15 минут
 
+# --- Lifecycle выдачи задач (job assignments) ---
+# Важно: это runtime-состояние в памяти для безопасного введения job_id без ломки совместимости.
+_job_assignments = {}  # job_id -> assignment dict
+_job_assignments_lock = threading.Lock()
+JOB_TTL_SECONDS = int(os.environ.get("JOB_TTL_SECONDS", "3600"))
+JOB_REASSIGN_COOLDOWN_SECONDS = int(os.environ.get("JOB_REASSIGN_COOLDOWN_SECONDS", "30"))
+JOB_MAX_REASSIGN_ATTEMPTS = int(os.environ.get("JOB_MAX_REASSIGN_ATTEMPTS", "3"))
+JOB_STATUSES_FINAL = {"reward_settled", "rejected", "expired", "reassigned"}
+
+
+def _expire_job_assignments(now_ts_value=None):
+    """Пометить просроченные assignment'ы как expired."""
+    now_value = now_ts_value if now_ts_value is not None else time.time()
+    with _job_assignments_lock:
+        for assignment in _job_assignments.values():
+            if assignment.get("status") in JOB_STATUSES_FINAL:
+                continue
+            expires_at = float(assignment.get("expires_at", 0) or 0)
+            if expires_at and expires_at <= now_value:
+                assignment["status"] = "expired"
+                assignment["expired_at"] = now_value
+                assignment["updated_at"] = now_value
+
+
+def _create_job_assignment(*, client_id, contract_id, task_seed, parent_job_id=None, reassign_count=0):
+    """Создать assignment для выданной задачи."""
+    now_value = time.time()
+    job_id = f"job-{uuid.uuid4().hex[:16]}"
+    assignment = {
+        "job_id": job_id,
+        "client_id": client_id,
+        "contract_id": contract_id,
+        "task_seed": int(task_seed),
+        "status": "issued",
+        "assigned_at": now_value,
+        "updated_at": now_value,
+        "expires_at": now_value + JOB_TTL_SECONDS,
+        "result_data": None,
+        "nonce": None,
+        "reward_id": None,
+        "parent_job_id": parent_job_id,
+        "reassign_count": int(reassign_count),
+    }
+    with _job_assignments_lock:
+        _job_assignments[job_id] = assignment
+    return assignment
+
+
+def _get_job_assignment(job_id):
+    if not job_id:
+        return None
+    _expire_job_assignments()
+    with _job_assignments_lock:
+        assignment = _job_assignments.get(job_id)
+        if not assignment:
+            return None
+        return dict(assignment)
+
+
+def _update_job_assignment(job_id, **updates):
+    if not job_id:
+        return None
+    with _job_assignments_lock:
+        assignment = _job_assignments.get(job_id)
+        if not assignment:
+            return None
+        assignment.update(updates)
+        assignment["updated_at"] = time.time()
+        return dict(assignment)
+
+
+def _issue_task_for_client(client_id, *, contract_id=None, sector_id=None):
+    """Выдать задачу клиенту и зарегистрировать assignment."""
+    if contract_id:
+        runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=False)
+        if not runtime:
+            return None, "Unknown contract_id or contract is not active"
+        if sector_id and runtime.get("record") and runtime["record"].get("sector_id") != sector_id:
+            return None, "contract_id does not belong to the selected sector"
+    else:
+        candidates = _available_contract_runtimes()
+        if sector_id:
+            candidates = [
+                r for r in candidates
+                if (r.get("record") or {}).get("sector_id") == sector_id
+            ]
+        if not candidates:
+            return None, "No available contracts"
+        runtime = random.choice(candidates)
+    _active_task_takers[(runtime["contract_id"], client_id)] = time.time()
+    spec = dict(runtime["spec"])
+    base = uuid.uuid4().int & ((1 << 64) - 1)
+    client_bits = int(hashlib.sha256(client_id.encode()).hexdigest()[:16], 16) % (1 << 64)
+    spec["task_seed"] = (base ^ client_bits) & ((1 << 64) - 1)
+    assignment = _create_job_assignment(
+        client_id=client_id,
+        contract_id=runtime["contract_id"],
+        task_seed=spec["task_seed"],
+    )
+    spec["job_id"] = assignment["job_id"]
+    spec["job_ttl_seconds"] = JOB_TTL_SECONDS
+    return spec, None
+
+
+def _sync_jobs_from_peer():
+    """Синхронизировать assignment'ы задач с пиром."""
+    if not PEER_URL:
+        return
+    try:
+        headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
+        response = requests.get(
+            f"{PEER_URL.rstrip('/')}/jobs/snapshot",
+            timeout=PEER_REQUEST_TIMEOUT,
+            headers=headers,
+        )
+        if response.status_code != 200:
+            return
+        peer_rows = response.json()
+        if not isinstance(peer_rows, list):
+            return
+        with _job_assignments_lock:
+            for row in peer_rows:
+                if not isinstance(row, dict):
+                    continue
+                job_id = (row.get("job_id") or "").strip()
+                if not job_id:
+                    continue
+                local = _job_assignments.get(job_id)
+                peer_updated = float(row.get("updated_at", 0) or 0)
+                local_updated = float((local or {}).get("updated_at", 0) or 0)
+                if (not local) or (peer_updated > local_updated):
+                    _job_assignments[job_id] = dict(row)
+    except requests.RequestException:
+        return
+
 def get_client_id_from_auth():
     """Из заголовка Authorization: Bearer <api_key> возвращаем client_id или None."""
     auth = request.headers.get("Authorization")
@@ -146,6 +289,7 @@ PEER_REQUEST_TIMEOUT = int(os.environ.get("PEER_REQUEST_TIMEOUT", "15"))
 SYNC_INTERVAL = int(os.environ.get("SYNC_INTERVAL", "10"))
 # Секрет для запросов между узлами (receive_block, receive_chain, add_pending_tx) — опционально
 NODE_SECRET = os.environ.get("NODE_SECRET", "")
+DESKTOP_AGENT_LATEST_VERSION = os.environ.get("DESKTOP_AGENT_LATEST_VERSION", "0.2.0")
 
 # --- Решение централизации: ротация лидера между узлами ---
 # Идентификатор текущего узла (уникальный для каждого узла в сети)
@@ -240,7 +384,15 @@ def require_node_secret(f):
     """Проверка секрета узла для эндпоинтов синхронизации (опционально, если NODE_SECRET задан)."""
     @wraps(f)
     def wrapped(*args, **kwargs):
-        if NODE_SECRET and request.headers.get("X-Node-Secret") != NODE_SECRET:
+        if not NODE_SECRET:
+            # Fail-closed для удалённых сред: без NODE_SECRET служебные эндпоинты
+            # разрешены только локально (loopback) для dev-сценариев.
+            remote_addr = (request.remote_addr or "").strip()
+            if remote_addr not in ("127.0.0.1", "::1"):
+                logger.error("node_secret_missing_for_remote_request: path=%s remote_addr=%s", request.path, remote_addr or "unknown")
+                return jsonify({"error": "NODE_SECRET is required for remote node synchronization endpoints"}), 503
+            return f(*args, **kwargs)
+        if request.headers.get("X-Node-Secret") != NODE_SECRET:
             return jsonify({"error": "Forbidden"}), 403
         return f(*args, **kwargs)
     return wrapped
@@ -363,6 +515,7 @@ def periodic_sync():
     while True:
         time.sleep(SYNC_INTERVAL)
         sync_chain_from_peer()
+        _sync_jobs_from_peer()
 
 
 # --- API Эндпоинты ---
@@ -485,6 +638,8 @@ def _build_dynamic_task_spec(contract_record):
         reward_currency = MARKET_DEFAULT_CURRENCY
     return {
         "contract_id": contract_record["contract_id"],
+        "sector_id": contract_record.get("sector_id"),
+        "sector_name": contract_record.get("sector_name"),
         "work_units_required": int(contract_record["work_units_required"]),
         "difficulty": int(contract_record["difficulty"]),
         "task_name": contract_record.get("task_name") or contract_record["contract_id"],
@@ -654,30 +809,26 @@ def get_task():
     client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    contract_id = request.args.get("contract_id")
-    if contract_id:
-        runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=False)
-        if not runtime:
-            return jsonify({"error": "Unknown contract_id or contract is not active"}), 400
-    else:
-        candidates = _available_contract_runtimes()
-        if not candidates:
-            return jsonify({"error": "No available contracts"}), 503
-        runtime = random.choice(candidates)
-    # Учитываем активного вычислителя по этому контракту
-    _active_task_takers[(runtime["contract_id"], client_id)] = time.time()
-    spec = dict(runtime["spec"])
-    # Уникальный task_seed при каждой выдаче, 64 бит + привязка к client_id — чтобы коллизии
-    # между разными клиентами были практически невозможны (proof already used by different client).
-    base = uuid.uuid4().int & ((1 << 64) - 1)
-    client_bits = int(hashlib.sha256(client_id.encode()).hexdigest()[:16], 16) % (1 << 64)
-    spec["task_seed"] = (base ^ client_bits) & ((1 << 64) - 1)
+    _expire_job_assignments()
+    contract_id = (request.args.get("contract_id") or "").strip() or None
+    sector_id = (request.args.get("sector_id") or "").strip() or None
+    spec, issue_err = _issue_task_for_client(
+        client_id,
+        contract_id=contract_id,
+        sector_id=sector_id,
+    )
+    if issue_err:
+        code = 400 if contract_id else 503
+        if "selected sector" in issue_err:
+            code = 400
+        return jsonify({"error": issue_err}), code
     logger.info(
-        "task_issued: contract_id=%s origin=%s client_id=%s... task_seed=%s",
-        runtime["contract_id"],
-        runtime["kind"],
+        "task_issued: contract_id=%s client_id=%s... task_seed=%s job_id=%s sector_id=%s",
+        spec["contract_id"],
         client_id[:8],
         spec["task_seed"],
+        spec["job_id"],
+        sector_id,
     )
     return jsonify(spec), 200
 
@@ -698,6 +849,7 @@ def submit_work():
     except Exception:
         logger.warning("submit_work_invalid_json")
         return jsonify({"error": "Invalid JSON"}), 400
+    _expire_job_assignments()
     client_id = data.get("client_id")
     if client_id != client_id_from_key:
         logger.warning("submit_work: rejected client_id mismatch (body=%s... auth=%s...)", (client_id or "")[:8], (client_id_from_key or "")[:8])
@@ -706,6 +858,7 @@ def submit_work():
     work_units_done = data.get("work_units_done")
     result_data = data.get("result_data")
     nonce = data.get("nonce")  # Nonce для строгой проверки контрактом
+    job_id = (data.get("job_id") or "").strip() or None
 
     if not all([client_id, contract_id, work_units_done is not None]):
         logger.warning("submit_work: missing data (client_id=%s contract_id=%s work_units_done=%s)", bool(client_id), contract_id, work_units_done)
@@ -716,6 +869,31 @@ def submit_work():
         return jsonify({"error": "work_units_done must be integer"}), 400
     if work_units_done <= 0:
         return jsonify({"error": "work_units_done must be > 0"}), 400
+
+    assignment = None
+    if job_id:
+        assignment = _get_job_assignment(job_id)
+        if not assignment:
+            return jsonify({"error": "Unknown job_id"}), 404
+        if assignment.get("client_id") != client_id:
+            return jsonify({"error": "job_id belongs to another client"}), 403
+        if assignment.get("contract_id") != contract_id:
+            return jsonify({"error": "job_id contract mismatch"}), 400
+        if assignment.get("status") == "expired":
+            return jsonify({"error": "job_id expired, request a new task"}), 409
+        if assignment.get("status") == "rejected":
+            return jsonify({"error": "job_id already rejected"}), 409
+        if assignment.get("status") == "reassigned":
+            return jsonify({"error": "job_id already reassigned"}), 409
+        existing_result = assignment.get("result_data")
+        if existing_result and result_data and existing_result != result_data:
+            return jsonify({"error": "job_id already used with another proof"}), 409
+        if assignment.get("status") == "reward_settled":
+            return jsonify({
+                "status": "success",
+                "message": "Job already settled (idempotent request)",
+                "reward_issued": 0,
+            }), 200
 
     # Защита от DoS: проверка размера result_data (хеш должен быть 64 символа, максимум 1KB для безопасности)
     if result_data:
@@ -774,6 +952,14 @@ def submit_work():
                         _, settle_err = _append_onchain_events([settlement_tx])
                         if settle_err:
                             return jsonify({"error": settle_err}), 500
+                    if assignment:
+                        _update_job_assignment(
+                            job_id,
+                            status="reward_settled",
+                            result_data=result_data,
+                            nonce=str(nonce),
+                            reward_id=reward_id,
+                        )
                 return jsonify({
                     "status": "success",
                     "reward_issued": reward_amount,
@@ -806,6 +992,8 @@ def submit_work():
                 hint = ""
                 if not is_known_user:
                     hint = " That client_id is already in the chain (from a past run), not created now. To avoid this for new runs, start the worker from the dashboard with your calculator selected (64-bit task_seed makes your proof unique)."
+                if assignment:
+                    _update_job_assignment(job_id, status="rejected")
                 return jsonify({
                     "error": "Proof already used by another worker for this contract (task already completed)." + hint,
                     "code": "proof_used_other_client",
@@ -825,8 +1013,17 @@ def submit_work():
         contract_id,
         runtime["kind"],
     )
+    if assignment:
+        _update_job_assignment(
+            job_id,
+            status="completed_submitted",
+            result_data=result_data,
+            nonce=str(nonce),
+        )
     if not runtime["verify"](client_id, contract_id, work_units_done, result_data, nonce):
         logger.warning("submit_work_verification_failed: client_id=%s... contract_id=%s (balance not updated)", client_id[:8], contract_id)
+        if assignment:
+            _update_job_assignment(job_id, status="rejected")
         return jsonify({"error": "Work verification failed"}), 400
     logger.info("submit_work: verification passed for client_id=%s... contract_id=%s", client_id[:8], contract_id)
 
@@ -875,6 +1072,12 @@ def submit_work():
         "result_data": result_data,
         "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
     }
+    reward_id = _reward_event_id(
+        client_id=client_id,
+        contract_id=contract_id,
+        result_data=result_data,
+        nonce=nonce,
+    )
     reward_settlement_tx = _build_reward_settlement_tx(
         client_id=client_id,
         provider_client_id=provider_client_id,
@@ -933,6 +1136,8 @@ def submit_work():
         new_balance = blockchain.get_balance(client_id)
         logger.info("block_created: client_id=%s... reward=%s new_balance=%s block_index=%s",
                     client_id[:8], reward_amount, new_balance, new_block.index)
+        if assignment:
+            _update_job_assignment(job_id, status="reward_settled", reward_id=reward_id)
 
     _push_block_to_peer(new_block)
 
@@ -1347,9 +1552,44 @@ def _provider_contract_error_response(error):
         return jsonify({"error": error}), 403
     if error == "Contract not found":
         return jsonify({"error": error}), 404
+    if error == "Sector not found":
+        return jsonify({"error": error}), 404
     if error == "Insufficient wallet balance":
         return jsonify({"error": error}), 409
+    if "sector_id is required" in (error or ""):
+        return jsonify({"error": error}), 400
     return jsonify({"error": error}), 400
+
+
+@app.route("/provider/sectors", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
+def provider_sectors():
+    """API секторов поставщика: список и создание."""
+    owner_client_id = get_client_id_from_auth()
+    if owner_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if request.method == "GET":
+        rows = contract_market.list_owner_sectors(owner_client_id)
+        return jsonify(rows), 200
+
+    data = request.get_json(silent=True) or {}
+    sector_name = (data.get("sector_name") or "").strip()
+    organization_name = (data.get("organization_name") or "").strip()
+    compute_domain = (data.get("compute_domain") or "").strip()
+    description = (data.get("description") or "").strip()
+    if not sector_name:
+        return jsonify({"error": "sector_name is required"}), 400
+    try:
+        created = contract_market.create_sector(
+            owner_client_id=owner_client_id,
+            sector_name=sector_name,
+            organization_name=organization_name,
+            compute_domain=compute_domain,
+            description=description,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(created), 201
 
 
 @app.route("/provider/contracts", methods=["GET", "POST"])
@@ -1365,7 +1605,17 @@ def provider_contracts():
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
 
     if request.method == "GET":
-        runtime_contracts = contract_market.list_provider_contracts(provider_client_id)
+        sector_id_filter = (request.args.get("sector_id") or "").strip() or None
+        if sector_id_filter:
+            sector = contract_market.get_sector(sector_id_filter)
+            if not sector:
+                return jsonify({"error": "Sector not found"}), 404
+            if sector.get("owner_client_id") != provider_client_id:
+                return jsonify({"error": "Forbidden"}), 403
+        runtime_contracts = contract_market.list_provider_contracts(
+            provider_client_id,
+            sector_id=sector_id_filter,
+        )
         onchain_rows = list_contracts_onchain(blockchain.chain, provider_client_id=provider_client_id)
         onchain_by_id = {row.get("contract_id"): row for row in onchain_rows}
         for row in runtime_contracts:
@@ -1373,10 +1623,14 @@ def provider_contracts():
         return jsonify(runtime_contracts), 200
 
     data = request.get_json(silent=True) or {}
+    sector_id = (data.get("sector_id") or "").strip() or None
     task_name = (data.get("task_name") or "").strip()
     task_description = (data.get("task_description") or "").strip()
     task_category = (data.get("task_category") or "").strip() or "Пользовательская"
     computation_type = (data.get("computation_type") or "simple_pow").strip()
+
+    if not sector_id:
+        return jsonify({"error": "sector_id is required: create/select sector first"}), 400
 
     if not task_name:
         return jsonify({"error": "task_name is required"}), 400
@@ -1414,6 +1668,7 @@ def provider_contracts():
     try:
         created = contract_market.create_contract(
             provider_client_id=provider_client_id,
+            sector_id=sector_id,
             task_name=task_name,
             task_description=task_description,
             task_category=task_category,
@@ -1426,7 +1681,7 @@ def provider_contracts():
             budget_currency=budget_currency,
         )
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return _provider_contract_error_response(str(exc))
 
     activate_now = data.get("activate_now") in (True, "true", "1", 1)
     final_status = created.get("status", STATUS_DRAFT)
@@ -1447,6 +1702,7 @@ def provider_contracts():
             "type": "contract_create_event",
             "contract_id": created["contract_id"],
             "provider_client_id": provider_client_id,
+            "sector_id": created.get("sector_id"),
             "task_name": task_name,
             "task_category": task_category,
             "computation_type": computation_type,
@@ -1761,6 +2017,8 @@ def get_contracts():
         onchain_row = onchain_by_id.get(cid) or {}
         out.append({
             "contract_id": cid,
+            "sector_id": contract_record.get("sector_id"),
+            "sector_name": contract_record.get("sector_name"),
             "work_units_required": wu_required,
             "difficulty": int(contract_record["difficulty"]),
             "reward": int(contract_record["reward_per_task"]),
@@ -1899,6 +2157,245 @@ _worker_progress = {}
 WORKER_PROGRESS_TTL = 300  # 5 минут — считаем прогресс устаревшим, если дольше нет обновлений
 
 
+@app.route("/job/<job_id>", methods=["GET"])
+@limiter.limit("120 per minute")
+def job_status(job_id):
+    """Статус assignment'а задачи (для воркера/приложения)."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    assignment = _get_job_assignment((job_id or "").strip())
+    if not assignment:
+        return jsonify({"error": "Job not found"}), 404
+    if assignment.get("client_id") != client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    return jsonify(assignment), 200
+
+
+@app.route("/jobs/snapshot", methods=["GET"])
+@require_node_secret
+def jobs_snapshot():
+    """Снимок assignment'ов для синхронизации между узлами."""
+    _expire_job_assignments()
+    with _job_assignments_lock:
+        rows = [dict(v) for v in _job_assignments.values()]
+    return jsonify(rows), 200
+
+
+@app.route("/jobs/my", methods=["GET"])
+@limiter.limit("120 per minute")
+def jobs_my():
+    """Список assignment'ов текущего вычислителя для диагностики desktop-агента."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    _expire_job_assignments()
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(500, limit))
+    with _job_assignments_lock:
+        rows = [
+            dict(v)
+            for v in _job_assignments.values()
+            if v.get("client_id") == client_id
+        ]
+    rows.sort(key=lambda x: float(x.get("updated_at", 0) or 0), reverse=True)
+    return jsonify({"jobs": rows[:limit]}), 200
+
+
+@app.route("/job/<job_id>/reassign", methods=["POST"])
+@limiter.limit("60 per minute")
+def job_reassign(job_id):
+    """Переиздать просроченную задачу тому же/другому клиенту."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    source = _get_job_assignment((job_id or "").strip())
+    if not source:
+        return jsonify({"error": "Job not found"}), 404
+    if source.get("client_id") != client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    if source.get("status") != "expired":
+        return jsonify({"error": "Only expired jobs can be reassigned"}), 409
+    expired_at = float(source.get("expired_at", 0) or 0)
+    if expired_at and (time.time() - expired_at) < JOB_REASSIGN_COOLDOWN_SECONDS:
+        wait_for = int(JOB_REASSIGN_COOLDOWN_SECONDS - (time.time() - expired_at))
+        return jsonify({"error": f"Reassign cooldown active, retry in {max(1, wait_for)}s"}), 409
+    current_reassign_count = int(source.get("reassign_count", 0) or 0)
+    if current_reassign_count >= JOB_MAX_REASSIGN_ATTEMPTS:
+        return jsonify({"error": "Max reassignment attempts reached"}), 409
+    spec, issue_err = _issue_task_for_client(
+        client_id,
+        contract_id=source.get("contract_id"),
+        sector_id=None,
+    )
+    if issue_err:
+        return jsonify({"error": issue_err}), 409
+    _update_job_assignment(source.get("job_id"), status="reassigned", reassigned_to=spec.get("job_id"))
+    _update_job_assignment(
+        spec.get("job_id"),
+        parent_job_id=source.get("job_id"),
+        reassign_count=current_reassign_count + 1,
+    )
+    return jsonify(spec), 200
+
+
+@app.route("/agent/get_task", methods=["POST"])
+@limiter.limit("60 per minute")
+def agent_get_task():
+    """Desktop-agent: взять задачу по сектору/контракту."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    contract_id = (data.get("contract_id") or "").strip() or None
+    sector_id = (data.get("sector_id") or "").strip() or None
+    spec, issue_err = _issue_task_for_client(
+        client_id,
+        contract_id=contract_id,
+        sector_id=sector_id,
+    )
+    if issue_err:
+        code = 400 if contract_id else 503
+        if "selected sector" in issue_err:
+            code = 400
+        return jsonify({"error": issue_err}), code
+    return jsonify(spec), 200
+
+
+@app.route("/agent/job/<job_id>/heartbeat", methods=["POST"])
+@limiter.limit("120 per minute")
+def agent_job_heartbeat(job_id):
+    """Desktop-agent: продлить lease задачи."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    assignment = _get_job_assignment((job_id or "").strip())
+    if not assignment:
+        return jsonify({"error": "Job not found"}), 404
+    if assignment.get("client_id") != client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    if assignment.get("status") in JOB_STATUSES_FINAL:
+        return jsonify({"error": f"Job is {assignment.get('status')}"}), 409
+    updated = _update_job_assignment(
+        assignment.get("job_id"),
+        expires_at=time.time() + JOB_TTL_SECONDS,
+    )
+    return jsonify(updated), 200
+
+
+@app.route("/agent/version", methods=["GET"])
+def agent_version():
+    """Публичная версия desktop-агента для автообновления."""
+    return jsonify(
+        {
+            "latest_version": DESKTOP_AGENT_LATEST_VERSION,
+            "download_url": "/download/desktop-agent",
+        }
+    ), 200
+
+
+@app.route("/agent/devices/register", methods=["POST"])
+@limiter.limit("120 per minute")
+def agent_devices_register():
+    """Desktop-agent: регистрация/обновление устройства."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    rec, err = register_or_update_device(
+        client_id=client_id,
+        device_id=(data.get("device_id") or "").strip() or None,
+        device_name=(data.get("device_name") or "").strip() or None,
+        agent_version=(data.get("agent_version") or "").strip() or None,
+    )
+    if err:
+        return jsonify({"error": err}), 400 if err != "Forbidden" else 403
+    return jsonify(rec), 200
+
+
+@app.route("/agent/devices/heartbeat", methods=["POST"])
+@limiter.limit("240 per minute")
+def agent_devices_heartbeat():
+    """Desktop-agent: heartbeat устройства."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    rec, err = heartbeat_device(
+        client_id=client_id,
+        device_id=(data.get("device_id") or "").strip(),
+        agent_version=(data.get("agent_version") or "").strip() or None,
+    )
+    if err:
+        status = 404
+        if err == "Forbidden":
+            status = 403
+        if err == "device_id is required":
+            status = 400
+        if err == "Device is disabled":
+            status = 409
+        return jsonify({"error": err}), status
+    return jsonify(rec), 200
+
+
+@app.route("/agent/devices/my", methods=["GET"])
+@limiter.limit("120 per minute")
+def agent_devices_my():
+    """Список устройств текущего вычислителя."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    rows = list_devices_for_client(client_id)
+    return jsonify({"devices": rows}), 200
+
+
+@app.route("/agent/devices/<device_id>/disable", methods=["POST"])
+@limiter.limit("60 per minute")
+def agent_devices_disable(device_id):
+    """Включить/выключить устройство вычислителя."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    rec, err = set_device_disabled(
+        client_id=client_id,
+        device_id=(device_id or "").strip(),
+        is_disabled=bool(data.get("is_disabled", True)),
+    )
+    if err:
+        return jsonify({"error": err}), 404 if err == "Device not found" else 403
+    return jsonify(rec), 200
+
+
+@app.route("/agent/job/<job_id>/complete_ack", methods=["POST"])
+@limiter.limit("120 per minute")
+def agent_job_complete_ack(job_id):
+    """Desktop-agent: локальное подтверждение завершения вычисления до submit_work."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    assignment = _get_job_assignment((job_id or "").strip())
+    if not assignment:
+        return jsonify({"error": "Job not found"}), 404
+    if assignment.get("client_id") != client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    if assignment.get("status") in JOB_STATUSES_FINAL:
+        return jsonify({"error": f"Job is {assignment.get('status')}"}), 409
+    data = request.get_json(silent=True) or {}
+    result_preview = (data.get("result_data") or "")[:64] or None
+    nonce_preview = (str(data.get("nonce")) if data.get("nonce") is not None else None)
+    updated = _update_job_assignment(
+        assignment.get("job_id"),
+        status="completed_local",
+        result_data=result_preview,
+        nonce=nonce_preview,
+    )
+    return jsonify(updated), 200
+
+
 @app.route("/worker_progress", methods=["GET", "POST"])
 @limiter.limit("60 per minute")
 def worker_progress():
@@ -1962,6 +2459,37 @@ def worker_progress():
 def dashboard():
     """Веб-интерфейс (дашборд по принципам BOINC)."""
     return send_from_directory(app.static_folder or "static", "dashboard.html")
+
+
+@app.route("/download/desktop-agent", methods=["GET"])
+def download_desktop_agent():
+    """Скачать desktop-агент как zip-архив."""
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(app_dir), "desktop_agent"),
+        os.path.join(app_dir, "desktop_agent"),
+    ]
+    desktop_dir = next((path for path in candidates if os.path.isdir(path)), "")
+    if not desktop_dir:
+        return jsonify({"error": "Desktop agent bundle not found on server"}), 404
+
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(desktop_dir):
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            for file_name in files:
+                if file_name.endswith((".pyc", ".pyo")):
+                    continue
+                abs_path = os.path.join(root, file_name)
+                rel_path = os.path.relpath(abs_path, desktop_dir)
+                zf.write(abs_path, arcname=os.path.join("desktop_agent", rel_path))
+    archive.seek(0)
+    return send_file(
+        archive,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="desktop_agent.zip",
+    )
 
 
 @app.route("/explorer")
@@ -2054,4 +2582,10 @@ if __name__ == "__main__":
     else:
         logger.info("TLS not configured (set TLS_CERT_FILE, TLS_KEY_FILE for HTTPS)")
 
-    app.run(host="0.0.0.0", port=5000, debug=True, ssl_context=ssl_context)
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").strip().lower() in ("1", "true", "yes", "on")
+    if debug_mode:
+        logger.warning("FLASK_DEBUG is enabled (use only for local development)")
+    if not NODE_SECRET and not debug_mode:
+        logger.error("NODE_SECRET is not set; remote synchronization endpoints are disabled. Set NODE_SECRET for non-local environments.")
+        raise RuntimeError("NODE_SECRET must be set when FLASK_DEBUG is disabled")
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode, ssl_context=ssl_context)

@@ -5,6 +5,8 @@ WORKDIR /app
 
 # Общий модуль вычислений (один источник правды для верификации)
 COPY shared /app/shared
+# Desktop agent bundle for /download/desktop-agent endpoint
+COPY desktop_agent /app/desktop_agent
 # Модуль оркестратора
 COPY orchestrator_node/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

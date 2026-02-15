@@ -122,6 +122,20 @@ class ClientWorker:
             logger.warning("fetch_task failed: %s", e)
             return None
 
+    def _heartbeat_job(self, job_id):
+        """Продлить lease задачи на оркестраторе (best-effort)."""
+        if not job_id:
+            return
+        try:
+            requests.post(
+                f"{ORCHESTRATOR_URL}/agent/job/{job_id}/heartbeat",
+                headers=self._auth_headers(),
+                verify=VERIFY_SSL,
+                timeout=3,
+            )
+        except requests.RequestException:
+            pass
+
     def perform_computation(self, task):
         """
         Выполнение работы по спецификации контракта.
@@ -147,6 +161,7 @@ class ClientWorker:
             compute_func = compute_simple_pow
 
         task_seed = task.get("task_seed")
+        job_id = task.get("job_id")
         logger.info("Starting computation: type=%s contract_id=%s work_units=%s task_seed=%s",
                    computation_type, contract_id, target_work, task_seed)
         if target_work >= 10000 and computation_type != "simple_pow":
@@ -154,6 +169,7 @@ class ClientWorker:
                         target_work)
 
         if computation_type == "simple_pow":
+            self._heartbeat_job(job_id)
             task_seed = task.get("task_seed")
             result_data, solution_nonce = compute_func(
                 self.client_id, contract_id, target_work, difficulty, seed=task_seed
@@ -174,6 +190,7 @@ class ClientWorker:
                 pct = 100.0 * cur / total if total else 0
                 logger.info("Progress: %s / %s (%.0f%%)", cur, total, pct)
                 self._report_progress(contract_id, cur, total)
+                self._heartbeat_job(job_id)
             result_data, computed_seed = compute_func(
                 self.client_id, contract_id, target_work, seed=seed,
                 progress_callback=_progress
@@ -192,9 +209,22 @@ class ClientWorker:
 
     def submit_work(self, task, work_done, result_data, solution_nonce=None):
         """Отправка результата оркестратору. Повторные попытки при сбое — чтобы не терять выполненную работу."""
+        job_id = task.get("job_id")
+        if job_id:
+            try:
+                requests.post(
+                    f"{ORCHESTRATOR_URL}/agent/job/{job_id}/complete_ack",
+                    json={"result_data": result_data, "nonce": solution_nonce},
+                    headers=self._auth_headers(),
+                    verify=VERIFY_SSL,
+                    timeout=3,
+                )
+            except requests.RequestException:
+                pass
         payload = {
             "client_id": self.client_id,
             "contract_id": task["contract_id"],
+            "job_id": job_id,
             "work_units_done": work_done,
             "result_data": result_data,
             "nonce": solution_nonce,

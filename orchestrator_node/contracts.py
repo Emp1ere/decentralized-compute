@@ -99,8 +99,8 @@ def verify_contract_result(
                 SEED_MAX,
             )
         except ImportError:
-            # Старые образы без shared: fallback на проверку формата
-            return True
+            # Fail-closed: если модуль верификации недоступен, работу нельзя считать подтверждённой.
+            return False
         if not (SEED_MIN <= seed_val <= SEED_MAX):
             return False
         compute_func = COMPUTATION_TYPES.get(expected_computation_type)
