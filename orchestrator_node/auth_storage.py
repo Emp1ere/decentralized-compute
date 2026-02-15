@@ -67,6 +67,22 @@ def find_by_client_id(client_id):
     return None
 
 
+def find_by_api_key(api_key):
+    """Найти пользователя по api_key. Возвращает dict с login, nickname, client_id или None."""
+    users = _load_raw()
+    key = (api_key or "").strip()
+    if not key:
+        return None
+    for u in users:
+        if isinstance(u, dict) and (u.get("api_key") or "").strip() == key:
+            return {
+                "login": u.get("login"),
+                "nickname": u.get("nickname") or u.get("login"),
+                "client_id": u.get("client_id"),
+            }
+    return None
+
+
 def create_user(login, password, nickname=None):
     """
     Создать пользователя (логин, пароль, опционально никнейм).

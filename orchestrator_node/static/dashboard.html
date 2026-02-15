@@ -332,15 +332,18 @@
       <div class="label">Создать контракт поставщика</div>
       <div class="row">
         <input type="text" id="provider-task-name" placeholder="Название задачи" style="min-width:200px;">
-        <input type="text" id="provider-task-category" placeholder="Категория" style="min-width:160px;">
+        <input type="text" id="provider-task-category" placeholder="Категория (опционально)" style="min-width:180px;">
         <select id="provider-computation-type" style="min-width:180px;">
-          <option value="simple_pow">simple_pow</option>
-          <option value="cosmological">cosmological</option>
-          <option value="supernova">supernova</option>
-          <option value="mhd">mhd</option>
-          <option value="radiative">radiative</option>
-          <option value="gravitational_waves">gravitational_waves</option>
+          <option value="modeling_simulations">Моделирование и симуляции</option>
+          <option value="biomedicine">Биомедицина</option>
+          <option value="artificial_intelligence">Искусственный интеллект</option>
+          <option value="data_analysis">Анализ данных</option>
         </select>
+      </div>
+      <div class="row">
+        <small style="color:var(--muted);">
+          В этом списке выбирается типология задачи для интерфейса. Внутренний вычислительный профиль подставляется автоматически для совместимости.
+        </small>
       </div>
       <div class="row">
         <input type="number" id="provider-work-units" min="1" step="1" placeholder="Ед. на сдачу" style="min-width:140px;">
@@ -1192,6 +1195,28 @@
       radiative: 4,
       gravitational_waves: 6
     };
+    const PROVIDER_CATEGORY_PRESETS = {
+      modeling_simulations: {
+        label: 'Моделирование и симуляции',
+        computationType: 'cosmological',
+        defaultDifficulty: 5
+      },
+      biomedicine: {
+        label: 'Биомедицина',
+        computationType: 'supernova',
+        defaultDifficulty: 5
+      },
+      artificial_intelligence: {
+        label: 'Искусственный интеллект',
+        computationType: 'mhd',
+        defaultDifficulty: 4
+      },
+      data_analysis: {
+        label: 'Анализ данных',
+        computationType: 'simple_pow',
+        defaultDifficulty: 3
+      }
+    };
     const SUPPORTED_BUDGET_CURRENCIES = ['RUB', 'USD', 'EUR'];
     function formatWalletBalances(balances) {
       const safe = balances || {};
@@ -1767,9 +1792,12 @@
 
     document.getElementById('provider-computation-type').addEventListener('change', function() {
       const difficultyEl = document.getElementById('provider-difficulty');
+      const categoryEl = document.getElementById('provider-task-category');
+      const preset = PROVIDER_CATEGORY_PRESETS[this.value] || PROVIDER_CATEGORY_PRESETS.data_analysis;
       if (!difficultyEl.value) {
-        difficultyEl.value = DEFAULT_DIFFICULTY_BY_COMPUTATION[this.value] || 3;
+        difficultyEl.value = preset.defaultDifficulty;
       }
+      if (categoryEl && !categoryEl.value.trim()) categoryEl.value = preset.label;
     });
 
     document.getElementById('btn-provider-refresh').onclick = function() {
@@ -1779,9 +1807,11 @@
     document.getElementById('btn-provider-create').onclick = async function() {
       const msgEl = document.getElementById('provider-create-msg');
       const taskName = (document.getElementById('provider-task-name').value || '').trim();
-      const taskCategory = (document.getElementById('provider-task-category').value || '').trim() || 'Пользовательская';
+      const selectedCategory = document.getElementById('provider-computation-type').value;
+      const preset = PROVIDER_CATEGORY_PRESETS[selectedCategory] || PROVIDER_CATEGORY_PRESETS.data_analysis;
+      const taskCategory = (document.getElementById('provider-task-category').value || '').trim() || preset.label;
       const taskDescription = (document.getElementById('provider-task-description').value || '').trim();
-      const computationType = document.getElementById('provider-computation-type').value;
+      const computationType = preset.computationType;
       const workUnits = parseInt(document.getElementById('provider-work-units').value, 10);
       const reward = parseInt(document.getElementById('provider-reward').value, 10);
       const budgetCurrency = document.getElementById('provider-budget-currency').value;
@@ -1797,7 +1827,7 @@
       const targetTotal = targetRaw && targetRaw >= workUnits ? targetRaw : (workUnits * 10);
       const difficulty = difficultyRaw && difficultyRaw > 0
         ? difficultyRaw
-        : (DEFAULT_DIFFICULTY_BY_COMPUTATION[computationType] || 3);
+        : (preset.defaultDifficulty || DEFAULT_DIFFICULTY_BY_COMPUTATION[computationType] || 3);
       const jobsEstimate = Math.max(1, Math.floor(targetTotal / Math.max(1, workUnits)));
       const initialBudget = Number.isFinite(budgetRaw) ? Math.max(0, budgetRaw) : (reward * jobsEstimate);
 

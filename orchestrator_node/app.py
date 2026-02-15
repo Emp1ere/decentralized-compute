@@ -81,6 +81,7 @@ auth_load_all = None
 auth_create_user = None
 auth_verify_login = None
 auth_find_by_client_id = None
+auth_find_by_api_key = None
 auth_ensure_user = None
 try:
     from auth_storage import (
@@ -88,6 +89,7 @@ try:
         create_user as auth_create_user,
         verify_login as auth_verify_login,
         find_by_client_id as auth_find_by_client_id,
+        find_by_api_key as auth_find_by_api_key,
         ensure_user as auth_ensure_user,
     )
     n = auth_load_all(api_key_to_client)
@@ -108,7 +110,18 @@ def get_client_id_from_auth():
     if not auth or not auth.startswith("Bearer "):
         return None
     token = auth[7:].strip()
-    return api_key_to_client.get(token)
+    client_id = api_key_to_client.get(token)
+    if client_id is not None:
+        return client_id
+    # Если ключ пришёл на другой узел (после логина/регистрации на пиру),
+    # подтягиваем соответствие из users.json и кэшируем локально.
+    if auth_find_by_api_key is not None:
+        profile = auth_find_by_api_key(token)
+        if profile and profile.get("client_id"):
+            client_id = profile["client_id"]
+            api_key_to_client[token] = client_id
+            return client_id
+    return None
 
 def rate_limit_key():
     """Ключ для лимитов: по API-ключу для авторизованных, иначе по IP (защита от DDoS)."""
@@ -839,7 +852,8 @@ def submit_work():
         contract_id,
     )
 
-    # Создаём транзакцию вознаграждения
+    # Транзакция point-награды (legacy): для рыночных контрактов не используем,
+    # чтобы награда начислялась только в валютный кошелёк через settlement.
     reward_from = f"provider_contract:{contract_id}"
     reward_tx = {
         "type": "reward",
@@ -899,7 +913,10 @@ def submit_work():
             if reserve_err:
                 return jsonify({"error": reserve_err, "code": "provider_contract_budget"}), 409
         try:
-            blockchain.add_transaction(reward_tx)
+            # Для provider-контрактов награда идёт только в fiat-кошелёк
+            # (contract_reward_settlement), а не в chain points.
+            if runtime["kind"] != "provider":
+                blockchain.add_transaction(reward_tx)
             blockchain.add_transaction(work_receipt_tx)
             blockchain.add_transaction(reward_settlement_tx)
         except ValueError as e:
@@ -1856,7 +1873,7 @@ def run_worker():
     if not auth or not auth.startswith("Bearer "):
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     api_key = auth[7:].strip()
-    client_id = api_key_to_client.get(api_key)
+    client_id = get_client_id_from_auth()
     if client_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
     data = request.get_json(silent=True) or {}
@@ -1900,10 +1917,7 @@ def worker_progress():
         POST: JSON с полем "ok": true при успешном сохранении
     """
     if request.method == "POST":
-        auth = request.headers.get("Authorization")
-        if not auth or not auth.startswith("Bearer "):
-            return jsonify({"error": "Missing or invalid Authorization"}), 401
-        client_id = api_key_to_client.get(auth[7:].strip())
+        client_id = get_client_id_from_auth()
         if client_id is None:
             return jsonify({"error": "Missing or invalid Authorization"}), 401
         data = request.get_json(silent=True) or {}
@@ -1966,9 +1980,15 @@ def receive_block():
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"accepted": False, "error": "No JSON"}), 400
+    prev_last_index = blockchain.get_last_block().index if blockchain.chain else -1
     ok, err = blockchain.add_block_from_peer(data)
     if ok:
-        if PEER_URL:
+        # Важно: пересылаем дальше только реально новый блок.
+        # Иначе дубликаты (ok=True для идемпотентности) начинают "пинг-понг"
+        # между узлами и забивают /receive_block до 429.
+        current_last_index = blockchain.get_last_block().index if blockchain.chain else -1
+        is_new_block = current_last_index > prev_last_index
+        if PEER_URL and is_new_block:
             try:
                 headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
                 requests.post(

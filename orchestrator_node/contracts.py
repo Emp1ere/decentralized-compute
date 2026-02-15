@@ -226,7 +226,7 @@ class CosmologicalSimulation(BaseContract):
     reward = 500
     task_name = "Космологическая симуляция"
     task_description = "Моделирование крупномасштабной структуры Вселенной: гравитация, гидродинамика, звездообразование, обратная связь от чёрных дыр"
-    task_category = "Астрофизика"
+    task_category = "Моделирование и симуляции"
     computation_type = "cosmological"
 
     def _difficulty(self):
@@ -245,7 +245,7 @@ class SupernovaModeling(BaseContract):
     reward = 400
     task_name = "Моделирование сверхновой"
     task_description = "Радиационно-гидродинамическое моделирование взрыва сверхновой с учётом нейтринного транспорта"
-    task_category = "Астрофизика"
+    task_category = "Моделирование и симуляции"
     computation_type = "supernova"
 
     def _difficulty(self):
@@ -264,7 +264,7 @@ class MHDJetAccretion(BaseContract):
     reward = 300
     task_name = "МГД джетов и аккреции"
     task_description = "Магнитогидродинамическое моделирование джетов и аккреционных дисков с адаптивными сетками"
-    task_category = "Астрофизика"
+    task_category = "Моделирование и симуляции"
     computation_type = "mhd"
 
     def _difficulty(self):
@@ -283,7 +283,7 @@ class RadiativeTransfer(BaseContract):
     reward = 350
     task_name = "Радиационный перенос"
     task_description = "Решение уравнения переноса излучения в многомерных пространствах (распараллеливание по углам, частотам, координатам)"
-    task_category = "Астрофизика"
+    task_category = "Моделирование и симуляции"
     computation_type = "radiative"
 
     def _difficulty(self):
@@ -303,7 +303,7 @@ class GravitationalWaves(BaseContract):
     reward = 750
     task_name = "Гравитационные волны"
     task_description = "Численное решение уравнений Эйнштейна для моделирования слияний нейтронных звёзд и чёрных дыр"
-    task_category = "Астрофизика"
+    task_category = "Моделирование и симуляции"
     computation_type = "gravitational_waves"
 
     def _difficulty(self):

@@ -119,12 +119,12 @@
       "difficulty": 4,
       "status": "active",
       "budget_tokens_total": 3000,
-      "budget_tokens_spent": 0,
+      "budget_tokens_spent": 1500,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 0,
-      "jobs_completed": 0,
+      "completed_work_units": 300000,
+      "jobs_completed": 5,
       "created_at": 1771101828,
-      "updated_at": 1771101828
+      "updated_at": 1771124938
     },
     {
       "contract_id": "astro-004",
