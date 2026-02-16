@@ -1,0 +1,13 @@
+{
+  "devices": [
+    {
+      "device_id": "dev-1771195239",
+      "client_id": "1c350a50-f554-4ad1-949f-bf03bb555ee4",
+      "device_name": "Desktop agent",
+      "agent_version": "0.3.0",
+      "created_at": 1771197569,
+      "last_seen_at": 1771197988,
+      "is_disabled": false
+    }
+  ]
+}

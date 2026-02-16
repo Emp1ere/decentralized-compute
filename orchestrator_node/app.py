@@ -1616,9 +1616,21 @@ def provider_contracts():
             provider_client_id,
             sector_id=sector_id_filter,
         )
+        chain_stats = blockchain.get_contract_stats()
         onchain_rows = list_contracts_onchain(blockchain.chain, provider_client_id=provider_client_id)
         onchain_by_id = {row.get("contract_id"): row for row in onchain_rows}
         for row in runtime_contracts:
+            cid = row.get("contract_id")
+            stats = chain_stats.get(cid, {})
+            target = int(row.get("target_total_work_units") or 0)
+            total_done = int(stats.get("total_work_done", 0))
+            completion_pct = min(100.0, (total_done / target * 100)) if target else 0.0
+            row["total_work_done"] = total_done
+            row["jobs_count"] = int(stats.get("jobs_count", 0))
+            row["completion_pct"] = round(completion_pct, 1)
+            row["active_workers"] = _active_workers_count(cid)
+            row["remaining_volume"] = max(0, target - total_done)
+            row["free_volume"] = row["remaining_volume"]
             row["onchain"] = onchain_by_id.get(row.get("contract_id"))
         return jsonify(runtime_contracts), 200
 
@@ -1959,16 +1971,33 @@ def explorer_address(client_id):
     client_id = (client_id or "").strip()
     if not client_id:
         return jsonify({"error": "client_id required"}), 400
-    balance = blockchain.get_balance(client_id)
+
+    known_client_ids = set(blockchain.balances.keys())
+    party_fields = ("to", "from", "client_id", "provider_client_id", "worker_client_id")
+    for block in blockchain.chain:
+        for tx in block.transactions:
+            for field in party_fields:
+                value = tx.get(field)
+                if isinstance(value, str) and value:
+                    known_client_ids.add(value)
+
+    resolved_client_id = client_id
+    if client_id not in known_client_ids:
+        matches = sorted(cid for cid in known_client_ids if cid.startswith(client_id))
+        if len(matches) == 1:
+            resolved_client_id = matches[0]
+        elif len(matches) > 1:
+            return jsonify({
+                "error": "Ambiguous client_id prefix",
+                "matches": matches[:10],
+            }), 400
+
+    chain_points = blockchain.get_balance(resolved_client_id)
+    wallet_info = get_wallet_from_chain(blockchain.chain, resolved_client_id)
     transactions = []
     for block in blockchain.chain:
-        b_dict = block.__dict__
         for tx in block.transactions:
-            involved = False
-            if tx.get("type") == "reward" and tx.get("to") == client_id:
-                involved = True
-            if tx.get("type") == "work_receipt" and tx.get("client_id") == client_id:
-                involved = True
+            involved = any(tx.get(field) == resolved_client_id for field in party_fields)
             if involved:
                 transactions.append({
                     "block_index": block.index,
@@ -1976,11 +2005,17 @@ def explorer_address(client_id):
                     "tx": tx,
                 })
     transactions.reverse()
-    return jsonify({
-        "client_id": client_id,
-        "balance": balance,
+    payload = {
+        "client_id": resolved_client_id,
+        "balance": chain_points,
+        "chain_points": chain_points,
+        "fiat_wallet": wallet_info.get("balances", {}),
+        "fiat_total_rub_estimate": wallet_info.get("total_rub_estimate", 0),
         "transactions": transactions,
-    }), 200
+    }
+    if resolved_client_id != client_id:
+        payload["resolved_from"] = client_id
+    return jsonify(payload), 200
 
 
 @app.route("/pending", methods=["GET"])
@@ -2465,13 +2500,20 @@ def dashboard():
 def download_desktop_agent():
     """Скачать desktop-агент как zip-архив."""
     app_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
+    desktop_candidates = [
         os.path.join(os.path.dirname(app_dir), "desktop_agent"),
         os.path.join(app_dir, "desktop_agent"),
     ]
-    desktop_dir = next((path for path in candidates if os.path.isdir(path)), "")
+    shared_candidates = [
+        os.path.join(os.path.dirname(app_dir), "shared"),
+        os.path.join(app_dir, "shared"),
+    ]
+    desktop_dir = next((path for path in desktop_candidates if os.path.isdir(path)), "")
+    shared_dir = next((path for path in shared_candidates if os.path.isdir(path)), "")
     if not desktop_dir:
         return jsonify({"error": "Desktop agent bundle not found on server"}), 404
+    if not shared_dir:
+        return jsonify({"error": "Shared module bundle not found on server"}), 404
 
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -2483,6 +2525,14 @@ def download_desktop_agent():
                 abs_path = os.path.join(root, file_name)
                 rel_path = os.path.relpath(abs_path, desktop_dir)
                 zf.write(abs_path, arcname=os.path.join("desktop_agent", rel_path))
+        for root, dirs, files in os.walk(shared_dir):
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            for file_name in files:
+                if file_name.endswith((".pyc", ".pyo")):
+                    continue
+                abs_path = os.path.join(root, file_name)
+                rel_path = os.path.relpath(abs_path, shared_dir)
+                zf.write(abs_path, arcname=os.path.join("shared", rel_path))
     archive.seek(0)
     return send_file(
         archive,

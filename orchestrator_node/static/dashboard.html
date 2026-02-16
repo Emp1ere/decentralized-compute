@@ -246,8 +246,8 @@
       </div>
       <div id="auth-profile" style="display:none;">
         <p><strong>Вы вошли как</strong> <span id="profile-nickname">-</span> <span id="profile-login" class="muted" style="font-size:0.9em;"></span></p>
-        <p>Баланс в цепочке: <strong id="profile-balance">0</strong> баллов · Сдано работ: <strong id="profile-submissions">0</strong></p>
-        <p class="muted" style="font-size:0.85em; margin-top:8px;">Баланс и сданные работы хранятся в блокчейне узла. Данные по всем вычислителям обновляются по кнопке «Обновить данные».</p>
+        <p>Fiat-кошелёк: <strong id="profile-balance">RUB: 0 · USD: 0 · EUR: 0</strong> · Сдано работ: <strong id="profile-submissions">0</strong></p>
+        <p class="muted" style="font-size:0.85em; margin-top:8px;">Основные взаиморасчёты ведутся в валютах контракта (RUB/USD/EUR). Chain points отображаются в профиле как служебная метрика.</p>
         <button type="button" id="btn-auth-logout">Выйти</button>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -260,7 +260,7 @@
           href="/download/desktop-agent"
           style="text-decoration:none; display:inline-block; padding:14px 22px; border-radius:10px; font-size:1.05rem; font-weight:700; background:#2f7df6; color:#fff; box-shadow:0 8px 24px rgba(47,125,246,0.35);"
         >Скачать Desktop Agent</a>
-        <span class="muted" style="font-size:0.9em;">Скачивается zip-архив: распакуйте и запустите <code>python desktop_agent_app.py</code> в папке <code>desktop_agent</code>.</span>
+        <span class="muted" style="font-size:0.9em;">Скачивается zip-архив (desktop_agent + shared): распакуйте и запустите <code>python desktop_agent_app.py</code> в папке <code>desktop_agent</code>.</span>
       </div>
     </div>
   </div>
@@ -475,8 +475,8 @@
           <div class="card"><div class="label">Никнейм</div><div id="profile-nickname-full" class="value">-</div></div>
           <div class="card"><div class="label">Логин</div><div id="profile-login-full" class="value">-</div></div>
           <div class="card"><div class="label">ID вычислителя</div><div id="profile-client-id" class="value mono" style="font-size:0.9rem; word-break:break-all;">-</div></div>
-          <div class="card"><div class="label">Баланс в цепочке (поинты)</div><div id="profile-balance-full" class="value">-</div></div>
           <div class="card"><div class="label">Fiat-кошелёк</div><div id="profile-fiat-wallet" class="value" style="font-size:0.9rem;">-</div></div>
+          <div class="card"><div class="label">Chain points (служебно)</div><div id="profile-balance-full" class="value">-</div></div>
           <div class="card"><div class="label">Сдано работ</div><div id="profile-submissions-full" class="value">-</div></div>
         </div>
       </div>
@@ -747,9 +747,9 @@
       list.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        const bal = c.balance != null ? c.balance : '-';
+        const walletText = formatWalletBalances(c.fiat_wallet || {});
         const sub = c.submissions_count != null ? c.submissions_count : '-';
-        opt.textContent = (c.label || 'Вычислитель') + ' · баланс: ' + bal + ' · сдано: ' + sub;
+        opt.textContent = (c.label || 'Вычислитель') + ' · кошелёк: ' + walletText + ' · сдано: ' + sub;
         sel.appendChild(opt);
       });
       // Восстанавливаем выбранное значение, если оно всё ещё существует в списке
@@ -768,7 +768,13 @@
         const r = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + c.apiKey } });
         if (!r.ok) return c;
         const d = await r.json();
-        return { ...c, balance: d.balance ?? 0, submissions_count: d.submissions_count ?? 0, client_id: d.client_id || c.client_id };
+        return {
+          ...c,
+          balance: d.balance ?? 0,
+          fiat_wallet: d.fiat_wallet || c.fiat_wallet || {},
+          submissions_count: d.submissions_count ?? 0,
+          client_id: d.client_id || c.client_id,
+        };
       } catch (e) { return c; }
     }
     
@@ -817,9 +823,9 @@
       list.forEach(c => {
         const row = document.createElement('div');
         row.className = 'saved-client-row';
-        const bal = c.balance != null ? c.balance : '-';
+        const walletText = formatWalletBalances(c.fiat_wallet || {});
         const sub = c.submissions_count != null ? c.submissions_count : '-';
-        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> - chain-баланс: ' + bal + ' баллов, сдано работ: ' + sub + '</span>' +
+        row.innerHTML = '<span><strong>' + (c.label || 'Вычислитель') + '</strong> - кошелёк: ' + walletText + ', сдано работ: ' + sub + '</span>' +
           '<button type="button" class="primary" data-use="' + c.id + '">Использовать</button>' +
           '<button type="button" class="primary" data-sync-one="' + c.id + '">Обновить</button>' +
           '<button type="button" data-remove="' + c.id + '">Удалить</button>';
@@ -955,7 +961,7 @@
         const d = await r.json();
         document.getElementById('profile-nickname').textContent = d.nickname || d.login || d.client_id?.slice(0, 8) + '…';
         document.getElementById('profile-login').textContent = d.login ? '(' + d.login + ')' : '';
-        document.getElementById('profile-balance').textContent = d.balance ?? 0;
+        document.getElementById('profile-balance').textContent = formatWalletBalances(d.fiat_wallet || {});
         document.getElementById('profile-submissions').textContent = d.submissions_count ?? 0;
       } catch (e) {}
     }
@@ -1535,13 +1541,11 @@
         const meRes = await fetch(base + '/me', { headers: { 'Authorization': 'Bearer ' + key } });
         const meData = await meRes.json();
         if (!meRes.ok) throw new Error(meData.error || 'Неверный ключ');
-        const balRes = await fetch(base + '/get_balance/' + encodeURIComponent(meData.client_id), { headers: { 'Authorization': 'Bearer ' + key } });
-        const balData = await balRes.json();
-        if (!balRes.ok) throw new Error(balData.error || balRes.status);
+        const walletRes = await fetch(base + '/market/wallet', { headers: { 'Authorization': 'Bearer ' + key } });
+        const walletData = await walletRes.json();
+        if (!walletRes.ok) throw new Error(walletData.error || walletRes.status);
         resultEl.className = 'msg ok';
-        const bal = balData.balance ?? 0;
-        resultEl.textContent = 'Chain-баланс: ' + bal + ' баллов.';
-        if (bal === 0) resultEl.textContent += ' Если воркер уже сдал задачу - подождите 30–60 сек и нажмите снова. Диагностика: docker logs orchestrator_node_1';
+        resultEl.textContent = 'Кошелёк: ' + formatWalletBalances(walletData.balances || {}) + ' · Chain points: ' + (meData.balance ?? 0);
         resultEl.style.display = 'block';
       } catch (e) {
         resultEl.className = 'msg err';
@@ -1703,7 +1707,7 @@
         const walletData = await walletRes.json();
         if (!walletRes.ok) throw new Error(walletData.error || walletRes.status);
         msg.className = 'msg ok';
-        msg.textContent = 'Chain points: ' + (meData.balance ?? 0) + ' · Wallet: ' + formatWalletBalances(walletData.balances);
+        msg.textContent = 'Кошелёк: ' + formatWalletBalances(walletData.balances || {}) + ' · Chain points: ' + (meData.balance ?? 0);
         msg.style.display = 'block';
       } catch (e) {
         msg.className = 'msg err';

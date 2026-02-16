@@ -134,6 +134,7 @@
     <h2>Поиск блока по индексу</h2>
     <div class="row">
       <input type="number" id="search-block-index" min="0" placeholder="Индекс блока">
+      <button type="button" id="btn-paste-block-index">Вставить</button>
       <button type="button" class="primary" id="btn-search-block">Показать блок</button>
       <span id="block-search-msg" class="msg" style="display:none;"></span>
     </div>
@@ -170,6 +171,7 @@
     <h2>Поиск по адресу (client_id)</h2>
     <div class="row">
       <input type="text" id="search-address" placeholder="UUID вычислителя (client_id)">
+      <button type="button" id="btn-paste-address">Вставить</button>
       <button type="button" class="primary" id="btn-search-address">Показать адрес</button>
       <span id="address-msg" class="msg" style="display:none;"></span>
     </div>
@@ -178,7 +180,9 @@
   <div id="address-result" class="detail-panel">
     <h2 style="margin-top:0;">Адрес <span id="addr-client-id" class="mono"></span></h2>
     <div class="meta">
-      <div><span class="k">Баланс:</span> <span id="addr-balance" class="value"></span> токенов</div>
+      <div><span class="k">Fiat-кошелёк:</span> <span id="addr-fiat-wallet" class="value"></span></div>
+      <div><span class="k">Эквивалент (RUB):</span> <span id="addr-fiat-rub-estimate"></span></div>
+      <div><span class="k">Chain points:</span> <span id="addr-chain-points"></span></div>
       <div><span class="k">Транзакций:</span> <span id="addr-tx-count"></span></div>
     </div>
     <div class="table-responsive">
@@ -198,6 +202,11 @@
         if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
         return r.json();
       });
+    }
+
+    function formatWalletBalances(balances) {
+      const safe = balances || {};
+      return ['RUB', 'USD', 'EUR'].map(cur => `${cur}: ${safe[cur] ?? 0}`).join(' · ');
     }
 
     function loadSummary() {
@@ -287,10 +296,18 @@
       if (!clientId) return;
       api('/explorer/address/' + encodeURIComponent(clientId))
         .then(data => {
-          document.getElementById('address-msg').style.display = 'none';
+          if (data.resolved_from) {
+            document.getElementById('address-msg').textContent = 'Префикс ' + data.resolved_from + ' распознан как ' + data.client_id;
+            document.getElementById('address-msg').className = 'msg ok';
+            document.getElementById('address-msg').style.display = 'block';
+          } else {
+            document.getElementById('address-msg').style.display = 'none';
+          }
           document.getElementById('address-result').classList.add('active');
           document.getElementById('addr-client-id').textContent = data.client_id;
-          document.getElementById('addr-balance').textContent = data.balance ?? 0;
+          document.getElementById('addr-fiat-wallet').textContent = formatWalletBalances(data.fiat_wallet || {});
+          document.getElementById('addr-fiat-rub-estimate').textContent = data.fiat_total_rub_estimate ?? 0;
+          document.getElementById('addr-chain-points').textContent = data.chain_points ?? data.balance ?? 0;
           document.getElementById('addr-tx-count').textContent = (data.transactions && data.transactions.length) || 0;
           const tbody = document.querySelector('#address-tx-table tbody');
           tbody.innerHTML = '';
@@ -299,6 +316,15 @@
             let details = '';
             if (tx.type === 'reward') details = 'Награда +' + (tx.amount ?? 0) + ' за ' + (tx.contract_id || '');
             if (tx.type === 'work_receipt') details = 'Работа: ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0) + ', комиссия ' + (tx.fee ?? 0);
+            if (tx.type === 'fiat_topup') details = 'Пополнение: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
+            if (tx.type === 'fiat_withdrawal_request') details = 'Вывод: ' + (tx.amount ?? 0) + ' ' + (tx.currency || '') + ', статус ' + (tx.status || 'queued');
+            if (tx.type === 'fiat_conversion') details = 'Конвертация: ' + (tx.source_amount ?? 0) + ' ' + (tx.from_currency || '') + ' -> ' + (tx.target_amount ?? 0) + ' ' + (tx.to_currency || '');
+            if (tx.type === 'contract_reward_settlement') details = 'Выплата за контракт: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '') + ', контракт ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0);
+            if (tx.type === 'contract_create_event') details = 'Создан контракт: ' + (tx.contract_id || '') + ' (' + (tx.task_name || '') + ')';
+            if (tx.type === 'contract_budget_fund_event') details = 'Пополнение бюджета контракта: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
+            if (tx.type === 'contract_budget_refund_event') details = 'Возврат бюджета контракта: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
+            if (tx.type === 'contract_status_event') details = 'Статус контракта: ' + (tx.status || '');
+            if (!details) details = 'tx_id: ' + ((tx.event_id || tx.id || 'n/a').toString().slice(0, 24));
             tr.innerHTML = '<td><a href="#" class="mono block-link" data-index="' + block_index + '">' + block_index + '</a></td><td class="tx-type-' + (tx.type || '') + '">' + (tx.type || '—') + '</td><td>' + details + '</td>';
             tbody.appendChild(tr);
           });
@@ -312,6 +338,49 @@
           document.getElementById('address-msg').className = 'msg err';
           document.getElementById('address-msg').style.display = 'block';
         });
+    });
+
+    document.getElementById('search-address').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('btn-search-address').click();
+    });
+
+    document.getElementById('search-block-index').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('btn-search-block').click();
+    });
+
+    async function pasteIntoInput(inputId) {
+      const input = document.getElementById(inputId);
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          input.value = text.trim();
+          input.focus();
+          return;
+        }
+      } catch (_e) {
+        // ignore and fallback to prompt
+      }
+      const manual = window.prompt('Вставьте значение');
+      if (manual !== null) {
+        input.value = (manual || '').trim();
+        input.focus();
+      }
+    }
+
+    document.getElementById('btn-paste-address').addEventListener('click', async () => {
+      await pasteIntoInput('search-address');
+    });
+
+    document.getElementById('btn-paste-block-index').addEventListener('click', async () => {
+      await pasteIntoInput('search-block-index');
+    });
+
+    document.getElementById('search-address').addEventListener('paste', (e) => {
+      const pasted = e.clipboardData?.getData('text');
+      if (pasted) {
+        e.preventDefault();
+        e.target.value = pasted.trim();
+      }
     });
 
     loadSummary();

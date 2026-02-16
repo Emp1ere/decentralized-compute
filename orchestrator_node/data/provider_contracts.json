@@ -213,14 +213,14 @@
       "budget_currency": "RUB",
       "target_total_work_units": 100000,
       "difficulty": 3,
-      "status": "active",
+      "status": "closed",
       "budget_tokens_total": 100000,
-      "budget_tokens_spent": 0,
+      "budget_tokens_spent": 100000,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 0,
-      "jobs_completed": 0,
+      "completed_work_units": 100000,
+      "jobs_completed": 100,
       "created_at": 1771178315,
-      "updated_at": 1771178315
+      "updated_at": 1771199516
     }
   ]
 }

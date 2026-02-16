@@ -1,14 +1,18 @@
 @echo off
 setlocal EnableExtensions
-chcp 65001 >nul 2>&1
+if /I "%~1"=="__run" goto run
+start "start" cmd /k call "%~f0" __run
+exit /b 0
+
+:run
 cd /d "%~dp0"
 echo Current folder: %CD%
 echo.
 
-if not "%NODE_SECRET%"=="" goto have_node_secret
+if not "%NODE_SECRET%"=="" goto have_secret
 for /f "skip=2 tokens=1,2,*" %%A in ('reg query "HKCU\Environment" /v NODE_SECRET 2^>nul') do @if /I "%%A"=="NODE_SECRET" set "NODE_SECRET=%%C"
 
-:have_node_secret
+:have_secret
 if "%NODE_SECRET%"=="" goto missing_secret
 
 echo Starting Docker...
@@ -25,13 +29,6 @@ echo Opening browser: http://localhost:8080
 start "" "http://localhost:8080"
 echo.
 echo Done. To stop: docker-compose down
-if "%BOOTSTRAP_PROVIDER_LOGIN%"=="" set BOOTSTRAP_PROVIDER_LOGIN=first_provider
-if "%BOOTSTRAP_PROVIDER_PASSWORD%"=="" set BOOTSTRAP_PROVIDER_PASSWORD=first_provider_change_me
-echo.
-echo Bootstrap first provider:
-echo   login: %BOOTSTRAP_PROVIDER_LOGIN%
-echo   password: %BOOTSTRAP_PROVIDER_PASSWORD%
-echo   (change via environment variables or .env before start)
 echo.
 pause
 exit /b 0
@@ -39,18 +36,21 @@ exit /b 0
 :missing_secret
 echo ERROR: NODE_SECRET is not set.
 echo.
-echo Set NODE_SECRET before start, for example:
+echo Set NODE_SECRET and run again.
+echo Example:
 echo   set NODE_SECRET=replace_with_long_random_secret
-echo.
-echo For permanent setup (recommended):
-echo   setup_node_secret.bat --generate
 echo   start.bat
 echo.
-pause
-exit /b 1:docker_failed
+echo Permanent setup:
+echo   setup_node_secret.bat --generate
 echo.
-echo Docker failed. Start Docker Desktop and run this script again.
-echo Or open cmd, cd to this folder, run: docker-compose up -d --build
+pause
+exit /b 1
+
+:docker_failed
+echo.
+echo ERROR: Docker start failed.
+echo Make sure Docker Desktop is running.
 echo.
 pause
 exit /b 1

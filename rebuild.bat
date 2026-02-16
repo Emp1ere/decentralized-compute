@@ -1,66 +1,58 @@
 @echo off
 setlocal EnableExtensions
-chcp 65001 >nul 2>&1
+if /I "%~1"=="__run" goto run
+start "rebuild" cmd /k call "%~f0" __run
+exit /b 0
+
+:run
 cd /d "%~dp0"
 
-if not "%NODE_SECRET%"=="" goto have_node_secret
+if not "%NODE_SECRET%"=="" goto have_secret
 for /f "skip=2 tokens=1,2,*" %%A in ('reg query "HKCU\Environment" /v NODE_SECRET 2^>nul') do @if /I "%%A"=="NODE_SECRET" set "NODE_SECRET=%%C"
 
-:have_node_secret
+:have_secret
 if "%NODE_SECRET%"=="" goto missing_secret
 
 echo ========================================
-echo   ПОЛНАЯ ПЕРЕСБОРКА СИСТЕМЫ
+echo FULL REBUILD
 echo ========================================
 echo.
 
-echo [1/4] Остановка и удаление контейнеров...
+echo [1/4] Stop and remove containers...
 docker-compose down
 if errorlevel 1 docker compose down
 echo.
 
-echo [2/4] Пересборка образов (без кэша)...
+echo [2/4] Rebuild images without cache...
 docker-compose build --no-cache
 if errorlevel 1 docker compose build --no-cache
 if errorlevel 1 goto build_failed
 echo.
 
-echo [3/4] Запуск системы...
+echo [3/4] Start containers...
 docker-compose up -d
 if errorlevel 1 docker compose up -d
 if errorlevel 1 goto up_failed
 echo.
 
-echo [4/4] Ожидание запуска сервисов (10 сек)...
+echo [4/4] Wait 10 seconds...
 timeout /t 10 /nobreak >nul
 echo.
 
 echo ========================================
-echo   СТАТУС КОНТЕЙНЕРОВ
+echo CONTAINERS STATUS
 echo ========================================
 docker-compose ps
 echo.
-
-echo ========================================
-echo   СИСТЕМА ПЕРЕСОБРАНА И ЗАПУЩЕНА
-echo ========================================
+echo UI: http://localhost:8080
+echo Node1: http://localhost:5000
+echo Node2: http://localhost:5001
 echo.
-echo Интерфейс: http://localhost:8080
-echo Узел 1:    http://localhost:5000
-echo Узел 2:    http://localhost:5001
-if "%BOOTSTRAP_PROVIDER_LOGIN%"=="" set BOOTSTRAP_PROVIDER_LOGIN=first_provider
-if "%BOOTSTRAP_PROVIDER_PASSWORD%"=="" set BOOTSTRAP_PROVIDER_PASSWORD=first_provider_change_me
-echo.
-echo Bootstrap first provider:
-echo   login: %BOOTSTRAP_PROVIDER_LOGIN%
-echo   password: %BOOTSTRAP_PROVIDER_PASSWORD%
-echo   (change via environment variables or .env before rebuild)
-echo.
-echo Для просмотра логов:
+echo Logs:
 echo   docker logs orchestrator_node_1
 echo   docker logs orchestrator_node_2
 echo.
-echo Для остановки:
+echo Stop:
 echo   docker-compose down
 echo.
 pause
@@ -69,25 +61,28 @@ exit /b 0
 :missing_secret
 echo ERROR: NODE_SECRET is not set.
 echo.
-echo Set NODE_SECRET before rebuild, for example:
+echo Set NODE_SECRET and run again.
+echo Example:
 echo   set NODE_SECRET=replace_with_long_random_secret
-echo.
-echo For permanent setup (recommended):
-echo   setup_node_secret.bat --generate
 echo   rebuild.bat
 echo.
-pause
-exit /b 1:build_failed
+echo Permanent setup:
+echo   setup_node_secret.bat --generate
 echo.
-echo ОШИБКА: Не удалось пересобрать образы.
-echo Убедитесь, что Docker Desktop запущен.
+pause
+exit /b 1
+
+:build_failed
+echo.
+echo ERROR: Failed to rebuild Docker images.
+echo Check Docker Desktop is running.
 echo.
 pause
 exit /b 1
 
 :up_failed
 echo.
-echo ОШИБКА: Не удалось запустить систему.
+echo ERROR: Failed to start containers.
 echo.
 pause
 exit /b 1

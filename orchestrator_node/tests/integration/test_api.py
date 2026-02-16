@@ -259,6 +259,25 @@ def test_chain(client):
     assert chain[0]["index"] == 0
 
 
+def test_explorer_address_includes_settlement_and_prefix_resolve(client):
+    target_id = "e1e678fd-39b1-47d4-a164-2b498879f35c"
+    full_res = client.get(f"/explorer/address/{target_id}")
+    assert full_res.status_code == 200
+    full_payload = full_res.get_json()
+    assert full_payload["client_id"] == target_id
+    assert isinstance(full_payload.get("fiat_wallet"), dict)
+    assert "chain_points" in full_payload
+    tx_types = {item["tx"].get("type") for item in full_payload.get("transactions", [])}
+    assert "work_receipt" in tx_types
+    assert "contract_reward_settlement" in tx_types
+
+    prefix_res = client.get("/explorer/address/e1e678fd-39b1")
+    assert prefix_res.status_code == 200
+    prefix_payload = prefix_res.get_json()
+    assert prefix_payload["client_id"] == target_id
+    assert prefix_payload.get("resolved_from") == "e1e678fd-39b1"
+
+
 def test_contracts_with_stats(client):
     r = client.get("/contracts")
     assert r.status_code == 200
@@ -319,6 +338,16 @@ def test_provider_contract_flow(client, auth_headers):
     contract = create_data.get("contract", create_data)
     assert contract["status"] == "active"
     contract_id = contract["contract_id"]
+    provider_list_res = client.get(
+        "/provider/contracts",
+        headers=headers,
+        query_string={"sector_id": sector_id},
+    )
+    assert provider_list_res.status_code == 200
+    provider_rows = provider_list_res.get_json()
+    created_row = next((row for row in provider_rows if row.get("contract_id") == contract_id), None)
+    assert created_row is not None
+    assert created_row.get("completion_pct") is not None
 
     # 2) Контракт должен появиться в публичном списке /contracts
     contracts_res = client.get("/contracts")
