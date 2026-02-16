@@ -21,6 +21,17 @@
       "is_archived": false,
       "created_at": 1771177684,
       "updated_at": 1771177684
+    },
+    {
+      "sector_id": "sec-e4bda68b455b",
+      "owner_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+      "sector_name": "MolecularDynamics_Easy",
+      "organization_name": "",
+      "compute_domain": "Молекулярная динамика",
+      "description": "Частные тестовые вычисления из открытых источников - по молекулярной динамике",
+      "is_archived": false,
+      "created_at": 1771281269,
+      "updated_at": 1771281269
     }
   ],
   "contracts": [
