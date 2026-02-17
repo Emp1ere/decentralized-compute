@@ -1270,7 +1270,8 @@
       supernova: 5,
       mhd: 4,
       radiative: 4,
-      gravitational_waves: 6
+      gravitational_waves: 6,
+      molecular_dynamics_benchpep: 4
     };
     const PROVIDER_CATEGORY_PRESETS = {
       modeling_simulations: {
@@ -1292,6 +1293,11 @@
         label: 'Анализ данных',
         computationType: 'simple_pow',
         defaultDifficulty: 3
+      },
+      molecular_dynamics: {
+        label: 'Молекулярная динамика (benchPEP)',
+        computationType: 'molecular_dynamics_benchpep',
+        defaultDifficulty: 4
       }
     };
     const SUPPORTED_BUDGET_CURRENCIES = ['RUB', 'USD', 'EUR'];
@@ -1607,6 +1613,15 @@
         const targetWork = parseInt(currentTask.work_units_required, 10) || 0;
         const difficulty = parseInt(currentTask.difficulty, 10) || 0;
         const computationType = currentTask.computation_type || 'simple_pow';
+        if (computationType === 'molecular_dynamics_benchpep') {
+          progressEl.style.display = 'none';
+          runBtn.disabled = false;
+          resultEl.className = 'msg info';
+          resultEl.innerHTML = 'Для molecular dynamics (benchPEP) используйте Desktop Agent. ' +
+            '<a href="/download/desktop-agent" target="_blank" rel="noopener">Скачать дистрибутив</a>.';
+          resultEl.style.display = 'block';
+          return;
+        }
         
         // Выбираем тип вычислений
         let result;

@@ -232,6 +232,36 @@
       "jobs_completed": 100,
       "created_at": 1771178315,
       "updated_at": 1771199516
+    },
+    {
+      "contract_id": "usr-md-benchpep-001",
+      "provider_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+      "sector_id": "sec-e4bda68b455b",
+      "task_name": "benchPEP molecular dynamics workload",
+      "task_description": "BenchPEP-based MD benchmark profile for deterministic chunk execution and settlement validation.",
+      "task_category": "Молекулярная динамика",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 12000,
+      "reward_per_task": 120,
+      "budget_currency": "USD",
+      "target_total_work_units": 720000,
+      "difficulty": 4,
+      "status": "active",
+      "budget_tokens_total": 12000,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771342800,
+      "updated_at": 1771342800,
+      "benchmark_meta": {
+        "benchmark_name": "benchPEP",
+        "input_format": "gromacs_tpr",
+        "input_file": "benchPEP.tpr",
+        "manifest_file": "orchestrator_node/data/benchmarks/benchpep_manifest.example.json",
+        "source_hint": "local upload by provider",
+        "notes": "Binary .tpr parsing requires GROMACS tooling (gmx dump/mdrun)."
+      }
     }
   ]
 }

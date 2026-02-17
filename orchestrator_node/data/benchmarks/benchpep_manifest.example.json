@@ -1,0 +1,20 @@
+{
+  "benchmark_id": "benchpep_v1",
+  "name": "benchPEP",
+  "domain": "molecular_dynamics",
+  "input_format": "gromacs_tpr",
+  "input_file": "benchPEP.tpr",
+  "input_sha256": "REPLACE_WITH_REAL_SHA256",
+  "runner": {
+    "engine": "gromacs",
+    "command_template": "gmx mdrun -s {input_tpr} -nsteps {steps} -deffnm {out_prefix}"
+  },
+  "chunking": {
+    "step_size_per_chunk": 10000,
+    "recommended_checkpoint_interval_seconds": 30
+  },
+  "validation": {
+    "mode": "deterministic_hash",
+    "output_field": "energy_drift"
+  }
+}

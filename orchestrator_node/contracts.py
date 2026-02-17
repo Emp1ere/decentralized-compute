@@ -8,6 +8,7 @@ SUPPORTED_COMPUTATION_TYPES = (
     "mhd",
     "radiative",
     "gravitational_waves",
+    "molecular_dynamics_benchpep",
 )
 
 DEFAULT_DIFFICULTY_BY_COMPUTATION = {
@@ -17,6 +18,7 @@ DEFAULT_DIFFICULTY_BY_COMPUTATION = {
     "mhd": 4,
     "radiative": 4,
     "gravitational_waves": 6,
+    "molecular_dynamics_benchpep": 4,
 }
 
 DEFAULT_BUDGET_CURRENCY_BY_COMPUTATION = {
@@ -26,6 +28,7 @@ DEFAULT_BUDGET_CURRENCY_BY_COMPUTATION = {
     "mhd": "EUR",
     "radiative": "EUR",
     "gravitational_waves": "USD",
+    "molecular_dynamics_benchpep": "USD",
 }
 
 
@@ -79,6 +82,7 @@ def verify_contract_result(
         "mhd",
         "radiative",
         "gravitational_waves",
+        "molecular_dynamics_benchpep",
     ):
         if not (result_data and isinstance(result_data, str) and len(result_data) == 64):
             return False

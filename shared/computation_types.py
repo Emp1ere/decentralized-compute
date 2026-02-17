@@ -263,6 +263,77 @@ def compute_simple_pow(client_id, contract_id, work_units, difficulty, seed=None
     return final_result or "", solution_nonce
 
 
+def compute_molecular_dynamics_benchpep(client_id, contract_id, work_units, seed=None, progress_callback=None):
+    """
+    BenchPEP-like deterministic MD surrogate.
+    Note: this is not a full GROMACS execution; it is a deterministic compute profile
+    that mimics heavy MD numeric workload for contract orchestration/validation flow.
+    """
+    if seed is None:
+        seed = deterministic_seed(client_id, contract_id)
+    rng = random.Random(seed)
+
+    n_particles = 256
+    positions = [[rng.uniform(-2.0, 2.0), rng.uniform(-2.0, 2.0), rng.uniform(-2.0, 2.0)] for _ in range(n_particles)]
+    velocities = [[rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05)] for _ in range(n_particles)]
+    forces = [[0.0, 0.0, 0.0] for _ in range(n_particles)]
+
+    dt = 0.002
+    sigma = 0.34
+    epsilon = 0.238
+    cut2 = 1.2 * 1.2
+    total_energy = 0.0
+
+    for step in range(work_units):
+        if step and step % 2000 == 0 and progress_callback:
+            progress_callback(step, work_units)
+        for i in range(n_particles):
+            forces[i][0] = forces[i][1] = forces[i][2] = 0.0
+
+        potential = 0.0
+        for i in range(n_particles - 1):
+            xi, yi, zi = positions[i]
+            for j in range(i + 1, n_particles):
+                dx = positions[j][0] - xi
+                dy = positions[j][1] - yi
+                dz = positions[j][2] - zi
+                r2 = dx * dx + dy * dy + dz * dz + 1e-9
+                if r2 > cut2:
+                    continue
+                inv_r2 = 1.0 / r2
+                sr2 = (sigma * sigma) * inv_r2
+                sr6 = sr2 * sr2 * sr2
+                sr12 = sr6 * sr6
+                pair_pot = 4.0 * epsilon * (sr12 - sr6)
+                potential += pair_pot
+                coeff = 24.0 * epsilon * (2.0 * sr12 - sr6) * inv_r2
+                fx = coeff * dx
+                fy = coeff * dy
+                fz = coeff * dz
+                forces[i][0] -= fx
+                forces[i][1] -= fy
+                forces[i][2] -= fz
+                forces[j][0] += fx
+                forces[j][1] += fy
+                forces[j][2] += fz
+
+        kinetic = 0.0
+        for i in range(n_particles):
+            velocities[i][0] += forces[i][0] * dt
+            velocities[i][1] += forces[i][1] * dt
+            velocities[i][2] += forces[i][2] * dt
+            positions[i][0] += velocities[i][0] * dt
+            positions[i][1] += velocities[i][1] * dt
+            positions[i][2] += velocities[i][2] * dt
+            vx, vy, vz = velocities[i]
+            kinetic += 0.5 * (vx * vx + vy * vy + vz * vz)
+        total_energy = kinetic + potential
+
+    marker = f"{positions[0][0]:.6f}|{positions[7][1]:.6f}|{total_energy:.6f}"
+    result_hash = hashlib.sha256((client_id + "|" + marker).encode()).hexdigest()
+    return result_hash, str(seed)
+
+
 COMPUTATION_TYPES = {
     "cosmological": compute_cosmological_simulation,
     "supernova": compute_supernova_modeling,
@@ -270,4 +341,5 @@ COMPUTATION_TYPES = {
     "radiative": compute_radiative_transfer,
     "gravitational_waves": compute_gravitational_waves,
     "simple_pow": compute_simple_pow,
+    "molecular_dynamics_benchpep": compute_molecular_dynamics_benchpep,
 }

@@ -2,6 +2,7 @@ import os
 import sys
 import threading
 import time
+import json
 
 from api import ApiClient
 
@@ -14,6 +15,7 @@ from shared.computation_types import COMPUTATION_TYPES, deterministic_seed, comp
 
 
 AGENT_VERSION = "0.3.0"
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_state.json")
 
 
 def in_schedule_window(now_struct, start_hhmm, end_hhmm):
@@ -41,6 +43,18 @@ class DesktopAgent:
         self.worker_thread = None
         self.current_job_id = None
         self.last_task_snapshot = None
+        self.last_heartbeat_at = 0.0
+
+    def _write_state(self, state):
+        try:
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+        except OSError:
+            return
+
+    def _clear_state(self):
+        self.last_task_snapshot = None
+        self._write_state({"status": "idle", "updated_at": int(time.time())})
 
     def is_running(self):
         return self.worker_thread is not None and self.worker_thread.is_alive()
@@ -56,15 +70,26 @@ class DesktopAgent:
 
     def stop(self):
         self.stop_event.set()
+        if self.last_task_snapshot:
+            snapshot = dict(self.last_task_snapshot)
+            snapshot["status"] = "stopping"
+            snapshot["updated_at"] = int(time.time())
+            self._write_state(snapshot)
         self.push_log("Остановка агента...")
 
     def _heartbeat(self, api, cfg):
         if not self.current_job_id:
             return
+        now = time.time()
+        profile = ((self.last_task_snapshot or {}).get("task_profile") or {})
+        min_interval = max(2, int(profile.get("recommended_heartbeat_seconds", 20) or 20))
+        if now - self.last_heartbeat_at < min_interval:
+            return
         try:
             api.request("POST", f"/agent/job/{self.current_job_id}/heartbeat", payload={}, timeout=3)
         except Exception:
             return
+        self.last_heartbeat_at = now
         try:
             api.request(
                 "POST",
@@ -120,6 +145,10 @@ class DesktopAgent:
             if total:
                 pct = int(cur * 100 / total)
                 self.push_log(f"Прогресс {contract_id}: {pct}%")
+                if self.last_task_snapshot is not None:
+                    self.last_task_snapshot["progress_pct"] = pct
+                    self.last_task_snapshot["updated_at"] = int(time.time())
+                    self._write_state(self.last_task_snapshot)
             self._heartbeat(api, cfg)
             if throttle > 0:
                 time.sleep(throttle / 100.0)
@@ -143,6 +172,7 @@ class DesktopAgent:
 
     def _loop(self, cfg):
         api = ApiClient(cfg["base_url"], cfg["api_key"], cfg["verify_ssl"])
+        self._write_state({"status": "starting", "updated_at": int(time.time())})
         while not self.stop_event.is_set():
             now = time.localtime()
             if not in_schedule_window(now, cfg.get("start_time"), cfg.get("end_time")):
@@ -157,7 +187,12 @@ class DesktopAgent:
                     "job_id": self.current_job_id,
                     "contract_id": task.get("contract_id"),
                     "assigned_at": int(time.time()),
+                    "task_profile": task.get("task_profile") if isinstance(task.get("task_profile"), dict) else {},
+                    "status": "in_progress",
+                    "progress_pct": 0,
+                    "updated_at": int(time.time()),
                 }
+                self._write_state(self.last_task_snapshot)
                 work_done, result_data, nonce = self._compute(api, cfg, task)
                 if not result_data or nonce is None:
                     self.push_log("Результат не получен, повтор позже.")
@@ -180,21 +215,32 @@ class DesktopAgent:
                         "result_data": result_data,
                         "nonce": nonce,
                     },
-                    timeout=900,
+                    timeout=int(
+                        ((task.get("task_profile") or {}).get("recommended_submit_timeout_seconds") or 900)
+                    ),
                 )
                 reward = submit_result.get("reward_issued")
                 currency = submit_result.get("reward_currency", "")
                 self.push_log(f"Сдано успешно. Награда: {reward} {currency}".strip())
+                self._clear_state()
                 if cfg.get("check_updates", True):
                     self._check_updates(api)
             except Exception as exc:
                 self.push_log(f"Ошибка выполнения: {exc}")
+                if self.last_task_snapshot:
+                    failed = dict(self.last_task_snapshot)
+                    failed["status"] = "error"
+                    failed["error"] = str(exc)
+                    failed["updated_at"] = int(time.time())
+                    self._write_state(failed)
                 self.stop_event.wait(8)
                 continue
             finally:
                 self.current_job_id = None
+                self.last_heartbeat_at = 0.0
             if not cfg.get("auto_next", True):
                 self.push_log("Авто-следующая часть отключена, агент в режиме ожидания.")
                 break
             self.stop_event.wait(2)
+        self._clear_state()
         self.push_log("Агент остановлен.")

@@ -636,6 +636,21 @@ def _build_dynamic_task_spec(contract_record):
     reward_currency = (contract_record.get("budget_currency") or MARKET_DEFAULT_CURRENCY).upper()
     if reward_currency not in SUPPORTED_BUDGET_CURRENCIES:
         reward_currency = MARKET_DEFAULT_CURRENCY
+    computation_type = contract_record.get("computation_type", "simple_pow")
+    is_heavy = computation_type in {
+        "cosmological",
+        "supernova",
+        "mhd",
+        "radiative",
+        "gravitational_waves",
+        "molecular_dynamics_benchpep",
+    }
+    task_profile = {
+        "mode": "heavy" if is_heavy else "standard",
+        "recommended_heartbeat_seconds": 10 if is_heavy else 20,
+        "recommended_submit_timeout_seconds": 1800 if is_heavy else 900,
+        "recommended_checkpoint_interval_seconds": 30 if is_heavy else 60,
+    }
     return {
         "contract_id": contract_record["contract_id"],
         "sector_id": contract_record.get("sector_id"),
@@ -645,11 +660,13 @@ def _build_dynamic_task_spec(contract_record):
         "task_name": contract_record.get("task_name") or contract_record["contract_id"],
         "task_description": contract_record.get("task_description", ""),
         "task_category": contract_record.get("task_category", "Пользовательская"),
-        "computation_type": contract_record.get("computation_type", "simple_pow"),
+        "computation_type": computation_type,
         "reward_per_task": int(contract_record.get("reward_per_task", 0)),
         "reward_currency": reward_currency,
         "contract_origin": "provider",
         "provider_client_id": contract_record.get("provider_client_id"),
+        "task_profile": task_profile,
+        "benchmark_meta": contract_record.get("benchmark_meta", {}),
     }
 
 
