@@ -9,8 +9,8 @@
   "throttle_percent": 0,
   "device_id": "dev-1771441482",
   "device_name": "Desktop agent",
-  "sector_id": "sec-5d79f9237080",
-  "contract_id": "usr-cbf693eaa077",
+  "sector_id": "sec-e4bda68b455b",
+  "contract_id": "usr-md-benchpep-001",
   "device_capabilities": {
     "cpu_cores": 8,
     "ram_gb": 0.0,

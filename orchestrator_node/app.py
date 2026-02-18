@@ -47,6 +47,10 @@ from device_registry import (
     list_devices_for_client,
     set_device_disabled,
 )
+from decentralized_fiat_policy import (
+    sanitize_validation_policy,
+    sanitize_escrow_policy,
+)
 import hashlib
 import uuid
 import os
@@ -833,6 +837,10 @@ def _build_dynamic_task_spec(contract_record):
         "recommended_submit_timeout_seconds": 1800 if is_heavy else 900,
         "recommended_checkpoint_interval_seconds": 30 if is_heavy else 60,
     }
+    benchmark_meta = contract_record.get("benchmark_meta", {}) if isinstance(contract_record.get("benchmark_meta"), dict) else {}
+    policy_meta = benchmark_meta.get("decentralized_policy", {}) if isinstance(benchmark_meta.get("decentralized_policy"), dict) else {}
+    validation_policy = sanitize_validation_policy(policy_meta.get("validation_policy"))
+    escrow_policy = sanitize_escrow_policy(policy_meta.get("escrow_policy"))
     return {
         "contract_id": contract_record["contract_id"],
         "sector_id": contract_record.get("sector_id"),
@@ -848,7 +856,10 @@ def _build_dynamic_task_spec(contract_record):
         "contract_origin": "provider",
         "provider_client_id": contract_record.get("provider_client_id"),
         "task_profile": task_profile,
-        "benchmark_meta": contract_record.get("benchmark_meta", {}),
+        "benchmark_meta": benchmark_meta,
+        # Stage 1 migration fields: explicit policy payload for agent/validator pipeline.
+        "validation_policy": validation_policy,
+        "escrow_policy": escrow_policy,
     }
 
 
@@ -1881,6 +1892,16 @@ def provider_contracts():
         benchmark_meta = {}
     if not isinstance(benchmark_meta, dict):
         return jsonify({"error": "benchmark_meta must be an object"}), 400
+    # Stage 1 (decentralized+fiat): contract-level policy can be passed explicitly.
+    # It is stored in metadata and exposed in task spec without breaking old clients.
+    validation_policy = sanitize_validation_policy(data.get("validation_policy"))
+    escrow_policy = sanitize_escrow_policy(data.get("escrow_policy"))
+    policy_bucket = benchmark_meta.get("decentralized_policy")
+    if not isinstance(policy_bucket, dict):
+        policy_bucket = {}
+    policy_bucket["validation_policy"] = validation_policy
+    policy_bucket["escrow_policy"] = escrow_policy
+    benchmark_meta["decentralized_policy"] = policy_bucket
 
     if not sector_id:
         return jsonify({"error": "sector_id is required: create/select sector first"}), 400

@@ -120,9 +120,20 @@ class DesktopAgent:
         computation_type = task.get("computation_type", "simple_pow")
         throttle = max(0, min(95, int(cfg.get("throttle_percent", 0) or 0)))
         submit_timeout = int(((task.get("task_profile") or {}).get("recommended_submit_timeout_seconds") or 900))
+        validation_policy = task.get("validation_policy") if isinstance(task.get("validation_policy"), dict) else {}
+        escrow_policy = task.get("escrow_policy") if isinstance(task.get("escrow_policy"), dict) else {}
         self.push_log(
             f"Выполнение: contract={contract_id} type={computation_type} units={target_work} job={task.get('job_id')}"
         )
+        if validation_policy:
+            mode = validation_policy.get("mode", "deterministic")
+            repl = validation_policy.get("replication_factor", 1)
+            self.push_log(f"Validation policy: mode={mode}, replication={repl}")
+        if escrow_policy and escrow_policy.get("enabled"):
+            self.push_log(
+                f"Escrow policy: collateral={escrow_policy.get('worker_collateral', 0)}, "
+                f"penalty={escrow_policy.get('penalty_percent_on_reject', 0)}%"
+            )
 
         def progress(cur, total):
             if total:
