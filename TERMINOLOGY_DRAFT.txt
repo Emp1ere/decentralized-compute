@@ -1,0 +1,45 @@
+Draft terminology (not fixed standard yet)
+=========================================
+
+This file is a working draft for discussion.
+Terms may be renamed later.
+
+1) Orchestrator Node
+- Server-side node that exposes API, issues jobs, validates results, and syncs chain state with peer nodes.
+- In code context: NODE_ID, NODE_SECRET, PEER_URL, receive_block/receive_chain endpoints.
+
+2) Compute Worker (human role)
+- A registered account that performs computations and receives rewards.
+- Key identity: client_id.
+
+3) Desktop Agent (software)
+- Client application running on user hardware.
+- Acts on behalf of a Compute Worker: fetches tasks, computes, submits, sends heartbeats.
+
+4) Device
+- Concrete machine running Desktop Agent.
+- Key identity: device_id.
+- Provides capabilities (cpu_cores, ram_gb, has_gpu, supported_engines) for scheduling.
+
+5) Sector
+- Project container owned by a provider account.
+- Holds contracts in one compute domain.
+
+6) Contract
+- Work definition with budget, reward policy, computation type, and validation requirements.
+
+7) Job / Assignment
+- One issued unit of work (chunk) for a worker.
+- Key identity: job_id.
+- Lifecycle: issued -> in_progress/completed_submitted -> reward_settled/rejected/expired/reassigned.
+
+8) Explorer
+- Read-only detailed interface for chain blocks, address/transaction search and audit.
+
+9) Chain summary (dashboard tab)
+- Lightweight high-level chain status in web dashboard; deep details should be in Explorer.
+
+Notes for future review
+-----------------------
+- Decide final naming for "Compute Worker" vs "Calculator" in UI labels.
+- Decide whether to keep "Node" exclusively for orchestrator-side entities.

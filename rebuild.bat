@@ -47,10 +47,12 @@ echo.
 echo UI: http://localhost:8080
 echo Node1: http://localhost:5000
 echo Node2: http://localhost:5001
+echo Node3: http://localhost:5002
 echo.
 echo Logs:
 echo   docker logs orchestrator_node_1
 echo   docker logs orchestrator_node_2
+echo   docker logs orchestrator_node_3
 echo.
 echo Stop:
 echo   docker-compose down
