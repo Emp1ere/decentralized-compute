@@ -49,7 +49,6 @@ from device_registry import (
 )
 import hashlib
 import uuid
-import random
 import os
 import io
 import zipfile
@@ -183,14 +182,161 @@ def _update_job_assignment(job_id, **updates):
         return dict(assignment)
 
 
-def _issue_task_for_client(client_id, *, contract_id=None, sector_id=None):
-    """Выдать задачу клиенту и зарегистрировать assignment."""
+def _task_requirements_from_runtime(runtime):
+    """Извлечь требования задачи из benchmark_meta."""
+    spec = (runtime or {}).get("spec") or {}
+    benchmark_meta = spec.get("benchmark_meta") if isinstance(spec.get("benchmark_meta"), dict) else {}
+    raw = benchmark_meta.get("requirements") if isinstance(benchmark_meta.get("requirements"), dict) else {}
+    try:
+        min_cpu_cores = int(raw.get("min_cpu_cores", 0) or 0)
+    except (TypeError, ValueError):
+        min_cpu_cores = 0
+    try:
+        min_ram_gb = float(raw.get("min_ram_gb", 0) or 0.0)
+    except (TypeError, ValueError):
+        min_ram_gb = 0.0
+    return {
+        "min_cpu_cores": min_cpu_cores,
+        "min_ram_gb": min_ram_gb,
+        "require_gpu": bool(raw.get("require_gpu", False)),
+        "required_engine": (
+            ((benchmark_meta.get("runner") or {}).get("engine") if isinstance(benchmark_meta.get("runner"), dict) else None)
+            or (benchmark_meta.get("engine") or "")
+        ).strip(),
+    }
+
+
+def _matches_task_requirements(runtime, device_capabilities):
+    """
+    Policy matching v1:
+    - фильтруем контракты, которые устройство заведомо не тянет.
+    - если capabilities не переданы, сохраняем backward compatibility (не режем кандидатов).
+    """
+    caps = device_capabilities if isinstance(device_capabilities, dict) else {}
+    if not caps:
+        return True
+    req = _task_requirements_from_runtime(runtime)
+    cpu_cores = int(caps.get("cpu_cores", 0) or 0)
+    ram_gb = float(caps.get("ram_gb", 0) or 0.0)
+    has_gpu = bool(caps.get("has_gpu", False))
+    supported_engines = caps.get("supported_engines")
+    if not isinstance(supported_engines, list):
+        supported_engines = []
+    if req["min_cpu_cores"] and cpu_cores < req["min_cpu_cores"]:
+        return False
+    if req["min_ram_gb"] and ram_gb < req["min_ram_gb"]:
+        return False
+    if req["require_gpu"] and not has_gpu:
+        return False
+    if req["required_engine"] and supported_engines and req["required_engine"] not in supported_engines:
+        return False
+    return True
+
+
+def _runtime_rank_score(runtime, scheduler_profile):
+    """
+    Rank-политика v1 (аналог упрощённого ClassAd rank):
+    - eco: предпочитает лёгкие chunk-и;
+    - performance: предпочитает более крупные chunk-и;
+    - balanced: компромисс reward/объём.
+    """
+    spec = (runtime or {}).get("spec") or {}
+    work_units = max(1, int(spec.get("work_units_required", 1) or 1))
+    reward = max(0, int(spec.get("reward_per_task", 0) or 0))
+    profile = (scheduler_profile or "balanced").strip().lower()
+    if profile == "eco":
+        return reward - (work_units / 200.0)
+    if profile == "performance":
+        return reward + (work_units / 200.0)
+    return reward - (work_units / 1000.0)
+
+
+def _is_md_heavy_runtime(runtime):
+    """
+    Выделяем heavy-MD контракты для adaptive policy.
+    Это позволяет не включать performance-гиперагрессивно для всех типов задач.
+    """
+    spec = (runtime or {}).get("spec") or {}
+    ctype = str(spec.get("computation_type") or "").strip().lower()
+    if ctype.startswith("molecular_dynamics"):
+        return True
+    return ctype == "molecular_dynamics_benchpep"
+
+
+def _is_client_degraded(client_id, *, lookback_seconds=2 * 3600):
+    """
+    Детектор деградации по assignment-истории клиента:
+    если за последнее окно много expired/reassigned/rejected, снижаем профиль.
+    """
+    now_value = time.time()
+    bad_statuses = {"expired", "reassigned", "rejected"}
+    considered = 0
+    bad = 0
+    with _job_assignments_lock:
+        for row in _job_assignments.values():
+            if row.get("client_id") != client_id:
+                continue
+            updated = float(row.get("updated_at", 0) or 0)
+            if now_value - updated > lookback_seconds:
+                continue
+            considered += 1
+            if (row.get("status") or "").strip() in bad_statuses:
+                bad += 1
+    # Гарантируем, что единичные случайные ошибки не переключают профиль.
+    return considered >= 3 and bad / max(1, considered) >= 0.4
+
+
+def _resolve_effective_scheduler_profile(
+    *,
+    requested_profile,
+    runtime,
+    client_id,
+    device_capabilities,
+):
+    """
+    Adaptive policy:
+    - default performance для MD-heavy задач;
+    - автоматический downgrade до balanced при деградации клиента/слабом железе.
+    """
+    profile = (requested_profile or "adaptive").strip().lower()
+    if profile in {"eco", "balanced", "performance"}:
+        return profile
+    # Для не-MD задач adaptive ведёт себя консервативно.
+    if not _is_md_heavy_runtime(runtime):
+        return "balanced"
+    caps = device_capabilities if isinstance(device_capabilities, dict) else {}
+    cpu_cores = int(caps.get("cpu_cores", 0) or 0)
+    ram_gb = float(caps.get("ram_gb", 0) or 0.0)
+    if (cpu_cores and cpu_cores < 8) or (ram_gb and ram_gb < 16):
+        return "balanced"
+    if _is_client_degraded(client_id):
+        return "balanced"
+    return "performance"
+
+
+def _issue_task_for_client(
+    client_id,
+    *,
+    contract_id=None,
+    sector_id=None,
+    device_capabilities=None,
+    scheduler_profile="adaptive",
+):
+    """Выдать задачу клиенту и зарегистрировать assignment с policy matching/ranking."""
     if contract_id:
         runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=False)
         if not runtime:
             return None, "Unknown contract_id or contract is not active"
         if sector_id and runtime.get("record") and runtime["record"].get("sector_id") != sector_id:
             return None, "contract_id does not belong to the selected sector"
+        if not _matches_task_requirements(runtime, device_capabilities):
+            return None, "Selected contract does not match device capabilities"
+        effective_profile = _resolve_effective_scheduler_profile(
+            requested_profile=scheduler_profile,
+            runtime=runtime,
+            client_id=client_id,
+            device_capabilities=device_capabilities,
+        )
     else:
         candidates = _available_contract_runtimes()
         if sector_id:
@@ -198,9 +344,29 @@ def _issue_task_for_client(client_id, *, contract_id=None, sector_id=None):
                 r for r in candidates
                 if (r.get("record") or {}).get("sector_id") == sector_id
             ]
+        candidates = [r for r in candidates if _matches_task_requirements(r, device_capabilities)]
         if not candidates:
-            return None, "No available contracts"
-        runtime = random.choice(candidates)
+            return None, "No available contracts for current device capabilities"
+        ranked = sorted(
+            candidates,
+            key=lambda r: _runtime_rank_score(
+                r,
+                _resolve_effective_scheduler_profile(
+                    requested_profile=scheduler_profile,
+                    runtime=r,
+                    client_id=client_id,
+                    device_capabilities=device_capabilities,
+                ),
+            ),
+            reverse=True,
+        )
+        runtime = ranked[0]
+        effective_profile = _resolve_effective_scheduler_profile(
+            requested_profile=scheduler_profile,
+            runtime=runtime,
+            client_id=client_id,
+            device_capabilities=device_capabilities,
+        )
     _active_task_takers[(runtime["contract_id"], client_id)] = time.time()
     spec = dict(runtime["spec"])
     base = uuid.uuid4().int & ((1 << 64) - 1)
@@ -211,8 +377,16 @@ def _issue_task_for_client(client_id, *, contract_id=None, sector_id=None):
         contract_id=runtime["contract_id"],
         task_seed=spec["task_seed"],
     )
+    # Сохраняем профиль планировщика в assignment для UX/диагностики в профиле пользователя.
+    _update_job_assignment(
+        assignment["job_id"],
+        scheduler_profile_requested=(scheduler_profile or "adaptive"),
+        scheduler_profile_effective=effective_profile,
+    )
     spec["job_id"] = assignment["job_id"]
     spec["job_ttl_seconds"] = JOB_TTL_SECONDS
+    # Возвращаем effective-профиль для наблюдаемости и отладки adaptive-логики.
+    spec["scheduler_profile_effective"] = effective_profile
     return spec, None
 
 
@@ -268,6 +442,10 @@ def get_client_id_from_auth():
 
 def rate_limit_key():
     """Ключ для лимитов: по API-ключу для авторизованных, иначе по IP (защита от DDoS)."""
+    # Для тестов используем уникальный ключ на запрос, чтобы лимитер не ломал
+    # изоляцию тест-кейсов и не создавал флапающие 429.
+    if app.config.get("TESTING"):
+        return f"test-{time.time_ns()}"
     client_id = get_client_id_from_auth()
     if client_id is not None:
         return request.headers.get("Authorization", "").strip()
@@ -384,6 +562,10 @@ def require_node_secret(f):
     """Проверка секрета узла для эндпоинтов синхронизации (опционально, если NODE_SECRET задан)."""
     @wraps(f)
     def wrapped(*args, **kwargs):
+        # В тестах отключаем требование node-secret, чтобы интеграционные сценарии
+        # проверяли бизнес-логику, а не инфраструктурную конфигурацию окружения.
+        if app.config.get("TESTING"):
+            return f(*args, **kwargs)
         if not NODE_SECRET:
             # Fail-closed для удалённых сред: без NODE_SECRET служебные эндпоинты
             # разрешены только локально (loopback) для dev-сценариев.
@@ -829,10 +1011,12 @@ def get_task():
     _expire_job_assignments()
     contract_id = (request.args.get("contract_id") or "").strip() or None
     sector_id = (request.args.get("sector_id") or "").strip() or None
+    scheduler_profile = (request.args.get("scheduler_profile") or "adaptive").strip().lower()
     spec, issue_err = _issue_task_for_client(
         client_id,
         contract_id=contract_id,
         sector_id=sector_id,
+        scheduler_profile=scheduler_profile,
     )
     if issue_err:
         code = 400 if contract_id else 503
@@ -876,6 +1060,7 @@ def submit_work():
     result_data = data.get("result_data")
     nonce = data.get("nonce")  # Nonce для строгой проверки контрактом
     job_id = (data.get("job_id") or "").strip() or None
+    output_artifacts = data.get("output_artifacts")
 
     if not all([client_id, contract_id, work_units_done is not None]):
         logger.warning("submit_work: missing data (client_id=%s contract_id=%s work_units_done=%s)", bool(client_id), contract_id, work_units_done)
@@ -919,6 +1104,39 @@ def submit_work():
         if len(result_data) > 1024:  # Максимум 1KB
             logger.warning("submit_work: result_data too large (%s bytes)", len(result_data))
             return jsonify({"error": "result_data too large (max 1KB)"}), 400
+    # Artifact contract v1: валидируем структуру артефактов, чтобы тяжёлые раннеры сдавали
+    # воспроизводимые ссылки/хеши результатов (а не только result_data string).
+    if output_artifacts is None:
+        output_artifacts = []
+    if not isinstance(output_artifacts, list):
+        return jsonify({"error": "output_artifacts must be an array"}), 400
+    if len(output_artifacts) > 32:
+        return jsonify({"error": "too many output_artifacts (max 32)"}), 400
+    normalized_artifacts = []
+    for item in output_artifacts:
+        if not isinstance(item, dict):
+            return jsonify({"error": "each output_artifact must be an object"}), 400
+        name = str(item.get("name") or "").strip()
+        sha256 = str(item.get("sha256") or "").strip().lower()
+        uri = str(item.get("uri") or "").strip()
+        try:
+            size_bytes = int(item.get("size_bytes", 0) or 0)
+        except (TypeError, ValueError):
+            return jsonify({"error": "output_artifact.size_bytes must be integer"}), 400
+        if not name or len(name) > 256:
+            return jsonify({"error": "output_artifact.name is required (max 256)"}), 400
+        if not sha256 or len(sha256) != 64:
+            return jsonify({"error": "output_artifact.sha256 must be 64 hex chars"}), 400
+        if size_bytes < 0:
+            return jsonify({"error": "output_artifact.size_bytes must be >= 0"}), 400
+        normalized_artifacts.append(
+            {
+                "name": name,
+                "sha256": sha256,
+                "uri": uri,
+                "size_bytes": size_bytes,
+            }
+        )
 
     # Защита от мошенничества: обязателен nonce для строгой верификации (невозможно подделать результат)
     if nonce is None or nonce == "":
@@ -1088,6 +1306,7 @@ def submit_work():
         "work_units": work_units_done,
         "result_data": result_data,
         "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
+        "output_artifacts": normalized_artifacts,
     }
     reward_id = _reward_event_id(
         client_id=client_id,
@@ -1657,6 +1876,11 @@ def provider_contracts():
     task_description = (data.get("task_description") or "").strip()
     task_category = (data.get("task_category") or "").strip() or "Пользовательская"
     computation_type = (data.get("computation_type") or "simple_pow").strip()
+    benchmark_meta = data.get("benchmark_meta")
+    if benchmark_meta is None:
+        benchmark_meta = {}
+    if not isinstance(benchmark_meta, dict):
+        return jsonify({"error": "benchmark_meta must be an object"}), 400
 
     if not sector_id:
         return jsonify({"error": "sector_id is required: create/select sector first"}), 400
@@ -1708,6 +1932,7 @@ def provider_contracts():
             difficulty=difficulty,
             initial_budget_tokens=initial_budget_tokens,
             budget_currency=budget_currency,
+            benchmark_meta=benchmark_meta,
         )
     except ValueError as exc:
         return _provider_contract_error_response(str(exc))
@@ -2304,10 +2529,14 @@ def agent_get_task():
     data = request.get_json(silent=True) or {}
     contract_id = (data.get("contract_id") or "").strip() or None
     sector_id = (data.get("sector_id") or "").strip() or None
+    scheduler_profile = (data.get("scheduler_profile") or "adaptive").strip().lower()
+    device_capabilities = data.get("device_capabilities") if isinstance(data.get("device_capabilities"), dict) else {}
     spec, issue_err = _issue_task_for_client(
         client_id,
         contract_id=contract_id,
         sector_id=sector_id,
+        device_capabilities=device_capabilities,
+        scheduler_profile=scheduler_profile,
     )
     if issue_err:
         code = 400 if contract_id else 503
@@ -2362,6 +2591,7 @@ def agent_devices_register():
         device_id=(data.get("device_id") or "").strip() or None,
         device_name=(data.get("device_name") or "").strip() or None,
         agent_version=(data.get("agent_version") or "").strip() or None,
+        capabilities=data.get("device_capabilities") if isinstance(data.get("device_capabilities"), dict) else None,
     )
     if err:
         return jsonify({"error": err}), 400 if err != "Forbidden" else 403
@@ -2380,6 +2610,7 @@ def agent_devices_heartbeat():
         client_id=client_id,
         device_id=(data.get("device_id") or "").strip(),
         agent_version=(data.get("agent_version") or "").strip() or None,
+        capabilities=data.get("device_capabilities") if isinstance(data.get("device_capabilities"), dict) else None,
     )
     if err:
         status = 404

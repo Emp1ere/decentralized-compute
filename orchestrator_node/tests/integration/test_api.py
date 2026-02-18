@@ -170,6 +170,94 @@ def test_agent_task_and_heartbeat(client, auth_headers):
     assert ack_payload["status"] == "completed_local"
 
 
+def test_agent_get_task_adaptive_profile_defaults_to_balanced_for_non_md(client, auth_headers):
+    headers, _ = auth_headers
+    contracts_res = client.get("/contracts")
+    assert contracts_res.status_code == 200
+    contracts_list = contracts_res.get_json()
+    simple_pow_ids = [c["contract_id"] for c in contracts_list if c.get("computation_type") == "simple_pow"]
+    assert simple_pow_ids
+    task_res = client.post(
+        "/agent/get_task",
+        headers=headers,
+        json={"contract_id": simple_pow_ids[0], "scheduler_profile": "adaptive"},
+    )
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    assert task.get("scheduler_profile_effective") == "balanced"
+
+
+def test_agent_get_task_capability_matching(client, auth_headers):
+    headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=headers,
+        json={
+            "sector_name": "MD policy sector",
+            "organization_name": "Policy org",
+            "compute_domain": "molecular_dynamics",
+            "description": "Capabilities matching test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=headers,
+        json={"currency": "RUB", "amount": 20},
+    )
+    assert topup_res.status_code == 200
+    create_res = client.post(
+        "/provider/contracts",
+        headers=headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Capability-gated benchmark",
+            "task_description": "Should require higher capabilities",
+            "task_category": "Пользовательская",
+            "computation_type": "simple_pow",
+            "work_units_required": 500,
+            "reward_per_task": 5,
+            "target_total_work_units": 5000,
+            "difficulty": 2,
+            "budget_currency": "RUB",
+            "initial_budget_tokens": 10,
+            "activate_now": True,
+            "benchmark_meta": {
+                "requirements": {
+                    "min_cpu_cores": 8,
+                    "min_ram_gb": 16,
+                    "require_gpu": True,
+                }
+            },
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    too_small = client.post(
+        "/agent/get_task",
+        headers=headers,
+        json={
+            "contract_id": contract_id,
+            "device_capabilities": {"cpu_cores": 4, "ram_gb": 8, "has_gpu": False},
+        },
+    )
+    assert too_small.status_code == 400
+    assert "does not match device capabilities" in (too_small.get_json().get("error") or "")
+
+    match_res = client.post(
+        "/agent/get_task",
+        headers=headers,
+        json={
+            "contract_id": contract_id,
+            "device_capabilities": {"cpu_cores": 12, "ram_gb": 32, "has_gpu": True},
+        },
+    )
+    assert match_res.status_code == 200
+    assert match_res.get_json().get("job_id")
+
+
 def test_jobs_my_list(client, auth_headers):
     headers, _ = auth_headers
     task_res = client.get("/get_task", headers=headers)
@@ -211,11 +299,17 @@ def test_agent_devices_flow(client, auth_headers):
     register_res = client.post(
         "/agent/devices/register",
         headers=headers,
-        json={"device_id": "dev-test-001", "device_name": "Test Device", "agent_version": "0.2.0"},
+        json={
+            "device_id": "dev-test-001",
+            "device_name": "Test Device",
+            "agent_version": "0.2.0",
+            "device_capabilities": {"cpu_cores": 8, "ram_gb": 16, "has_gpu": False},
+        },
     )
     assert register_res.status_code == 200
     rec = register_res.get_json()
     assert rec["device_id"] == "dev-test-001"
+    assert rec.get("capabilities", {}).get("cpu_cores") == 8
 
     hb_res = client.post(
         "/agent/devices/heartbeat",
@@ -259,8 +353,33 @@ def test_chain(client):
     assert chain[0]["index"] == 0
 
 
-def test_explorer_address_includes_settlement_and_prefix_resolve(client):
-    target_id = "e1e678fd-39b1-47d4-a164-2b498879f35c"
+def test_explorer_address_includes_settlement_and_prefix_resolve(client, auth_headers):
+    headers, target_id = auth_headers
+    contracts_res = client.get("/contracts")
+    assert contracts_res.status_code == 200
+    contracts_list = contracts_res.get_json()
+    simple_pow_ids = [c["contract_id"] for c in contracts_list if c.get("computation_type") == "simple_pow"]
+    assert simple_pow_ids
+    contract_id = simple_pow_ids[0]
+    task_res = client.get("/get_task", headers=headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    result_hash, nonce = _solve_pow(target_id, contract_id, task["difficulty"])
+    assert result_hash is not None
+    submit_res = client.post(
+        "/submit_work",
+        headers=headers,
+        json={
+            "client_id": target_id,
+            "contract_id": contract_id,
+            "job_id": task.get("job_id"),
+            "work_units_done": task["work_units_required"],
+            "result_data": result_hash,
+            "nonce": nonce,
+        },
+    )
+    assert submit_res.status_code == 200
+
     full_res = client.get(f"/explorer/address/{target_id}")
     assert full_res.status_code == 200
     full_payload = full_res.get_json()
@@ -271,11 +390,12 @@ def test_explorer_address_includes_settlement_and_prefix_resolve(client):
     assert "work_receipt" in tx_types
     assert "contract_reward_settlement" in tx_types
 
-    prefix_res = client.get("/explorer/address/e1e678fd-39b1")
+    prefix = target_id[:13]
+    prefix_res = client.get(f"/explorer/address/{prefix}")
     assert prefix_res.status_code == 200
     prefix_payload = prefix_res.get_json()
     assert prefix_payload["client_id"] == target_id
-    assert prefix_payload.get("resolved_from") == "e1e678fd-39b1"
+    assert prefix_payload.get("resolved_from") == prefix
 
 
 def test_contracts_with_stats(client):
@@ -330,6 +450,10 @@ def test_provider_contract_flow(client, auth_headers):
             "difficulty": 2,
             "initial_budget_tokens": 6,
             "budget_currency": "RUB",
+            "benchmark_meta": {
+                "runner": {"engine": "python_cli", "command_template": "python --version"},
+                "input_format": "none",
+            },
             "activate_now": True,
         },
     )
@@ -337,6 +461,7 @@ def test_provider_contract_flow(client, auth_headers):
     create_data = create_res.get_json()
     contract = create_data.get("contract", create_data)
     assert contract["status"] == "active"
+    assert (contract.get("benchmark_meta") or {}).get("runner", {}).get("engine") == "python_cli"
     contract_id = contract["contract_id"]
     provider_list_res = client.get(
         "/provider/contracts",

@@ -223,6 +223,7 @@ class ContractMarket:
         difficulty,
         initial_budget_tokens=0,
         budget_currency=DEFAULT_BUDGET_CURRENCY,
+        benchmark_meta=None,
         contract_id=None,
         status=STATUS_DRAFT,
     ):
@@ -260,6 +261,8 @@ class ContractMarket:
                 "created_at": now,
                 "updated_at": now,
             }
+            if isinstance(benchmark_meta, dict) and benchmark_meta:
+                record["benchmark_meta"] = copy.deepcopy(benchmark_meta)
             if any(c.get("contract_id") == normalized_contract_id for c in state["contracts"]):
                 raise ValueError("Contract ID already exists")
             state["contracts"].append(record)

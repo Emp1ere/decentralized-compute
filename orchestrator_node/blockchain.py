@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import threading
+import sys
 from onchain_accounting import is_valid_onchain_economic_tx
 
 logger = logging.getLogger("blockchain")
@@ -189,17 +190,36 @@ def _save_chain_to_disk(chain):
         logger.warning("blockchain_save_failed: %s", e)
 
 
+def _is_test_runtime():
+    """
+    Определяем тестовый режим.
+    В тестах отключаем персистентность chain.json, чтобы каждый тест
+    стартовал с чистого genesis и не зависел от прошлых прогонов.
+    """
+    forced = str(os.environ.get("BLOCKCHAIN_FORCE_PERSIST", "")).strip().lower()
+    if forced in {"1", "true", "yes"}:
+        return False
+    if str(os.environ.get("PYTEST_CURRENT_TEST", "")).strip():
+        return True
+    return any("pytest" in str(arg).lower() for arg in sys.argv)
+
+
 class Blockchain:
     """Блокчейн с консенсусом Proof-of-Useful-Work (PoUW). Цепочка и балансы сохраняются на диск."""
     def __init__(self):
-        chain, balances = _load_chain_from_disk()
-        if chain and balances is not None:
-            self.chain = chain
-            self.balances = balances
+        self._persist_enabled = not _is_test_runtime()
+        if self._persist_enabled:
+            chain, balances = _load_chain_from_disk()
+            if chain and balances is not None:
+                self.chain = chain
+                self.balances = balances
+            else:
+                self.chain = [self.create_genesis_block()]
+                self.balances = {}
+                _save_chain_to_disk(self.chain)  # сохранить genesis при первом запуске
         else:
             self.chain = [self.create_genesis_block()]
             self.balances = {}
-            _save_chain_to_disk(self.chain)  # сохранить genesis при первом запуске
         self.pending_transactions = []  # Очередь транзакций для упаковки в блок
         self.difficulty = 0  # PoUW: не используется для валидации (блок создаётся при полезной работе)
 
@@ -278,7 +298,8 @@ class Blockchain:
         _apply_block_transactions(self.pending_transactions, self.balances)
 
         self.pending_transactions = []
-        _save_chain_to_disk(self.chain)
+        if self._persist_enabled:
+            _save_chain_to_disk(self.chain)
         return new_block
 
     def add_block_from_peer(self, block_dict):
@@ -315,10 +336,13 @@ class Blockchain:
         # Проверка транзакций в блоке: все поддерживаемые tx должны быть валидными
         for tx in block.transactions:
             if not _is_valid_chain_tx(tx):
+                if tx.get("type") == "reward":
+                    return False, "invalid reward transaction in block"
                 return False, "invalid transaction in block"
         self.chain.append(block)
         _apply_block_transactions(block.transactions, self.balances)
-        _save_chain_to_disk(self.chain)
+        if self._persist_enabled:
+            _save_chain_to_disk(self.chain)
         logger.info("Sync added block index=%s from peer", block.index)
         return True, None
 
@@ -370,7 +394,8 @@ class Blockchain:
                 self.balances = {}
                 for block in self.chain:
                     _apply_block_transactions(block.transactions, self.balances)
-                _save_chain_to_disk(self.chain)
+                if self._persist_enabled:
+                    _save_chain_to_disk(self.chain)
                 return True, None
             elif peer_last.timestamp == our_last.timestamp:
                 # Одинаковое время: выбираем по хешу (лексикографически меньший)
@@ -381,7 +406,8 @@ class Blockchain:
                     self.balances = {}
                     for block in self.chain:
                         _apply_block_transactions(block.transactions, self.balances)
-                    _save_chain_to_disk(self.chain)
+                    if self._persist_enabled:
+                        _save_chain_to_disk(self.chain)
                     return True, None
             # Наша цепочка остаётся (наш блок создан раньше или имеет меньший хеш)
             return False, "chain not longer (fork resolved in favor of local chain)"
@@ -389,13 +415,16 @@ class Blockchain:
         for bi, block in enumerate(new_chain):
             for tx in block.transactions:
                 if not _is_valid_chain_tx(tx):
+                    if tx.get("type") == "reward":
+                        return False, f"invalid reward transaction in block {bi}"
                     return False, f"invalid transaction in block {bi}"
         self.chain = new_chain
         self.pending_transactions = []
         self.balances = {}
         for block in self.chain:
             _apply_block_transactions(block.transactions, self.balances)
-        _save_chain_to_disk(self.chain)
+        if self._persist_enabled:
+            _save_chain_to_disk(self.chain)
         logger.info("Sync replaced chain: %s blocks", len(self.chain))
         return True, None
 

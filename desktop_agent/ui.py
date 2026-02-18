@@ -10,6 +10,7 @@ from tkinter import ttk
 from agent import DesktopAgent
 from api import ApiClient
 from config import (
+    collect_device_capabilities,
     read_settings,
     write_settings,
     validate_client_id,
@@ -73,6 +74,8 @@ class DesktopApp:
         self.throttle_percent = tk.IntVar(value=0)
         self.device_id = tk.StringVar(value=f"dev-{int(time.time())}")
         self.device_name = tk.StringVar(value="Desktop agent")
+        self.scheduler_profile = tk.StringVar(value="adaptive")
+        self.capabilities_info = tk.StringVar(value="")
 
         ttk.Label(frame, text="URL оркестратора").grid(row=0, column=0, sticky="w")
         ttk.Entry(frame, textvariable=self.base_url).grid(row=1, column=0, sticky="ew", padx=(0, 8))
@@ -113,6 +116,26 @@ class DesktopApp:
         ttk.Checkbutton(controls_row, text="Проверять обновления", variable=self.check_updates).pack(anchor="w")
         ttk.Label(controls_row, text="CPU throttle % (0..95)").pack(anchor="w")
         ttk.Entry(controls_row, width=10, textvariable=self.throttle_percent).pack(anchor="w")
+        ttk.Label(controls_row, text="Профиль планировщика").pack(anchor="w", pady=(6, 0))
+        ttk.Combobox(
+            controls_row,
+            textvariable=self.scheduler_profile,
+            state="readonly",
+            values=("adaptive", "balanced", "performance", "eco"),
+            width=14,
+        ).pack(anchor="w")
+        ttk.Label(
+            controls_row,
+            text="adaptive: быстро для heavy задач, но мягче при деградации.",
+            wraplength=320,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 0))
+        ttk.Label(
+            controls_row,
+            textvariable=self.capabilities_info,
+            wraplength=340,
+            justify="left",
+        ).pack(anchor="w", pady=(6, 0))
 
         controls = ttk.Frame(frame)
         controls.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(10, 0))
@@ -132,6 +155,7 @@ class DesktopApp:
         self.logger.info(message)
 
     def _settings_payload(self):
+        capabilities = collect_device_capabilities()
         return {
             "base_url": self.base_url.get().strip(),
             "api_key": self.api_key.get().strip(),
@@ -146,6 +170,9 @@ class DesktopApp:
             "device_name": self.device_name.get().strip() or "Desktop agent",
             "sector_id": self.sector_var.get().split(" | ")[0] if self.sector_var.get() else "",
             "contract_id": self.contract_var.get().split(" | ")[0] if self.contract_var.get() else "",
+            # Храним capabilities в settings для диагностики и воспроизводимости.
+            "device_capabilities": capabilities,
+            "scheduler_profile": (self.scheduler_profile.get() or "adaptive").strip().lower(),
         }
 
     def _load_saved(self):
@@ -161,6 +188,20 @@ class DesktopApp:
         self.throttle_percent.set(int(cfg.get("throttle_percent", 0) or 0))
         self.device_id.set((cfg.get("device_id") or self.device_id.get()).strip())
         self.device_name.set((cfg.get("device_name") or "Desktop agent").strip())
+        profile = (cfg.get("scheduler_profile") or "adaptive").strip().lower()
+        if profile not in {"adaptive", "balanced", "performance", "eco"}:
+            profile = "adaptive"
+        self.scheduler_profile.set(profile)
+        self._refresh_capabilities_info()
+
+    def _refresh_capabilities_info(self):
+        caps = collect_device_capabilities()
+        engines = ", ".join(caps.get("supported_engines", [])[:4]) or "-"
+        text = (
+            f"Устройство: CPU {caps.get('cpu_cores', 0)} • RAM {caps.get('ram_gb', 0)} GB • "
+            f"GPU {'yes' if caps.get('has_gpu') else 'no'} • engines: {engines}"
+        )
+        self.capabilities_info.set(text)
 
     def _validate_inputs(self):
         if not validate_url(self.base_url.get()):
@@ -191,6 +232,7 @@ class DesktopApp:
                     "device_id": self.device_id.get().strip(),
                     "device_name": self.device_name.get().strip() or "Desktop agent",
                     "agent_version": "0.3.0",
+                    "device_capabilities": collect_device_capabilities(),
                 },
             )
             self.device_id.set(rec.get("device_id", self.device_id.get().strip()))
@@ -250,6 +292,8 @@ class DesktopApp:
             "throttle_percent": max(0, min(95, int(self.throttle_percent.get() or 0))),
             "device_id": self.device_id.get().strip(),
             "device_name": self.device_name.get().strip() or "Desktop agent",
+            "device_capabilities": collect_device_capabilities(),
+            "scheduler_profile": (self.scheduler_profile.get() or "adaptive").strip().lower(),
         }
 
     def _start_agent(self):
@@ -270,6 +314,7 @@ class DesktopApp:
                     "device_id": cfg["device_id"],
                     "device_name": cfg["device_name"],
                     "agent_version": "0.3.0",
+                    "device_capabilities": cfg.get("device_capabilities") or {},
                 },
             )
         except Exception as exc:

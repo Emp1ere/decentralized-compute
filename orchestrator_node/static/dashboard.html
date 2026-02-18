@@ -260,7 +260,7 @@
           href="/download/desktop-agent"
           style="text-decoration:none; display:inline-block; padding:14px 22px; border-radius:10px; font-size:1.05rem; font-weight:700; background:#2f7df6; color:#fff; box-shadow:0 8px 24px rgba(47,125,246,0.35);"
         >Скачать Desktop Agent</a>
-        <span class="muted" style="font-size:0.9em;">Скачивается zip-архив (desktop_agent + shared): распакуйте и запустите <code>python desktop_agent_app.py</code> в папке <code>desktop_agent</code>.</span>
+        <span class="muted" style="font-size:0.9em;">Скачивается zip-архив (desktop_agent + shared): распакуйте и запустите <code>python desktop_agent_app.py</code> в папке <code>desktop_agent</code>. Режим по умолчанию: <code>adaptive</code>.</span>
       </div>
     </div>
   </div>
@@ -445,12 +445,23 @@
   </div>
 
   <div id="panel-chain" class="panel">
+    <p class="muted" style="font-size:0.9em; margin-bottom:12px;">
+      Краткая сводка chain. Детальный просмотр блоков и адресов — в Explorer.
+    </p>
+    <div class="row" style="margin-bottom:12px; align-items:center;">
+      <a
+        class="primary"
+        href="/explorer"
+        target="_blank"
+        rel="noopener"
+        style="text-decoration:none; display:inline-block; padding:10px 16px; border-radius:8px;"
+      >Открыть Explorer</a>
+    </div>
     <p class="loading" id="chain-load">Загрузка…</p>
-    <div class="table-responsive">
-      <table id="table-chain" style="display:none;">
-        <thead><tr><th>Индекс</th><th>Хеш</th><th>Транзакций</th><th>Время</th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <div class="overview-grid">
+      <div class="card"><div class="label">Последний блок</div><div id="chain-last-index" class="value">-</div></div>
+      <div class="card"><div class="label">Транзакций в последнем блоке</div><div id="chain-last-tx-count" class="value">-</div></div>
+      <div class="card"><div class="label">Обновлён</div><div id="chain-last-ts" class="value">-</div></div>
     </div>
   </div>
 
@@ -495,7 +506,7 @@
         <p id="profile-jobs-empty" class="muted" style="display:none;">Заданий пока нет.</p>
         <div class="table-responsive">
           <table id="table-profile-jobs" style="display:none;">
-            <thead><tr><th>Job</th><th>Контракт</th><th>Статус</th><th>Переназначений</th><th>Обновлено</th></tr></thead>
+            <thead><tr><th>Job</th><th>Контракт</th><th>Статус</th><th>Профиль</th><th>Переназначений</th><th>Обновлено</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -2159,7 +2170,7 @@
                 const sectorPart = c.sector_name ? ('Сектор: ' + c.sector_name + '. ') : '';
                 alert(
                   sectorPart +
-                  'Для старта вычислений скачайте Desktop Agent, затем выберите этот сектор/контракт в приложении.'
+                  'Для старта вычислений скачайте Desktop Agent, затем выберите сектор/контракт. Рекомендуемый режим: adaptive.'
                 );
                 window.location.href = '/download/desktop-agent';
               };
@@ -2200,20 +2211,24 @@
 
     function loadChain() {
       const load = document.getElementById('chain-load');
-      const table = document.getElementById('table-chain');
+      const lastIndexEl = document.getElementById('chain-last-index');
+      const lastTxCountEl = document.getElementById('chain-last-tx-count');
+      const lastTsEl = document.getElementById('chain-last-ts');
       api('/chain')
         .then(chain => {
           load.style.display = 'none';
-          const list = (chain || []).slice(-30).reverse();
-          const tbody = table.querySelector('tbody');
-          tbody.innerHTML = '';
-          list.forEach(b => {
-            const tr = document.createElement('tr');
-            const ts = b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : '-';
-            tr.innerHTML = '<td>' + b.index + '</td><td class="mono hash" title="' + (b.hash || '') + '">' + (b.hash || '') + '</td><td>' + (b.transactions && b.transactions.length) + '</td><td>' + ts + '</td>';
-            tbody.appendChild(tr);
-          });
-          table.style.display = 'table';
+          const rows = Array.isArray(chain) ? chain : [];
+          const last = rows.length ? rows[rows.length - 1] : null;
+          if (!last) {
+            if (lastIndexEl) lastIndexEl.textContent = '-';
+            if (lastTxCountEl) lastTxCountEl.textContent = '-';
+            if (lastTsEl) lastTsEl.textContent = '-';
+            return;
+          }
+          const ts = last.timestamp ? new Date(last.timestamp * 1000).toLocaleString() : '-';
+          if (lastIndexEl) lastIndexEl.textContent = String(last.index ?? '-');
+          if (lastTxCountEl) lastTxCountEl.textContent = String((last.transactions || []).length);
+          if (lastTsEl) lastTsEl.textContent = ts;
         })
         .catch(() => { load.textContent = 'Ошибка загрузки'; });
     }
@@ -2261,6 +2276,7 @@
             '<td class="mono">' + (job.job_id || '-') + '</td>' +
             '<td>' + (job.contract_id || '-') + '</td>' +
             '<td>' + (job.status || '-') + '</td>' +
+            '<td>' + (job.scheduler_profile_effective || job.scheduler_profile_requested || '-') + '</td>' +
             '<td>' + (job.reassign_count ?? 0) + '</td>' +
             '<td>' + updatedAt + '</td>';
           tbody.appendChild(tr);

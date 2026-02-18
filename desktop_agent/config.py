@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import platform
+import multiprocessing
 from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -89,3 +91,33 @@ def validate_hhmm(value):
         return False
     hh, mm = [int(x) for x in value.split(":")]
     return 0 <= hh <= 23 and 0 <= mm <= 59
+
+
+def collect_device_capabilities():
+    """
+    Собирает capabilities устройства для policy matching на сервере.
+    Минимальный stdlib-профиль без тяжёлых зависимостей.
+    """
+    cpu_cores = multiprocessing.cpu_count() or 1
+    ram_gb = 0.0
+    try:
+        if hasattr(os, "sysconf"):
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            phys_pages = os.sysconf("SC_PHYS_PAGES")
+            ram_gb = round((page_size * phys_pages) / (1024 ** 3), 2)
+    except (ValueError, OSError, AttributeError):
+        ram_gb = 0.0
+    has_gpu = str(os.environ.get("AGENT_HAS_GPU", "")).strip().lower() in {"1", "true", "yes"}
+    supported_engines = ["python_compute", "python_cli"]
+    if has_gpu:
+        supported_engines.append("gpu")
+    # Внешний engine включается только если бинарь доступен в PATH.
+    if str(os.environ.get("AGENT_HAS_GROMACS", "")).strip().lower() in {"1", "true", "yes"}:
+        supported_engines.append("gromacs")
+    return {
+        "cpu_cores": max(1, int(cpu_cores)),
+        "ram_gb": max(0.0, float(ram_gb)),
+        "has_gpu": has_gpu,
+        "supported_engines": sorted(set(supported_engines)),
+        "os": platform.system().lower(),
+    }

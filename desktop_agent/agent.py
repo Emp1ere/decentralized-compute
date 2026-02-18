@@ -5,14 +5,12 @@ import time
 import json
 
 from api import ApiClient
+from runners import run_task
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-
-from shared.computation_types import COMPUTATION_TYPES, deterministic_seed, compute_simple_pow  # noqa: E402
-
 
 AGENT_VERSION = "0.3.0"
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_state.json")
@@ -94,14 +92,22 @@ class DesktopAgent:
             api.request(
                 "POST",
                 "/agent/devices/heartbeat",
-                payload={"device_id": cfg.get("device_id"), "agent_version": AGENT_VERSION},
+                payload={
+                    "device_id": cfg.get("device_id"),
+                    "agent_version": AGENT_VERSION,
+                    "device_capabilities": cfg.get("device_capabilities") or {},
+                },
                 timeout=3,
             )
         except Exception:
             return
 
     def _fetch_task(self, api, cfg):
-        payload = {}
+        payload = {
+            # Передаём capabilities/profile, чтобы оркестратор применил policy matching/ranking.
+            "device_capabilities": cfg.get("device_capabilities") or {},
+            "scheduler_profile": cfg.get("scheduler_profile", "adaptive"),
+        }
         if cfg.get("sector_id"):
             payload["sector_id"] = cfg["sector_id"]
         if cfg.get("contract_id"):
@@ -111,35 +117,12 @@ class DesktopAgent:
     def _compute(self, api, cfg, task):
         contract_id = task["contract_id"]
         target_work = int(task["work_units_required"])
-        difficulty = int(task.get("difficulty", 0))
         computation_type = task.get("computation_type", "simple_pow")
-        task_seed = task.get("task_seed")
         throttle = max(0, min(95, int(cfg.get("throttle_percent", 0) or 0)))
+        submit_timeout = int(((task.get("task_profile") or {}).get("recommended_submit_timeout_seconds") or 900))
         self.push_log(
             f"Выполнение: contract={contract_id} type={computation_type} units={target_work} job={task.get('job_id')}"
         )
-        compute_func = COMPUTATION_TYPES.get(computation_type) or compute_simple_pow
-        if computation_type == "simple_pow":
-            self._heartbeat(api, cfg)
-            result_data, solution_nonce = compute_func(
-                cfg["client_id"],
-                contract_id,
-                target_work,
-                difficulty,
-                seed=task_seed,
-                progress_callback=(lambda cur, total: self._heartbeat(api, cfg)),
-            )
-            if throttle > 0:
-                time.sleep(throttle / 100.0)
-            return target_work, result_data, solution_nonce
-
-        if task_seed is not None:
-            try:
-                seed = int(task_seed)
-            except (TypeError, ValueError):
-                seed = deterministic_seed(cfg["client_id"], contract_id)
-        else:
-            seed = deterministic_seed(cfg["client_id"], contract_id)
 
         def progress(cur, total):
             if total:
@@ -153,10 +136,13 @@ class DesktopAgent:
             if throttle > 0:
                 time.sleep(throttle / 100.0)
 
-        result_data, computed_seed = compute_func(
-            cfg["client_id"], contract_id, target_work, seed=seed, progress_callback=progress
+        return run_task(
+            task=task,
+            cfg=cfg,
+            push_log=self.push_log,
+            progress_callback=progress,
+            submit_timeout_seconds=submit_timeout,
         )
-        return target_work, result_data, (computed_seed if computed_seed else str(seed))
 
     def _check_updates(self, api):
         try:

@@ -50,3 +50,12 @@ start_desktop_agent.bat
 - `api_key` хранится в `settings.json` в зашифрованном виде (`api_key_encrypted`).
 - Ключ шифрования хранится локально в `settings.key`.
 - Диагностические логи пишутся в `agent.log` с ротацией.
+- Агент отправляет `device_capabilities` (CPU/RAM/GPU/engines), чтобы оркестратор
+  выдавал совместимые задачи по policy matching.
+- Планировщик агента по умолчанию использует `adaptive` профиль:
+  для heavy MD пытается `performance`, но автоматически откатывается в `balanced`
+  при признаках деградации (expired/reassigned/rejected jobs).
+- Профиль можно выбрать в UI: `adaptive`, `balanced`, `performance`, `eco`.
+- Для ручного оверрайда capabilities можно использовать env:
+  - `AGENT_HAS_GPU=true`
+  - `AGENT_HAS_GROMACS=true`

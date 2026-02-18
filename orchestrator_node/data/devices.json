@@ -8,6 +8,20 @@
       "created_at": 1771197569,
       "last_seen_at": 1771197988,
       "is_disabled": false
+    },
+    {
+      "device_id": "dev-test-001",
+      "client_id": "eead28a3-2be4-40cc-ad52-c80005a564fe",
+      "device_name": "Test Device",
+      "agent_version": "0.2.1",
+      "created_at": 1771436356,
+      "last_seen_at": 1771436356,
+      "is_disabled": true,
+      "capabilities": {
+        "cpu_cores": 8,
+        "has_gpu": false,
+        "ram_gb": 16
+      }
     }
   ]
 }

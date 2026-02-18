@@ -1,0 +1,26 @@
+{
+  "base_url": "http://localhost:8080",
+  "client_id": "",
+  "verify_ssl": true,
+  "start_time": "22:00",
+  "end_time": "07:00",
+  "auto_next": true,
+  "check_updates": true,
+  "throttle_percent": 0,
+  "device_id": "dev-1771441482",
+  "device_name": "Desktop agent",
+  "sector_id": "sec-5d79f9237080",
+  "contract_id": "usr-cbf693eaa077",
+  "device_capabilities": {
+    "cpu_cores": 8,
+    "ram_gb": 0.0,
+    "has_gpu": false,
+    "supported_engines": [
+      "python_cli",
+      "python_compute"
+    ],
+    "os": "windows"
+  },
+  "scheduler_profile": "adaptive",
+  "api_key_encrypted": ""
+}
