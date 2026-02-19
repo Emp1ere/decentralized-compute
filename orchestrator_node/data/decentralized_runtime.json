@@ -1,0 +1,700 @@
+{
+  "replication_groups": {
+    "rg-1e9d6a9a6213452b": {
+      "group_id": "rg-1e9d6a9a6213452b",
+      "contract_id": "usr-75c9585e9e06",
+      "task_seed": 11852017835604424412,
+      "replication_factor": 2,
+      "issued_clients": [
+        "e5e45c70-347a-4637-a392-a0583927f1fd",
+        "331c6e7e-69b8-4438-bc8b-147766f02f1e"
+      ],
+      "submissions": [
+        {
+          "job_id": "job-dc152bd28e8542f0",
+          "client_id": "e5e45c70-347a-4637-a392-a0583927f1fd",
+          "result_data": "00bd3c9c1a2666c172126e69b1321dbc447cb6aaf52dfb9937b12a774437e9a3",
+          "created_at": 1771453002
+        },
+        {
+          "job_id": "job-851aa28473584cad",
+          "client_id": "331c6e7e-69b8-4438-bc8b-147766f02f1e",
+          "result_data": "00d52c4c9b9d8382ae8990e8e9a023cc82d9cf25df825399edb2aecdc983f937",
+          "created_at": 1771453002
+        }
+      ],
+      "status": "resolved",
+      "winner_result": null,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    "rg-6a206643e49d4dbd": {
+      "group_id": "rg-6a206643e49d4dbd",
+      "contract_id": "usr-76656e77bdb5",
+      "task_seed": 10514722453326376765,
+      "replication_factor": 2,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "c090c2e8-26f6-4c14-b9da-ab66997ff9a6",
+        "1f7cad1b-a5d3-4bf2-aae8-bcfc9272e867"
+      ],
+      "submissions": [
+        {
+          "job_id": "job-037f61b0fdc64c62",
+          "client_id": "c090c2e8-26f6-4c14-b9da-ab66997ff9a6",
+          "result_data": "00763451964d80e96dd3db4671718e98c9afcca2803eab6acec13838ec92a1d8",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455113
+        },
+        {
+          "job_id": "job-5f9baaf14f8b4c3b",
+          "client_id": "1f7cad1b-a5d3-4bf2-aae8-bcfc9272e867",
+          "result_data": "003e023aaf81742e0fcbc289b7f19db3daaf504b795d9f04774a318e74c4c808",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455113
+        }
+      ],
+      "status": "resolved",
+      "winner_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resolution_reason": "quorum_reached",
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    "rg-07c4ef3ae92148eb": {
+      "group_id": "rg-07c4ef3ae92148eb",
+      "contract_id": "usr-54e059dffd2a",
+      "task_seed": 10619296734490971292,
+      "replication_factor": 3,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "f41af368-ac3b-43b3-853a-2bdbc4e7dae6",
+        "a46c0dcf-aff2-4cdc-b9a8-5fb81462814a"
+      ],
+      "submissions": [
+        {
+          "job_id": "job-25024a9dd0a64ab5",
+          "client_id": "f41af368-ac3b-43b3-853a-2bdbc4e7dae6",
+          "result_data": "00a2dfadb9bd30b4b912c4c2df64fb8fc9f145c52d3b6a8b95941b072ddc5418",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455113
+        },
+        {
+          "job_id": "job-b17953f5174541a6",
+          "client_id": "a46c0dcf-aff2-4cdc-b9a8-5fb81462814a",
+          "result_data": "001dc84128e43e80678e89f9131eb91a2edc0c3d63f05e77d9ea659e4ed29b71",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455113
+        }
+      ],
+      "status": "resolved",
+      "winner_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resolution_reason": "quorum_reached",
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    "rg-7d8f451699214e90": {
+      "group_id": "rg-7d8f451699214e90",
+      "contract_id": "usr-ad217068d18b",
+      "task_seed": 11487100730846960303,
+      "replication_factor": 2,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "bb61e1df-852f-4b7e-b41c-4bb20abafdce"
+      ],
+      "submissions": [],
+      "status": "open",
+      "winner_manifest_hash": null,
+      "resolution_reason": null,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    "rg-eabba0c89c6240f5": {
+      "group_id": "rg-eabba0c89c6240f5",
+      "contract_id": "usr-f5785e66440c",
+      "task_seed": 13395152190646780212,
+      "replication_factor": 2,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "2f5deb4a-338b-4ee3-bb85-fce71c7f709f",
+        "2e53f511-a880-4534-9912-7d58d6e1db72"
+      ],
+      "submissions": [
+        {
+          "job_id": "job-2b40888ef6db410e",
+          "client_id": "2f5deb4a-338b-4ee3-bb85-fce71c7f709f",
+          "result_data": "0061d1e171758bb29fd724fb57ddd4f6e35f9c076750390e9926a598034c7588",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455226
+        },
+        {
+          "job_id": "job-23421267f37c4cb8",
+          "client_id": "2e53f511-a880-4534-9912-7d58d6e1db72",
+          "result_data": "00537452365c2c83e44c3aae46ec164933afbc86c21a9a8ffce01ed45c75b0c2",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455226
+        }
+      ],
+      "status": "resolved",
+      "winner_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resolution_reason": "quorum_reached",
+      "created_at": 1771455226,
+      "updated_at": 1771455226
+    },
+    "rg-7fa9f0a6b0b2411b": {
+      "group_id": "rg-7fa9f0a6b0b2411b",
+      "contract_id": "usr-d617fcde839e",
+      "task_seed": 11798459390604814841,
+      "replication_factor": 3,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "86c307e7-4066-4a07-b842-58cf1768d23c",
+        "0a5eb7d7-ece9-4668-afe5-ea38fd402a25"
+      ],
+      "submissions": [
+        {
+          "job_id": "job-d2ac50cc965b40bc",
+          "client_id": "86c307e7-4066-4a07-b842-58cf1768d23c",
+          "result_data": "00dc6ad2378168463ad758063eea9e04af8aa814dbe379297ebf18455adb1e88",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455227
+        },
+        {
+          "job_id": "job-bd1d9fab31424db4",
+          "client_id": "0a5eb7d7-ece9-4668-afe5-ea38fd402a25",
+          "result_data": "00325246415c3acd073335b751444460a375201d65618f341e7aecc4c317e337",
+          "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "attempt_id": 1,
+          "created_at": 1771455227
+        }
+      ],
+      "status": "resolved",
+      "winner_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resolution_reason": "quorum_reached",
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    "rg-a51dfbe399ab4967": {
+      "group_id": "rg-a51dfbe399ab4967",
+      "contract_id": "usr-7c08bd441f9a",
+      "task_seed": 12416437596936277519,
+      "replication_factor": 2,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "374dba24-8c05-4074-bb85-ef9024cbb668"
+      ],
+      "submissions": [
+        {
+          "job_id": "job-77b866ad32ec44b1",
+          "client_id": "374dba24-8c05-4074-bb85-ef9024cbb668",
+          "result_data": "00dc4d961777dc6d647c5d973bb6161e613ad694cb15766ad8a62755e6f42ba9",
+          "artifact_manifest_hash": "18f3820ddb99ca85bdfa350da08df607a6f8508bae9557b9473c41b0ef1f0c71",
+          "attempt_id": 1,
+          "created_at": 1771455227
+        }
+      ],
+      "status": "open",
+      "winner_manifest_hash": null,
+      "resolution_reason": null,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    "rg-a8986680da6e49a9": {
+      "group_id": "rg-a8986680da6e49a9",
+      "contract_id": "usr-b6540f9b995e",
+      "task_seed": 11590387466585977938,
+      "replication_factor": 2,
+      "quorum_threshold": 2,
+      "issued_clients": [
+        "88b88eb6-1dc9-44c1-9978-ea58950f2db9"
+      ],
+      "submissions": [],
+      "status": "open",
+      "winner_manifest_hash": null,
+      "resolution_reason": null,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    }
+  },
+  "escrow_holds": {
+    "esc-2256d4ddf28540b0": {
+      "hold_id": "esc-2256d4ddf28540b0",
+      "job_id": "job-a0cf2198fb4f48a8",
+      "contract_id": "usr-db392bbebb87",
+      "provider_client_id": "2bbfc3e4-31da-40f1-b7af-a392bc76a132",
+      "worker_client_id": "0022840f-6be7-4dec-8669-a0587cf2687e",
+      "currency": "RUB",
+      "amount": 2,
+      "status": "penalized",
+      "created_at": 1771453002,
+      "updated_at": 1771453002,
+      "penalty_percent": 50,
+      "penalty_amount": 1
+    },
+    "esc-80223bc5400c4e11": {
+      "hold_id": "esc-80223bc5400c4e11",
+      "job_id": "job-de5c115102e0418c",
+      "contract_id": "usr-40c901413db1",
+      "provider_client_id": "4eec826c-ce9f-4f80-adfd-ff1d9fc09471",
+      "worker_client_id": "0d312b2d-b6dc-4111-a9bd-d0ce8408d3c4",
+      "currency": "RUB",
+      "amount": 2,
+      "status": "penalized",
+      "created_at": 1771455114,
+      "updated_at": 1771455114,
+      "penalty_percent": 50,
+      "penalty_amount": 1
+    },
+    "esc-da435dacff6943ec": {
+      "hold_id": "esc-da435dacff6943ec",
+      "job_id": "job-212aaa3c99c74a1f",
+      "contract_id": "usr-6251d2e4fd5b",
+      "provider_client_id": "ad573ba1-0fb5-457f-94d1-97a26adc61ff",
+      "worker_client_id": "99e79c75-5208-4983-bfdd-f8aa2035075c",
+      "currency": "RUB",
+      "amount": 2,
+      "status": "penalized",
+      "created_at": 1771455227,
+      "updated_at": 1771455227,
+      "penalty_percent": 50,
+      "penalty_amount": 1
+    }
+  },
+  "challenges": {
+    "chg-505f5e369d014c31": {
+      "challenge_id": "chg-505f5e369d014c31",
+      "job_id": "job-a0cf2198fb4f48a8",
+      "contract_id": "usr-db392bbebb87",
+      "opened_by": "442e1745-8489-42e5-9997-4d2628a2e6ab",
+      "reason": "need manual review",
+      "status": "resolved",
+      "decision": "reject_worker",
+      "opened_at": 1771453002,
+      "deadline_at": 1771453302,
+      "resolved_at": 1771453002,
+      "resolved_by": "2bbfc3e4-31da-40f1-b7af-a392bc76a132"
+    },
+    "chg-254f0e4f375b41c5": {
+      "challenge_id": "chg-254f0e4f375b41c5",
+      "job_id": "job-de5c115102e0418c",
+      "contract_id": "usr-40c901413db1",
+      "opened_by": "aa46a961-3f01-4ade-9fa9-7c7bb14a0629",
+      "reason": "need manual review",
+      "status": "resolved",
+      "decision": "reject_worker",
+      "opened_at": 1771455114,
+      "deadline_at": 1771455414,
+      "resolved_at": 1771455114,
+      "resolved_by": "4eec826c-ce9f-4f80-adfd-ff1d9fc09471"
+    },
+    "chg-0236f06ad1a54080": {
+      "challenge_id": "chg-0236f06ad1a54080",
+      "job_id": "job-212aaa3c99c74a1f",
+      "contract_id": "usr-6251d2e4fd5b",
+      "opened_by": "bd9bbeae-1a72-40b9-9fd1-9c6441aea936",
+      "reason": "need manual review",
+      "status": "resolved",
+      "decision": "reject_worker",
+      "opened_at": 1771455227,
+      "deadline_at": 1771455527,
+      "resolved_at": 1771455227,
+      "resolved_by": "ad573ba1-0fb5-457f-94d1-97a26adc61ff"
+    }
+  },
+  "validator_verdicts": {
+    "rg-7d8f451699214e90": [
+      {
+        "validator_client_id": "6b1bcace-cbaa-498a-8f08-87d59a134446",
+        "decision": "accept",
+        "reason": "artifacts look consistent",
+        "weight": 2,
+        "created_at": 1771455114,
+        "updated_at": 1771455114
+      }
+    ],
+    "rg-a8986680da6e49a9": [
+      {
+        "validator_client_id": "46832ec0-241c-4de5-be9a-3bd707d05b99",
+        "decision": "accept",
+        "reason": "artifacts look consistent",
+        "weight": 2,
+        "created_at": 1771455227,
+        "updated_at": 1771455227
+      }
+    ]
+  },
+  "replay_index": {
+    "719d839daafb9178baad75967538a55c17cf3ffd346975740b94737a8b15560a": {
+      "replay_key": "719d839daafb9178baad75967538a55c17cf3ffd346975740b94737a8b15560a",
+      "job_id": "job-724f191e85bd40fa",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455113
+    },
+    "c78454d00b639c379fd6ff06bbea6c6cd8cf2ab40a9fa068763d0169780739d7": {
+      "replay_key": "c78454d00b639c379fd6ff06bbea6c6cd8cf2ab40a9fa068763d0169780739d7",
+      "job_id": "job-8bcc26c3d05a41bb",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455113
+    },
+    "c81e768b4d1f657bb7d937632e67f75dd35f1f0d8bdd9dd965883908aaf56ea2": {
+      "replay_key": "c81e768b4d1f657bb7d937632e67f75dd35f1f0d8bdd9dd965883908aaf56ea2",
+      "job_id": "job-037f61b0fdc64c62",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455113
+    },
+    "c7516b49acdb6a216a14758a1b4b9d4524dec1668c5870b977cb719a66f146f8": {
+      "replay_key": "c7516b49acdb6a216a14758a1b4b9d4524dec1668c5870b977cb719a66f146f8",
+      "job_id": "job-5f9baaf14f8b4c3b",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455113
+    },
+    "ab12e1811e33c8c9f04abd140ef2873fac121e57cedf48808c361b15c2a35e31": {
+      "replay_key": "ab12e1811e33c8c9f04abd140ef2873fac121e57cedf48808c361b15c2a35e31",
+      "job_id": "job-25024a9dd0a64ab5",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455113
+    },
+    "097c6c28dfeff411ab84dc4942be24220b669355abd42d231d51498daafc6170": {
+      "replay_key": "097c6c28dfeff411ab84dc4942be24220b669355abd42d231d51498daafc6170",
+      "job_id": "job-b17953f5174541a6",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455113
+    },
+    "18dbc41b901988302a48b38b53f2c948dfd64dfd509c1447d8efe033f2595beb": {
+      "replay_key": "18dbc41b901988302a48b38b53f2c948dfd64dfd509c1447d8efe033f2595beb",
+      "job_id": "job-4db9e8d813b243f4",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "18f3820ddb99ca85bdfa350da08df607a6f8508bae9557b9473c41b0ef1f0c71",
+      "created_at": 1771455114
+    },
+    "457fe0fcf333dc463874c88b5c15e6d67f8d3c00688cfb2f8e76c615f3bef60f": {
+      "replay_key": "457fe0fcf333dc463874c88b5c15e6d67f8d3c00688cfb2f8e76c615f3bef60f",
+      "job_id": "job-de5c115102e0418c",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455114
+    },
+    "bfabe19d2412d87f9d2e6c7479e6fd7c628d8cc196299b404ac1d3bb73f358a7": {
+      "replay_key": "bfabe19d2412d87f9d2e6c7479e6fd7c628d8cc196299b404ac1d3bb73f358a7",
+      "job_id": "job-4b2bcbb67a604ba2",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455226
+    },
+    "b7b10065a145db23642e4045dfe0a560d659900764de5f585ad7028dcfaef514": {
+      "replay_key": "b7b10065a145db23642e4045dfe0a560d659900764de5f585ad7028dcfaef514",
+      "job_id": "job-0e2f155595af4793",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455226
+    },
+    "65f69ebc4b22f3767e6ccba27dda6ad3652c1f9f37d12bbae308610226bbf875": {
+      "replay_key": "65f69ebc4b22f3767e6ccba27dda6ad3652c1f9f37d12bbae308610226bbf875",
+      "job_id": "job-2b40888ef6db410e",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455226
+    },
+    "01c6427436f0dbdb9e5a785ff709c0c6d6a51e89b3c5496124b229c6c8058fff": {
+      "replay_key": "01c6427436f0dbdb9e5a785ff709c0c6d6a51e89b3c5496124b229c6c8058fff",
+      "job_id": "job-23421267f37c4cb8",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455226
+    },
+    "aac0be82b975227308b36eb04198957583889d4a1a336e1dcdad369624a2c926": {
+      "replay_key": "aac0be82b975227308b36eb04198957583889d4a1a336e1dcdad369624a2c926",
+      "job_id": "job-d2ac50cc965b40bc",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455227
+    },
+    "8cc5c2f3eac69b64f98055e188aa0314f32c1e6fa95dd6e4168d49adcd253b38": {
+      "replay_key": "8cc5c2f3eac69b64f98055e188aa0314f32c1e6fa95dd6e4168d49adcd253b38",
+      "job_id": "job-bd1d9fab31424db4",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455227
+    },
+    "2ee4a63ae073052150332879505963599aedbf5f325aab992bd800a68d631a44": {
+      "replay_key": "2ee4a63ae073052150332879505963599aedbf5f325aab992bd800a68d631a44",
+      "job_id": "job-77b866ad32ec44b1",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "18f3820ddb99ca85bdfa350da08df607a6f8508bae9557b9473c41b0ef1f0c71",
+      "created_at": 1771455227
+    },
+    "c10438af79fad816335a43fb8b10e15f39e54051c9d2869b9f67f7a8e51f119a": {
+      "replay_key": "c10438af79fad816335a43fb8b10e15f39e54051c9d2869b9f67f7a8e51f119a",
+      "job_id": "job-212aaa3c99c74a1f",
+      "attempt_id": 1,
+      "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": 1771455227
+    }
+  },
+  "reputations": {
+    "worker:1f7cad1b-a5d3-4bf2-aae8-bcfc9272e867": {
+      "actor_id": "1f7cad1b-a5d3-4bf2-aae8-bcfc9272e867",
+      "role": "worker",
+      "score": 2,
+      "events": [
+        {
+          "delta": 2,
+          "reason": "replication_accepted",
+          "at": 1771455113
+        }
+      ],
+      "updated_at": 1771455113
+    },
+    "worker:a46c0dcf-aff2-4cdc-b9a8-5fb81462814a": {
+      "actor_id": "a46c0dcf-aff2-4cdc-b9a8-5fb81462814a",
+      "role": "worker",
+      "score": 2,
+      "events": [
+        {
+          "delta": 2,
+          "reason": "replication_accepted",
+          "at": 1771455113
+        }
+      ],
+      "updated_at": 1771455113
+    },
+    "worker:300791db-9ed5-4b5e-9302-b92642a26e14": {
+      "actor_id": "300791db-9ed5-4b5e-9302-b92642a26e14",
+      "role": "worker",
+      "score": -5,
+      "events": [
+        {
+          "delta": -5,
+          "reason": "verification_failed",
+          "at": 1771455114
+        }
+      ],
+      "updated_at": 1771455114
+    },
+    "worker:0d312b2d-b6dc-4111-a9bd-d0ce8408d3c4": {
+      "actor_id": "0d312b2d-b6dc-4111-a9bd-d0ce8408d3c4",
+      "role": "worker",
+      "score": -4,
+      "events": [
+        {
+          "delta": -4,
+          "reason": "challenge_reject",
+          "at": 1771455114
+        }
+      ],
+      "updated_at": 1771455114
+    },
+    "validator:4eec826c-ce9f-4f80-adfd-ff1d9fc09471": {
+      "actor_id": "4eec826c-ce9f-4f80-adfd-ff1d9fc09471",
+      "role": "validator",
+      "score": 1,
+      "events": [
+        {
+          "delta": 1,
+          "reason": "challenge_resolve",
+          "at": 1771455114
+        }
+      ],
+      "updated_at": 1771455114
+    },
+    "validator:6b1bcace-cbaa-498a-8f08-87d59a134446": {
+      "actor_id": "6b1bcace-cbaa-498a-8f08-87d59a134446",
+      "role": "validator",
+      "score": 1,
+      "events": [
+        {
+          "delta": 1,
+          "reason": "validator_verdict_submitted",
+          "at": 1771455114
+        }
+      ],
+      "updated_at": 1771455114
+    },
+    "worker:2e53f511-a880-4534-9912-7d58d6e1db72": {
+      "actor_id": "2e53f511-a880-4534-9912-7d58d6e1db72",
+      "role": "worker",
+      "score": 2,
+      "events": [
+        {
+          "delta": 2,
+          "reason": "replication_accepted",
+          "at": 1771455226
+        }
+      ],
+      "updated_at": 1771455226
+    },
+    "worker:0a5eb7d7-ece9-4668-afe5-ea38fd402a25": {
+      "actor_id": "0a5eb7d7-ece9-4668-afe5-ea38fd402a25",
+      "role": "worker",
+      "score": 2,
+      "events": [
+        {
+          "delta": 2,
+          "reason": "replication_accepted",
+          "at": 1771455227
+        }
+      ],
+      "updated_at": 1771455227
+    },
+    "worker:99e79c75-5208-4983-bfdd-f8aa2035075c": {
+      "actor_id": "99e79c75-5208-4983-bfdd-f8aa2035075c",
+      "role": "worker",
+      "score": -4,
+      "events": [
+        {
+          "delta": -4,
+          "reason": "challenge_reject",
+          "at": 1771455227
+        }
+      ],
+      "updated_at": 1771455227
+    },
+    "validator:ad573ba1-0fb5-457f-94d1-97a26adc61ff": {
+      "actor_id": "ad573ba1-0fb5-457f-94d1-97a26adc61ff",
+      "role": "validator",
+      "score": 1,
+      "events": [
+        {
+          "delta": 1,
+          "reason": "challenge_resolve",
+          "at": 1771455227
+        }
+      ],
+      "updated_at": 1771455227
+    },
+    "validator:46832ec0-241c-4de5-be9a-3bd707d05b99": {
+      "actor_id": "46832ec0-241c-4de5-be9a-3bd707d05b99",
+      "role": "validator",
+      "score": 1,
+      "events": [
+        {
+          "delta": 1,
+          "reason": "validator_verdict_submitted",
+          "at": 1771455227
+        }
+      ],
+      "updated_at": 1771455227
+    }
+  },
+  "disputes": {
+    "dsp-f05b29ab396e4e0c": {
+      "dispute_id": "dsp-f05b29ab396e4e0c",
+      "job_id": "job-de5c115102e0418c",
+      "contract_id": "usr-40c901413db1",
+      "opened_by": "aa46a961-3f01-4ade-9fa9-7c7bb14a0629",
+      "reason": "need manual review",
+      "state": "closed_reject",
+      "review_deadline_at": 1771455414,
+      "appeal_deadline_at": 1771459014,
+      "events": [
+        {
+          "event": "create",
+          "from_state": null,
+          "to_state": "opened",
+          "at": 1771455114,
+          "by": "aa46a961-3f01-4ade-9fa9-7c7bb14a0629"
+        },
+        {
+          "event": "start_review",
+          "from_state": "opened",
+          "to_state": "under_review",
+          "at": 1771455114,
+          "by": "aa46a961-3f01-4ade-9fa9-7c7bb14a0629",
+          "payload": {
+            "source": "job_open_challenge"
+          }
+        },
+        {
+          "event": "resolve_reject",
+          "from_state": "under_review",
+          "to_state": "resolved_reject",
+          "at": 1771455114,
+          "by": "4eec826c-ce9f-4f80-adfd-ff1d9fc09471",
+          "payload": {
+            "challenge_id": "chg-254f0e4f375b41c5"
+          }
+        },
+        {
+          "event": "deadline_close_appeal_window",
+          "from_state": "resolved_reject",
+          "to_state": "closed_reject",
+          "at": 1771459246,
+          "by": "system",
+          "payload": {
+            "reason": "appeal_deadline_expired"
+          }
+        }
+      ],
+      "created_at": 1771455114,
+      "updated_at": 1771459246
+    },
+    "dsp-f0b0e742db2b4e63": {
+      "dispute_id": "dsp-f0b0e742db2b4e63",
+      "job_id": "job-212aaa3c99c74a1f",
+      "contract_id": "usr-6251d2e4fd5b",
+      "opened_by": "bd9bbeae-1a72-40b9-9fd1-9c6441aea936",
+      "reason": "need manual review",
+      "state": "closed_reject",
+      "review_deadline_at": 1771455527,
+      "appeal_deadline_at": 1771459127,
+      "events": [
+        {
+          "event": "create",
+          "from_state": null,
+          "to_state": "opened",
+          "at": 1771455227,
+          "by": "bd9bbeae-1a72-40b9-9fd1-9c6441aea936"
+        },
+        {
+          "event": "start_review",
+          "from_state": "opened",
+          "to_state": "under_review",
+          "at": 1771455227,
+          "by": "bd9bbeae-1a72-40b9-9fd1-9c6441aea936",
+          "payload": {
+            "source": "job_open_challenge"
+          }
+        },
+        {
+          "event": "resolve_reject",
+          "from_state": "under_review",
+          "to_state": "resolved_reject",
+          "at": 1771455227,
+          "by": "ad573ba1-0fb5-457f-94d1-97a26adc61ff",
+          "payload": {
+            "challenge_id": "chg-0236f06ad1a54080"
+          }
+        },
+        {
+          "event": "deadline_close_appeal_window",
+          "from_state": "resolved_reject",
+          "to_state": "closed_reject",
+          "at": 1771459246,
+          "by": "system",
+          "payload": {
+            "reason": "appeal_deadline_expired"
+          }
+        }
+      ],
+      "created_at": 1771455227,
+      "updated_at": 1771459246
+    }
+  },
+  "governance": {
+    "admitted_nodes": {},
+    "admitted_validators": {},
+    "protocol_rollout": null
+  }
+}

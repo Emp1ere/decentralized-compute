@@ -2444,8 +2444,14 @@
         });
         applyWalletToProfile({ balances: conversion.balances || {} });
         document.getElementById('profile-convert-amount').value = '';
+        const compliance = conversion.compliance || {};
+        const gate = compliance.gate || {};
+        const providerCase = compliance.provider_case || {};
+        const complianceHint = gate.decision
+          ? ` [compliance: ${gate.decision}${providerCase.case_id ? ', case=' + providerCase.case_id : ''}]`
+          : '';
         msgEl.className = 'msg ok';
-        msgEl.textContent = 'Конвертация выполнена: ' + conversion.source_amount + ' ' + conversion.from_currency + ' -> ' + conversion.target_amount + ' ' + conversion.to_currency;
+        msgEl.textContent = 'Конвертация выполнена: ' + conversion.source_amount + ' ' + conversion.from_currency + ' -> ' + conversion.target_amount + ' ' + conversion.to_currency + complianceHint;
         msgEl.style.display = 'block';
       } catch (e) {
         msgEl.className = 'msg err';
@@ -2498,8 +2504,14 @@
       })
         .then(resp => {
           applyWalletToProfile(resp.wallet || {});
+          const compliance = resp.compliance || {};
+          const gate = compliance.gate || {};
+          const providerCase = compliance.provider_case || {};
+          const complianceHint = gate.decision
+            ? ` [compliance: ${gate.decision}${providerCase.case_id ? ', case=' + providerCase.case_id : ''}]`
+            : '';
           msgEl.className = 'msg ok';
-          msgEl.textContent = 'Заявка на вывод создана: ' + amount + ' ' + currency + ' на карту ****' + card.slice(-4) + '. Статус: queued.';
+          msgEl.textContent = 'Заявка на вывод создана: ' + amount + ' ' + currency + ' на карту ****' + card.slice(-4) + '. Статус: queued.' + complianceHint;
           msgEl.style.display = 'block';
           document.getElementById('profile-withdraw-amount').value = '';
           document.getElementById('profile-withdraw-card').value = '';

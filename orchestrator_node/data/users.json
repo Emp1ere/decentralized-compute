@@ -1,0 +1,11 @@
+{
+  "users": [
+    {
+      "login": "first_provider",
+      "password_hash": "pbkdf2:sha256:1000000$y2HzwagYAWCDLqeN$4054c804b18128ff385e925ee691f87cada003eae3d76725dc51d48c31e6a881",
+      "client_id": "aeb3dec0-5718-4df2-9f0a-47df060e8b4c",
+      "api_key": "fQ5MZt5DN9WkBZNGQYKegPiAG8Rpg_RhIMkEljlBoQk",
+      "nickname": "Первый поставщик"
+    }
+  ]
+}

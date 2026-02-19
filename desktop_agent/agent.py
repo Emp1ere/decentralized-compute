@@ -128,7 +128,12 @@ class DesktopAgent:
         if validation_policy:
             mode = validation_policy.get("mode", "deterministic")
             repl = validation_policy.get("replication_factor", 1)
-            self.push_log(f"Validation policy: mode={mode}, replication={repl}")
+            quorum = validation_policy.get("quorum_threshold", repl)
+            self.push_log(f"Validation policy: mode={mode}, replication={repl}, quorum={quorum}")
+        if task.get("task_class"):
+            self.push_log(
+                f"Task class: {task.get('task_class')} ({task.get('validation_style', 'default validation style')})"
+            )
         if escrow_policy and escrow_policy.get("enabled"):
             self.push_log(
                 f"Escrow policy: collateral={escrow_policy.get('worker_collateral', 0)}, "
@@ -208,6 +213,7 @@ class DesktopAgent:
                         "client_id": cfg["client_id"],
                         "contract_id": task["contract_id"],
                         "job_id": task.get("job_id"),
+                        "attempt_id": 1,
                         "work_units_done": int(work_done),
                         "result_data": result_data,
                         "nonce": nonce,
@@ -216,9 +222,24 @@ class DesktopAgent:
                         ((task.get("task_profile") or {}).get("recommended_submit_timeout_seconds") or 900)
                     ),
                 )
+                if (submit_result.get("status") or "").strip() == "pending_validation":
+                    repl = submit_result.get("replication") if isinstance(submit_result.get("replication"), dict) else {}
+                    self.push_log(
+                        "Сабмит принят, ожидается quorum-валидация: "
+                        f"{repl.get('received_submissions', 0)}/{repl.get('required_submissions', '?')}"
+                    )
+                    self._clear_state()
+                    self.stop_event.wait(2)
+                    continue
                 reward = submit_result.get("reward_issued")
                 currency = submit_result.get("reward_currency", "")
-                self.push_log(f"Сдано успешно. Награда: {reward} {currency}".strip())
+                if submit_result.get("challenge_window_open"):
+                    self.push_log(
+                        f"Сдано успешно. Награда: {reward} {currency}. "
+                        "Открыто challenge-window до финализации."
+                    )
+                else:
+                    self.push_log(f"Сдано успешно. Награда: {reward} {currency}".strip())
                 self._clear_state()
                 if cfg.get("check_updates", True):
                     self._check_updates(api)

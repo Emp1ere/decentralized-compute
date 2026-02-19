@@ -340,6 +340,347 @@
       "is_archived": false,
       "created_at": 1771437273,
       "updated_at": 1771437273
+    },
+    {
+      "sector_id": "sec-9a9f55eb2135",
+      "owner_client_id": "c053f1cd-9bb4-4f11-aedb-5cf717086c0c",
+      "sector_name": "MD policy sector",
+      "organization_name": "Policy org",
+      "compute_domain": "molecular_dynamics",
+      "description": "Capabilities matching test",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-8c786519a94f",
+      "owner_client_id": "b5678027-5303-44d9-bfeb-25f638c71def",
+      "sector_name": "Astro BOINC sector",
+      "organization_name": "Test institute",
+      "compute_domain": "astrophysics",
+      "description": "Integration test sector",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-024b95f72538",
+      "owner_client_id": "ae306e50-200e-4a87-92a3-330c68542605",
+      "sector_name": "Replicated sector",
+      "organization_name": "Replication lab",
+      "compute_domain": "verification",
+      "description": "Quorum flow test",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-ac16b15e3fd2",
+      "owner_client_id": "2bbfc3e4-31da-40f1-b7af-a392bc76a132",
+      "sector_name": "Challenge sector",
+      "organization_name": "Dispute lab",
+      "compute_domain": "challenge",
+      "description": "Challenge + escrow lifecycle",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-309a2dded584",
+      "owner_client_id": "ed37a537-5f1d-473a-a26d-b39c9e9b0aab",
+      "sector_name": "Finance sector",
+      "organization_name": "Market Lab",
+      "compute_domain": "market",
+      "description": "USD payout integration",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-6f6af86a0558",
+      "owner_client_id": "a6a87c9d-5f1e-443c-8d48-5a408c68b4a9",
+      "sector_name": "Research sector",
+      "organization_name": "Lab",
+      "compute_domain": "simulation",
+      "description": "For contract grouping",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-5a7ac5a75f84",
+      "owner_client_id": "1ab94359-433a-4596-a2b5-09fc91f5a9fc",
+      "sector_name": "Owner-only sector",
+      "organization_name": "Owner org",
+      "compute_domain": "restricted",
+      "description": "Only sector creator can create contracts here",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-a2f340c95530",
+      "owner_client_id": "8fdb33ae-2f68-486f-be4c-2567552b4b1e",
+      "sector_name": "Private owner sector",
+      "organization_name": "Owner org",
+      "compute_domain": "private",
+      "description": "Should not be listed by foreign account",
+      "is_archived": false,
+      "created_at": 1771453002,
+      "updated_at": 1771453002
+    },
+    {
+      "sector_id": "sec-8af1fa4d12f5",
+      "owner_client_id": "338bee7a-271d-484f-b849-88db1e12b271",
+      "sector_name": "MD policy sector",
+      "organization_name": "Policy org",
+      "compute_domain": "molecular_dynamics",
+      "description": "Capabilities matching test",
+      "is_archived": false,
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    {
+      "sector_id": "sec-a5887e7f69a8",
+      "owner_client_id": "43bcc616-78f0-4d48-90e5-6f6453e80634",
+      "sector_name": "Astro BOINC sector",
+      "organization_name": "Test institute",
+      "compute_domain": "astrophysics",
+      "description": "Integration test sector",
+      "is_archived": false,
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    {
+      "sector_id": "sec-3348d483c9ea",
+      "owner_client_id": "38a3b3ba-48f4-4beb-bff6-7e94ddd354d7",
+      "sector_name": "Bio sector",
+      "organization_name": "Bio lab",
+      "compute_domain": "protein",
+      "description": "Auto task-class test",
+      "is_archived": false,
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    {
+      "sector_id": "sec-2fe4eeeff5a8",
+      "owner_client_id": "1be11b69-cb8f-48be-a1a9-fc0af41bf53b",
+      "sector_name": "Replicated sector",
+      "organization_name": "Replication lab",
+      "compute_domain": "verification",
+      "description": "Quorum flow test",
+      "is_archived": false,
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    {
+      "sector_id": "sec-388edc79b30c",
+      "owner_client_id": "90990342-67a2-4b50-b7ec-8b73cb499ce4",
+      "sector_name": "M-of-N sector",
+      "organization_name": "Quorum lab",
+      "compute_domain": "validation",
+      "description": "M-of-N early quorum",
+      "is_archived": false,
+      "created_at": 1771455113,
+      "updated_at": 1771455113
+    },
+    {
+      "sector_id": "sec-d70d9aea89c6",
+      "owner_client_id": "4eec826c-ce9f-4f80-adfd-ff1d9fc09471",
+      "sector_name": "Challenge sector",
+      "organization_name": "Dispute lab",
+      "compute_domain": "challenge",
+      "description": "Challenge + escrow lifecycle",
+      "is_archived": false,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    {
+      "sector_id": "sec-a17bf5a5fbce",
+      "owner_client_id": "90265370-d3e9-4b83-9b09-3b49a9914697",
+      "sector_name": "Validator sector",
+      "organization_name": "Validation lab",
+      "compute_domain": "validation",
+      "description": "Validator verdict path",
+      "is_archived": false,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    {
+      "sector_id": "sec-d02184d3f022",
+      "owner_client_id": "edea5377-cb1a-497e-ae32-98f02e2b9a53",
+      "sector_name": "Finance sector",
+      "organization_name": "Market Lab",
+      "compute_domain": "market",
+      "description": "USD payout integration",
+      "is_archived": false,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    {
+      "sector_id": "sec-9c152e383583",
+      "owner_client_id": "b0952012-82e5-42b6-9794-58912150abd8",
+      "sector_name": "Research sector",
+      "organization_name": "Lab",
+      "compute_domain": "simulation",
+      "description": "For contract grouping",
+      "is_archived": false,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    {
+      "sector_id": "sec-05ccf1deb602",
+      "owner_client_id": "0c4d1dde-e634-45f5-ac66-3d6d660801be",
+      "sector_name": "Owner-only sector",
+      "organization_name": "Owner org",
+      "compute_domain": "restricted",
+      "description": "Only sector creator can create contracts here",
+      "is_archived": false,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    {
+      "sector_id": "sec-f58f475a936f",
+      "owner_client_id": "e1539403-449d-4222-a61e-2c80408ac36f",
+      "sector_name": "Private owner sector",
+      "organization_name": "Owner org",
+      "compute_domain": "private",
+      "description": "Should not be listed by foreign account",
+      "is_archived": false,
+      "created_at": 1771455114,
+      "updated_at": 1771455114
+    },
+    {
+      "sector_id": "sec-ee57bb626b95",
+      "owner_client_id": "326d6335-90ed-4af9-b89c-9acfd7dbf52d",
+      "sector_name": "MD policy sector",
+      "organization_name": "Policy org",
+      "compute_domain": "molecular_dynamics",
+      "description": "Capabilities matching test",
+      "is_archived": false,
+      "created_at": 1771455226,
+      "updated_at": 1771455226
+    },
+    {
+      "sector_id": "sec-b12a2544c218",
+      "owner_client_id": "c2e2e4b1-5262-422e-a1a9-594002023880",
+      "sector_name": "Astro BOINC sector",
+      "organization_name": "Test institute",
+      "compute_domain": "astrophysics",
+      "description": "Integration test sector",
+      "is_archived": false,
+      "created_at": 1771455226,
+      "updated_at": 1771455226
+    },
+    {
+      "sector_id": "sec-04d1df99ab68",
+      "owner_client_id": "26670239-b67b-40b8-bea7-e8c28c27562e",
+      "sector_name": "Bio sector",
+      "organization_name": "Bio lab",
+      "compute_domain": "protein",
+      "description": "Auto task-class test",
+      "is_archived": false,
+      "created_at": 1771455226,
+      "updated_at": 1771455226
+    },
+    {
+      "sector_id": "sec-7427a602b12e",
+      "owner_client_id": "ec575109-fdd7-4955-a3b6-860671756cb5",
+      "sector_name": "Replicated sector",
+      "organization_name": "Replication lab",
+      "compute_domain": "verification",
+      "description": "Quorum flow test",
+      "is_archived": false,
+      "created_at": 1771455226,
+      "updated_at": 1771455226
+    },
+    {
+      "sector_id": "sec-f0bd999fc855",
+      "owner_client_id": "f1664bdd-de8d-4ec8-81e6-193225bf87e5",
+      "sector_name": "M-of-N sector",
+      "organization_name": "Quorum lab",
+      "compute_domain": "validation",
+      "description": "M-of-N early quorum",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-565d31d4875f",
+      "owner_client_id": "374dba24-8c05-4074-bb85-ef9024cbb668",
+      "sector_name": "Replay sector",
+      "organization_name": "Replay lab",
+      "compute_domain": "validation",
+      "description": "Replay guard test",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-55aa418cc270",
+      "owner_client_id": "ad573ba1-0fb5-457f-94d1-97a26adc61ff",
+      "sector_name": "Challenge sector",
+      "organization_name": "Dispute lab",
+      "compute_domain": "challenge",
+      "description": "Challenge + escrow lifecycle",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-8253c8f3b65c",
+      "owner_client_id": "b0613e4c-eba1-41fa-8dcd-7acf177c7579",
+      "sector_name": "Validator sector",
+      "organization_name": "Validation lab",
+      "compute_domain": "validation",
+      "description": "Validator verdict path",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-d03ff8cab64e",
+      "owner_client_id": "dbb5bbf8-fd00-4b62-b24c-7732937f0eac",
+      "sector_name": "Finance sector",
+      "organization_name": "Market Lab",
+      "compute_domain": "market",
+      "description": "USD payout integration",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-d865fcca1116",
+      "owner_client_id": "b509ed30-91b7-4f6f-81bb-945691b09182",
+      "sector_name": "Research sector",
+      "organization_name": "Lab",
+      "compute_domain": "simulation",
+      "description": "For contract grouping",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-5e8572ff8c2f",
+      "owner_client_id": "b427c93e-0e5e-4dd7-98c4-b8b53a02cb79",
+      "sector_name": "Owner-only sector",
+      "organization_name": "Owner org",
+      "compute_domain": "restricted",
+      "description": "Only sector creator can create contracts here",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-be9415bd47a6",
+      "owner_client_id": "36fd4ba1-81d9-4cda-8d7a-6dc46d42f089",
+      "sector_name": "Private owner sector",
+      "organization_name": "Owner org",
+      "compute_domain": "private",
+      "description": "Should not be listed by foreign account",
+      "is_archived": false,
+      "created_at": 1771455227,
+      "updated_at": 1771455227
     }
   ],
   "contracts": [
@@ -357,12 +698,12 @@
       "difficulty": 1,
       "status": "active",
       "budget_tokens_total": 20,
-      "budget_tokens_spent": 8,
+      "budget_tokens_spent": 14,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 400,
-      "jobs_completed": 4,
+      "completed_work_units": 700,
+      "jobs_completed": 7,
       "created_at": 1771101828,
-      "updated_at": 1771437273,
+      "updated_at": 1771455226,
       "sector_id": "sec-d56b154e8703"
     },
     {
@@ -379,12 +720,12 @@
       "difficulty": 3,
       "status": "active",
       "budget_tokens_total": 100,
-      "budget_tokens_spent": 10,
+      "budget_tokens_spent": 20,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 1000,
-      "jobs_completed": 1,
+      "completed_work_units": 2000,
+      "jobs_completed": 2,
       "created_at": 1771101828,
-      "updated_at": 1771436356,
+      "updated_at": 1771455226,
       "sector_id": "sec-d56b154e8703"
     },
     {
@@ -401,12 +742,12 @@
       "difficulty": 4,
       "status": "active",
       "budget_tokens_total": 500,
-      "budget_tokens_spent": 100,
+      "budget_tokens_spent": 150,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 10000,
-      "jobs_completed": 2,
+      "completed_work_units": 15000,
+      "jobs_completed": 3,
       "created_at": 1771101828,
-      "updated_at": 1771437273,
+      "updated_at": 1771455113,
       "sector_id": "sec-d56b154e8703"
     },
     {
@@ -918,14 +1259,14 @@
       "budget_currency": "USD",
       "target_total_work_units": 300,
       "difficulty": 2,
-      "status": "active",
+      "status": "closed",
       "budget_tokens_total": 10,
-      "budget_tokens_spent": 5,
+      "budget_tokens_spent": 10,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 150,
-      "jobs_completed": 1,
+      "completed_work_units": 300,
+      "jobs_completed": 2,
       "created_at": 1771437049,
-      "updated_at": 1771437049
+      "updated_at": 1771453002
     },
     {
       "contract_id": "usr-4119e49ae3cf",
@@ -1006,6 +1347,896 @@
       "jobs_completed": 1,
       "created_at": 1771437273,
       "updated_at": 1771437273
+    },
+    {
+      "contract_id": "usr-1b37fdaa593e",
+      "provider_client_id": "c053f1cd-9bb4-4f11-aedb-5cf717086c0c",
+      "sector_id": "sec-9a9f55eb2135",
+      "task_name": "Capability-gated benchmark",
+      "task_description": "Should require higher capabilities",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 500,
+      "reward_per_task": 5,
+      "budget_currency": "RUB",
+      "target_total_work_units": 5000,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771453002,
+      "updated_at": 1771453002,
+      "benchmark_meta": {
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 16,
+          "require_gpu": true
+        },
+        "decentralized_policy": {
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-a4858b89e78b",
+      "provider_client_id": "b5678027-5303-44d9-bfeb-25f638c71def",
+      "sector_id": "sec-8c786519a94f",
+      "task_name": "Provider PoW demo",
+      "task_description": "User-defined contract for integration test",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 200,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "closed",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 6,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 400,
+      "jobs_completed": 2,
+      "created_at": 1771453002,
+      "updated_at": 1771453002,
+      "benchmark_meta": {
+        "input_format": "none",
+        "runner": {
+          "command_template": "python --version",
+          "engine": "python_cli"
+        },
+        "decentralized_policy": {
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-75c9585e9e06",
+      "provider_client_id": "ae306e50-200e-4a87-92a3-330c68542605",
+      "sector_id": "sec-024b95f72538",
+      "task_name": "Replicated PoW",
+      "task_description": "Needs 2 replicated submissions",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771453002,
+      "updated_at": 1771453002,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-db392bbebb87",
+      "provider_client_id": "2bbfc3e4-31da-40f1-b7af-a392bc76a132",
+      "sector_id": "sec-ac16b15e3fd2",
+      "task_name": "Challengeable PoW",
+      "task_description": "Escrow should remain locked during challenge window",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 4,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 4,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771453002,
+      "updated_at": 1771453002,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 1,
+            "challenge_window_seconds": 300
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 2,
+            "penalty_percent_on_reject": 50
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-a2d894f6fd09",
+      "provider_client_id": "ed37a537-5f1d-473a-a26d-b39c9e9b0aab",
+      "sector_id": "sec-309a2dded584",
+      "task_name": "USD contract",
+      "task_description": "Market economy test",
+      "task_category": "Finance",
+      "computation_type": "simple_pow",
+      "work_units_required": 150,
+      "reward_per_task": 5,
+      "budget_currency": "USD",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 5,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 150,
+      "jobs_completed": 1,
+      "created_at": 1771453002,
+      "updated_at": 1771453002,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-9d326937914a",
+      "provider_client_id": "338bee7a-271d-484f-b849-88db1e12b271",
+      "sector_id": "sec-8af1fa4d12f5",
+      "task_name": "Capability-gated benchmark",
+      "task_description": "Should require higher capabilities",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 500,
+      "reward_per_task": 5,
+      "budget_currency": "RUB",
+      "target_total_work_units": 5000,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455113,
+      "updated_at": 1771455113,
+      "benchmark_meta": {
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 16,
+          "require_gpu": true
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-2804b222b30d",
+      "provider_client_id": "43bcc616-78f0-4d48-90e5-6f6453e80634",
+      "sector_id": "sec-a5887e7f69a8",
+      "task_name": "Provider PoW demo",
+      "task_description": "User-defined contract for integration test",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 200,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "closed",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 6,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 400,
+      "jobs_completed": 2,
+      "created_at": 1771455113,
+      "updated_at": 1771455113,
+      "benchmark_meta": {
+        "input_format": "none",
+        "runner": {
+          "command_template": "python --version",
+          "engine": "python_cli"
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-551992f5cdb9",
+      "provider_client_id": "38a3b3ba-48f4-4beb-bff6-7e94ddd354d7",
+      "sector_id": "sec-3348d483c9ea",
+      "task_name": "Protein structure fold",
+      "task_description": "3D protein structure search",
+      "task_category": "biomed",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 120,
+      "reward_per_task": 4,
+      "budget_currency": "USD",
+      "target_total_work_units": 240,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 8,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455113,
+      "updated_at": 1771455113,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-76656e77bdb5",
+      "provider_client_id": "1be11b69-cb8f-48be-a1a9-fc0af41bf53b",
+      "sector_id": "sec-2fe4eeeff5a8",
+      "task_name": "Replicated PoW",
+      "task_description": "Needs 2 replicated submissions",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771455113,
+      "updated_at": 1771455113,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-54e059dffd2a",
+      "provider_client_id": "90990342-67a2-4b50-b7ec-8b73cb499ce4",
+      "sector_id": "sec-388edc79b30c",
+      "task_name": "M of N PoW",
+      "task_description": "3 replicas, threshold 2",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771455113,
+      "updated_at": 1771455113,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 3,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-40c901413db1",
+      "provider_client_id": "4eec826c-ce9f-4f80-adfd-ff1d9fc09471",
+      "sector_id": "sec-d70d9aea89c6",
+      "task_name": "Challengeable PoW",
+      "task_description": "Escrow should remain locked during challenge window",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 4,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 4,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771455114,
+      "updated_at": 1771455114,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 300
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 2,
+            "penalty_percent_on_reject": 50
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-ad217068d18b",
+      "provider_client_id": "90265370-d3e9-4b83-9b09-3b49a9914697",
+      "sector_id": "sec-a17bf5a5fbce",
+      "task_name": "Validator PoW",
+      "task_description": "Need replication group for verdict",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455114,
+      "updated_at": 1771455114,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-80764c2304bb",
+      "provider_client_id": "edea5377-cb1a-497e-ae32-98f02e2b9a53",
+      "sector_id": "sec-d02184d3f022",
+      "task_name": "USD contract",
+      "task_description": "Market economy test",
+      "task_category": "Finance",
+      "computation_type": "simple_pow",
+      "work_units_required": 150,
+      "reward_per_task": 5,
+      "budget_currency": "USD",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 5,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 150,
+      "jobs_completed": 1,
+      "created_at": 1771455114,
+      "updated_at": 1771455114,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-8998f24cec67",
+      "provider_client_id": "326d6335-90ed-4af9-b89c-9acfd7dbf52d",
+      "sector_id": "sec-ee57bb626b95",
+      "task_name": "Capability-gated benchmark",
+      "task_description": "Should require higher capabilities",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 500,
+      "reward_per_task": 5,
+      "budget_currency": "RUB",
+      "target_total_work_units": 5000,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455226,
+      "updated_at": 1771455226,
+      "benchmark_meta": {
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 16,
+          "require_gpu": true
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-58e26050b45f",
+      "provider_client_id": "c2e2e4b1-5262-422e-a1a9-594002023880",
+      "sector_id": "sec-b12a2544c218",
+      "task_name": "Provider PoW demo",
+      "task_description": "User-defined contract for integration test",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 200,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "closed",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 6,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 400,
+      "jobs_completed": 2,
+      "created_at": 1771455226,
+      "updated_at": 1771455226,
+      "benchmark_meta": {
+        "input_format": "none",
+        "runner": {
+          "command_template": "python --version",
+          "engine": "python_cli"
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-678f2c85b836",
+      "provider_client_id": "26670239-b67b-40b8-bea7-e8c28c27562e",
+      "sector_id": "sec-04d1df99ab68",
+      "task_name": "Protein structure fold",
+      "task_description": "3D protein structure search",
+      "task_category": "biomed",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 120,
+      "reward_per_task": 4,
+      "budget_currency": "USD",
+      "target_total_work_units": 240,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 8,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455226,
+      "updated_at": 1771455226,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-f5785e66440c",
+      "provider_client_id": "ec575109-fdd7-4955-a3b6-860671756cb5",
+      "sector_id": "sec-7427a602b12e",
+      "task_name": "Replicated PoW",
+      "task_description": "Needs 2 replicated submissions",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771455226,
+      "updated_at": 1771455226,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-d617fcde839e",
+      "provider_client_id": "f1664bdd-de8d-4ec8-81e6-193225bf87e5",
+      "sector_id": "sec-f0bd999fc855",
+      "task_name": "M of N PoW",
+      "task_description": "3 replicas, threshold 2",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771455227,
+      "updated_at": 1771455227,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 3,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-7c08bd441f9a",
+      "provider_client_id": "374dba24-8c05-4074-bb85-ef9024cbb668",
+      "sector_id": "sec-565d31d4875f",
+      "task_name": "Replay replicated PoW",
+      "task_description": "Replay guard should trigger on same attempt",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 200,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455227,
+      "updated_at": 1771455227,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-6251d2e4fd5b",
+      "provider_client_id": "ad573ba1-0fb5-457f-94d1-97a26adc61ff",
+      "sector_id": "sec-55aa418cc270",
+      "task_name": "Challengeable PoW",
+      "task_description": "Escrow should remain locked during challenge window",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 4,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 4,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771455227,
+      "updated_at": 1771455227,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 300
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 2,
+            "penalty_percent_on_reject": 50
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-b6540f9b995e",
+      "provider_client_id": "b0613e4c-eba1-41fa-8dcd-7acf177c7579",
+      "sector_id": "sec-8253c8f3b65c",
+      "task_name": "Validator PoW",
+      "task_description": "Need replication group for verdict",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771455227,
+      "updated_at": 1771455227,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-d064d961eafb",
+      "provider_client_id": "dbb5bbf8-fd00-4b62-b24c-7732937f0eac",
+      "sector_id": "sec-d03ff8cab64e",
+      "task_name": "USD contract",
+      "task_description": "Market economy test",
+      "task_category": "Finance",
+      "computation_type": "simple_pow",
+      "work_units_required": 150,
+      "reward_per_task": 5,
+      "budget_currency": "USD",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 5,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 150,
+      "jobs_completed": 1,
+      "created_at": 1771455227,
+      "updated_at": 1771455227,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
     }
   ]
 }

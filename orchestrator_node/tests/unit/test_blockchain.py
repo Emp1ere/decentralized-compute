@@ -70,6 +70,8 @@ class TestBlockchain:
             "client_id": "c1",
             "contract_id": "sc-001",
             "work_units": 1000,
+            "attempt_id": 1,
+            "artifact_manifest_hash": "a" * 64,
             "result_data": "proof_hash_123",
         })
         bc.mine_pending_transactions(None)
@@ -163,6 +165,8 @@ class TestBlockchain:
             "client_id": "c1",
             "contract_id": "sc-001",
             "work_units": 1000,
+            "attempt_id": 1,
+            "artifact_manifest_hash": "b" * 64,
             "result_data": "x",
             "fee": 1,
         })
@@ -176,6 +180,8 @@ class TestBlockchain:
             "client_id": "c1",
             "contract_id": "sc-001",
             "work_units": 1000,
+            "attempt_id": 1,
+            "artifact_manifest_hash": "c" * 64,
             "result_data": "a",
         })
         with pytest.raises(ValueError, match="already has"):
@@ -184,5 +190,7 @@ class TestBlockchain:
                 "client_id": "c1",
                 "contract_id": "sc-001",
                 "work_units": 1000,
+                "attempt_id": 2,
+                "artifact_manifest_hash": "d" * 64,
                 "result_data": "b",
             })

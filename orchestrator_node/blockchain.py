@@ -63,6 +63,16 @@ def _is_valid_work_receipt_tx(tx):
     wu = tx.get("work_units")
     if wu is None or (not isinstance(wu, (int, float))) or wu < 0:
         return False
+    attempt_id = tx.get("attempt_id")
+    if not isinstance(attempt_id, int) or attempt_id <= 0:
+        return False
+    manifest_hash = tx.get("artifact_manifest_hash")
+    if not isinstance(manifest_hash, str) or len(manifest_hash) != 64:
+        return False
+    try:
+        int(manifest_hash, 16)
+    except ValueError:
+        return False
     fee = tx.get("fee", 0)
     if fee is not None and (not isinstance(fee, (int, float)) or fee < 0):
         return False

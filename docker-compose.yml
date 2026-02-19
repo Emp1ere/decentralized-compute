@@ -34,6 +34,12 @@ services:
       # Воркер, запущенный с node_1, работает через node_1.
       - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_1:5000
       - DOCKER_NETWORK=distributed-compute_default
+      # Compliance provider simulation profile (can be overridden via host env)
+      - COMPLIANCE_PROVIDER_MODE=${COMPLIANCE_PROVIDER_MODE:-simulated}
+      - COMPLIANCE_ENFORCEMENT_MODE=${COMPLIANCE_ENFORCEMENT_MODE:-adaptive}
+      - COMPLIANCE_SIM_REVIEW_SECONDS=${COMPLIANCE_SIM_REVIEW_SECONDS:-10}
+      - COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT=${COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT:-500}
+      - COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT=${COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT:-1000}
     # Для TLS задайте TLS_CERT_FILE, TLS_KEY_FILE и смонтируйте сертификаты
     # restart: unless-stopped
 
@@ -61,9 +67,13 @@ services:
       # Воркер, запущенный с node_2, работает через node_2 (для симметричной децентрализации).
       - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_2:5000
       - DOCKER_NETWORK=distributed-compute_default
+      - COMPLIANCE_PROVIDER_MODE=${COMPLIANCE_PROVIDER_MODE:-simulated}
+      - COMPLIANCE_ENFORCEMENT_MODE=${COMPLIANCE_ENFORCEMENT_MODE:-adaptive}
+      - COMPLIANCE_SIM_REVIEW_SECONDS=${COMPLIANCE_SIM_REVIEW_SECONDS:-10}
+      - COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT=${COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT:-500}
+      - COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT=${COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT:-1000}
     depends_on:
       - orchestrator_node_1
-      - orchestrator_node_3
     # restart: unless-stopped
 
   # 2b. Узел 3 (третий равноправный оркестратор).
@@ -90,9 +100,13 @@ services:
       - WORKER_IMAGE=distributed-compute-client_worker_1
       - ORCHESTRATOR_URL_FOR_WORKER=http://orchestrator_node_3:5000
       - DOCKER_NETWORK=distributed-compute_default
+      - COMPLIANCE_PROVIDER_MODE=${COMPLIANCE_PROVIDER_MODE:-simulated}
+      - COMPLIANCE_ENFORCEMENT_MODE=${COMPLIANCE_ENFORCEMENT_MODE:-adaptive}
+      - COMPLIANCE_SIM_REVIEW_SECONDS=${COMPLIANCE_SIM_REVIEW_SECONDS:-10}
+      - COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT=${COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT:-500}
+      - COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT=${COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT:-1000}
     depends_on:
       - orchestrator_node_1
-      - orchestrator_node_2
     # restart: unless-stopped
 
   # 3. Клиент-вычислитель 1 (подключается к узлу 1).

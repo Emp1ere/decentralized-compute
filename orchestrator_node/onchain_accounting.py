@@ -42,6 +42,9 @@ ONCHAIN_ECONOMIC_TX_TYPES = {
     "contract_budget_fund_event",
     "contract_budget_refund_event",
     "contract_reward_settlement",
+    "contract_worker_escrow_hold",
+    "contract_worker_escrow_release",
+    "contract_worker_escrow_penalty",
 }
 
 
@@ -258,6 +261,44 @@ def is_valid_onchain_economic_tx(tx: dict) -> bool:
             and _positive_int(tx.get("work_units")) is not None
         )
 
+    if tx_type == "contract_worker_escrow_hold":
+        return (
+            isinstance(tx.get("hold_id"), str)
+            and bool(tx.get("hold_id"))
+            and isinstance(tx.get("job_id"), str)
+            and bool(tx.get("job_id"))
+            and isinstance(tx.get("contract_id"), str)
+            and bool(tx.get("contract_id"))
+            and isinstance(tx.get("provider_client_id"), str)
+            and bool(tx.get("provider_client_id"))
+            and isinstance(tx.get("worker_client_id"), str)
+            and bool(tx.get("worker_client_id"))
+            and normalize_currency(tx.get("currency")) is not None
+            and _positive_int(tx.get("amount")) is not None
+        )
+
+    if tx_type == "contract_worker_escrow_release":
+        return (
+            isinstance(tx.get("hold_id"), str)
+            and bool(tx.get("hold_id"))
+            and isinstance(tx.get("worker_client_id"), str)
+            and bool(tx.get("worker_client_id"))
+            and normalize_currency(tx.get("currency")) is not None
+            and _positive_int(tx.get("amount")) is not None
+        )
+
+    if tx_type == "contract_worker_escrow_penalty":
+        return (
+            isinstance(tx.get("hold_id"), str)
+            and bool(tx.get("hold_id"))
+            and isinstance(tx.get("provider_client_id"), str)
+            and bool(tx.get("provider_client_id"))
+            and isinstance(tx.get("worker_client_id"), str)
+            and bool(tx.get("worker_client_id"))
+            and normalize_currency(tx.get("currency")) is not None
+            and _positive_int(tx.get("penalty_amount")) is not None
+        )
+
     return False
 
 
@@ -392,6 +433,35 @@ def _wallets_and_audit(chain: Iterable) -> tuple:
                 row["settled_total"] = int(row.get("settled_total", 0)) + int(amount or 0)
                 row["jobs_completed"] = int(row.get("jobs_completed", 0)) + 1
                 row["work_units_done"] = int(row.get("work_units_done", 0)) + int(work_units)
+            continue
+
+        if tx_type == "contract_worker_escrow_hold":
+            worker = tx.get("worker_client_id")
+            cur = normalize_currency(tx.get("currency"))
+            amount = _positive_int(tx.get("amount"))
+            if worker and cur and amount:
+                wallet = _ensure_wallet(wallets, worker)
+                wallet[cur] = max(0, wallet[cur] - amount)
+            continue
+
+        if tx_type == "contract_worker_escrow_release":
+            worker = tx.get("worker_client_id")
+            cur = normalize_currency(tx.get("currency"))
+            amount = _positive_int(tx.get("amount"))
+            if worker and cur and amount:
+                _ensure_wallet(wallets, worker)[cur] += amount
+            continue
+
+        if tx_type == "contract_worker_escrow_penalty":
+            worker = tx.get("worker_client_id")
+            provider = tx.get("provider_client_id")
+            cur = normalize_currency(tx.get("currency"))
+            penalty_amount = _positive_int(tx.get("penalty_amount"))
+            if worker and cur and penalty_amount:
+                wallet = _ensure_wallet(wallets, worker)
+                wallet[cur] = max(0, wallet[cur] - penalty_amount)
+            if provider and cur and penalty_amount:
+                _ensure_wallet(wallets, provider)[cur] += penalty_amount
             continue
 
         if tx_type == "fiat_conversion":

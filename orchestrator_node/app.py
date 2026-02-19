@@ -48,8 +48,55 @@ from device_registry import (
     set_device_disabled,
 )
 from decentralized_fiat_policy import (
+    build_policy_bundle,
+    list_task_class_profiles,
     sanitize_validation_policy,
     sanitize_escrow_policy,
+)
+from decentralized_runtime_store import (
+    add_validator_verdict,
+    enforce_dispute_deadlines,
+    export_runtime_state,
+    governance_ack_rollout,
+    governance_admit_node,
+    governance_admit_validator,
+    governance_finalize_rollout,
+    governance_is_validator_admitted,
+    governance_propose_rollout,
+    governance_snapshot,
+    bump_reputation,
+    check_and_register_replay,
+    create_dispute,
+    acquire_replication_group,
+    create_escrow_hold,
+    get_challenge,
+    get_dispute,
+    get_escrow_hold_by_job,
+    get_open_challenge_by_job,
+    get_reputation,
+    open_challenge,
+    penalize_escrow_hold,
+    merge_runtime_state,
+    register_replication_submission,
+    release_escrow_hold,
+    resolve_challenge,
+    runtime_snapshot,
+    summarize_validator_verdicts,
+    transition_dispute,
+)
+from validation_codes import PENALTY_CODES, error_payload
+from compliance_core import (
+    evaluate_aml_risk,
+    evaluate_jurisdiction,
+    evaluate_kyc_tier,
+    evaluate_withdrawal_gate,
+)
+from simulated_compliance_provider import (
+    evaluate_or_create_case as simulated_compliance_case,
+    list_cases as simulated_list_cases,
+    list_webhook_events as simulated_list_webhook_events,
+    process_cases as simulated_process_cases,
+    get_case as simulated_get_case,
 )
 import hashlib
 import uuid
@@ -373,9 +420,35 @@ def _issue_task_for_client(
         )
     _active_task_takers[(runtime["contract_id"], client_id)] = time.time()
     spec = dict(runtime["spec"])
-    base = uuid.uuid4().int & ((1 << 64) - 1)
-    client_bits = int(hashlib.sha256(client_id.encode()).hexdigest()[:16], 16) % (1 << 64)
-    spec["task_seed"] = (base ^ client_bits) & ((1 << 64) - 1)
+    validation_policy, escrow_policy = _runtime_policies(runtime)
+    replication_mode = validation_policy.get("mode") in {"replicated", "challengeable"}
+    replication_factor = int(validation_policy.get("replication_factor", 1) or 1)
+    quorum_threshold = int(validation_policy.get("quorum_threshold", replication_factor) or replication_factor)
+    replication_group_id = None
+    if replication_mode and replication_factor > 1:
+        group = acquire_replication_group(
+            contract_id=runtime["contract_id"],
+            client_id=client_id,
+            replication_factor=replication_factor,
+            quorum_threshold=quorum_threshold,
+        )
+        spec["task_seed"] = int(group["task_seed"])
+        replication_group_id = group["group_id"]
+    else:
+        base = uuid.uuid4().int & ((1 << 64) - 1)
+        client_bits = int(hashlib.sha256(client_id.encode()).hexdigest()[:16], 16) % (1 << 64)
+        spec["task_seed"] = (base ^ client_bits) & ((1 << 64) - 1)
+
+    escrow_collateral = int(escrow_policy.get("worker_collateral", 0) or 0)
+    reward_currency = _normalized_budget_currency(spec.get("reward_currency")) or MARKET_DEFAULT_CURRENCY
+    if escrow_policy.get("enabled") and escrow_collateral > 0:
+        wallet_amount = get_wallet_amount(blockchain.chain, client_id, reward_currency)
+        if wallet_amount < escrow_collateral:
+            return None, (
+                f"Insufficient wallet balance for escrow collateral: "
+                f"required {escrow_collateral} {reward_currency}"
+            )
+
     assignment = _create_job_assignment(
         client_id=client_id,
         contract_id=runtime["contract_id"],
@@ -386,11 +459,40 @@ def _issue_task_for_client(
         assignment["job_id"],
         scheduler_profile_requested=(scheduler_profile or "adaptive"),
         scheduler_profile_effective=effective_profile,
+        replication_group_id=replication_group_id,
+        replication_factor=replication_factor if replication_mode else 1,
+        quorum_threshold=quorum_threshold if replication_mode else 1,
     )
+    if escrow_policy.get("enabled") and escrow_collateral > 0:
+        provider_client_id = (runtime.get("record") or {}).get("provider_client_id")
+        hold = create_escrow_hold(
+            job_id=assignment["job_id"],
+            contract_id=runtime["contract_id"],
+            provider_client_id=provider_client_id,
+            worker_client_id=client_id,
+            currency=reward_currency,
+            amount=escrow_collateral,
+        )
+        if hold:
+            _, hold_err = _append_onchain_events([_build_escrow_hold_tx(hold)])
+            if hold_err:
+                _update_job_assignment(assignment["job_id"], status="rejected")
+                return None, f"Failed to reserve escrow collateral: {hold_err}"
+            _update_job_assignment(
+                assignment["job_id"],
+                escrow_hold_id=hold.get("hold_id"),
+                escrow_status=hold.get("status"),
+                escrow_amount=int(hold.get("amount", 0)),
+                escrow_currency=hold.get("currency"),
+            )
     spec["job_id"] = assignment["job_id"]
     spec["job_ttl_seconds"] = JOB_TTL_SECONDS
     # Возвращаем effective-профиль для наблюдаемости и отладки adaptive-логики.
     spec["scheduler_profile_effective"] = effective_profile
+    if replication_group_id:
+        spec["replication_group_id"] = replication_group_id
+        spec["replication_factor"] = replication_factor
+        spec["quorum_threshold"] = quorum_threshold
     return spec, None
 
 
@@ -490,6 +592,24 @@ else:
         NODE_IDS = ["node-1", "node-2"]
     else:
         NODE_IDS = [NODE_ID]  # Один узел
+
+NETWORK_PROTOCOL_VERSION = os.environ.get("NETWORK_PROTOCOL_VERSION", "1.0")
+SUPPORTED_PROTOCOL_VERSIONS = [
+    value.strip()
+    for value in os.environ.get("SUPPORTED_PROTOCOL_VERSIONS", NETWORK_PROTOCOL_VERSION).split(",")
+    if value.strip()
+]
+if NETWORK_PROTOCOL_VERSION not in SUPPORTED_PROTOCOL_VERSIONS:
+    SUPPORTED_PROTOCOL_VERSIONS.append(NETWORK_PROTOCOL_VERSION)
+GOVERNANCE_ADMISSION_TOKEN = os.environ.get("GOVERNANCE_ADMISSION_TOKEN", "")
+COMPLIANCE_ENFORCEMENT_MODE = os.environ.get("COMPLIANCE_ENFORCEMENT_MODE", "shadow").strip().lower()
+COMPLIANCE_PROVIDER_MODE = os.environ.get("COMPLIANCE_PROVIDER_MODE", "deterministic").strip().lower()
+COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT = int(
+    os.environ.get("COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT", "500")
+)
+COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT = int(
+    os.environ.get("COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT", "1000")
+)
 
 
 BOOTSTRAP_PROVIDER_LOGIN = os.environ.get("BOOTSTRAP_PROVIDER_LOGIN", "first_provider")
@@ -702,6 +822,31 @@ def periodic_sync():
         time.sleep(SYNC_INTERVAL)
         sync_chain_from_peer()
         _sync_jobs_from_peer()
+        _sync_runtime_from_peer()
+        enforce_dispute_deadlines()
+        if COMPLIANCE_PROVIDER_MODE == "simulated":
+            simulated_process_cases()
+
+
+def _sync_runtime_from_peer():
+    """Синхронизировать runtime state (replication/challenge/dispute/governance) с пиром."""
+    if not PEER_URL:
+        return
+    try:
+        headers = {"X-Node-Secret": NODE_SECRET} if NODE_SECRET else {}
+        response = requests.get(
+            f"{PEER_URL.rstrip('/')}/runtime/snapshot",
+            timeout=PEER_REQUEST_TIMEOUT,
+            headers=headers,
+        )
+        if response.status_code != 200:
+            return
+        remote_state = response.json()
+        changed = merge_runtime_state(remote_state)
+        if changed:
+            logger.info("sync_runtime_merged: changed=%s", changed)
+    except requests.RequestException:
+        return
 
 
 # --- API Эндпоинты ---
@@ -841,6 +986,9 @@ def _build_dynamic_task_spec(contract_record):
     policy_meta = benchmark_meta.get("decentralized_policy", {}) if isinstance(benchmark_meta.get("decentralized_policy"), dict) else {}
     validation_policy = sanitize_validation_policy(policy_meta.get("validation_policy"))
     escrow_policy = sanitize_escrow_policy(policy_meta.get("escrow_policy"))
+    task_class = str(policy_meta.get("task_class") or "").strip() or None
+    task_class_source = str(policy_meta.get("task_class_source") or "").strip() or None
+    validation_style = str(policy_meta.get("validation_style") or "").strip() or None
     return {
         "contract_id": contract_record["contract_id"],
         "sector_id": contract_record.get("sector_id"),
@@ -860,6 +1008,9 @@ def _build_dynamic_task_spec(contract_record):
         # Stage 1 migration fields: explicit policy payload for agent/validator pipeline.
         "validation_policy": validation_policy,
         "escrow_policy": escrow_policy,
+        "task_class": task_class,
+        "task_class_source": task_class_source,
+        "validation_style": validation_style,
     }
 
 
@@ -872,6 +1023,24 @@ def _normalized_budget_currency(raw_currency):
 
 def _reward_event_id(*, client_id, contract_id, result_data, nonce):
     payload = f"{client_id}|{contract_id}|{result_data or ''}|{nonce or ''}"
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _artifact_manifest_hash(output_artifacts):
+    normalized = []
+    for item in output_artifacts or []:
+        if not isinstance(item, dict):
+            continue
+        normalized.append(
+            (
+                str(item.get("name") or "").strip(),
+                str(item.get("sha256") or "").strip().lower(),
+                str(item.get("uri") or "").strip(),
+                int(item.get("size_bytes", 0) or 0),
+            )
+        )
+    normalized.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
+    payload = "|".join(f"{name}:{sha256}:{uri}:{size}" for name, sha256, uri, size in normalized)
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -903,6 +1072,71 @@ def _build_reward_settlement_tx(
         "work_units": int(work_units_done),
         "created_at": now_ts(),
     }
+
+
+def _runtime_policies(runtime):
+    spec = (runtime or {}).get("spec") or {}
+    validation_policy = spec.get("validation_policy") if isinstance(spec.get("validation_policy"), dict) else {}
+    escrow_policy = spec.get("escrow_policy") if isinstance(spec.get("escrow_policy"), dict) else {}
+    return sanitize_validation_policy(validation_policy), sanitize_escrow_policy(escrow_policy)
+
+
+def _build_escrow_hold_tx(hold):
+    return {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": hold.get("hold_id"),
+        "job_id": hold.get("job_id"),
+        "contract_id": hold.get("contract_id"),
+        "provider_client_id": hold.get("provider_client_id"),
+        "worker_client_id": hold.get("worker_client_id"),
+        "currency": hold.get("currency"),
+        "amount": int(hold.get("amount", 0)),
+        "created_at": now_ts(),
+    }
+
+
+def _build_escrow_release_tx(hold):
+    return {
+        "type": "contract_worker_escrow_release",
+        "hold_id": hold.get("hold_id"),
+        "worker_client_id": hold.get("worker_client_id"),
+        "currency": hold.get("currency"),
+        "amount": int(hold.get("amount", 0)),
+        "created_at": now_ts(),
+    }
+
+
+def _build_escrow_penalty_tx(hold):
+    return {
+        "type": "contract_worker_escrow_penalty",
+        "hold_id": hold.get("hold_id"),
+        "contract_id": hold.get("contract_id"),
+        "provider_client_id": hold.get("provider_client_id"),
+        "worker_client_id": hold.get("worker_client_id"),
+        "currency": hold.get("currency"),
+        "penalty_amount": int(hold.get("penalty_amount", 0)),
+        "created_at": now_ts(),
+    }
+
+
+def _try_release_escrow_for_job(job_id):
+    hold = release_escrow_hold(job_id)
+    if not hold or hold.get("status") != "released":
+        return None, None
+    tx = _build_escrow_release_tx(hold)
+    _, err = _append_onchain_events([tx])
+    return hold, err
+
+
+def _try_penalize_escrow_for_job(job_id, *, penalty_percent):
+    hold = penalize_escrow_hold(job_id, penalty_percent=penalty_percent)
+    if not hold or hold.get("status") != "penalized":
+        return None, None
+    if int(hold.get("penalty_amount", 0)) <= 0:
+        return hold, None
+    tx = _build_escrow_penalty_tx(hold)
+    _, err = _append_onchain_events([tx])
+    return hold, err
 
 
 def _push_block_to_peer(new_block):
@@ -958,6 +1192,135 @@ def _oracle_epoch_summary(epoch_id):
         "finalization": finalization,
         "is_finalized": finalization is not None,
     }
+
+
+def _withdrawal_usage(client_id):
+    rows = list_withdrawals_from_chain(blockchain.chain, client_id=client_id, limit=1000)
+    now_value = now_ts()
+    day_start = now_value - 24 * 3600
+    month_start = now_value - 30 * 24 * 3600
+    daily_used = 0
+    monthly_used = 0
+    for row in rows:
+        status = (row.get("status") or "").strip()
+        if status == "rejected":
+            continue
+        amount = int(row.get("amount", 0) or 0)
+        created_at = int(row.get("created_at", 0) or 0)
+        if created_at >= day_start:
+            daily_used += amount
+        if created_at >= month_start:
+            monthly_used += amount
+    return daily_used, monthly_used
+
+
+def _stage3_observability_metrics():
+    runtime = runtime_snapshot()
+    latencies = []
+    settlement_delays = []
+    with _job_assignments_lock:
+        rows = [dict(v) for v in _job_assignments.values()]
+    for row in rows:
+        assigned = float(row.get("assigned_at", 0) or 0)
+        validation_finished = float(row.get("validation_finished_at", 0) or 0)
+        updated = float(row.get("updated_at", 0) or 0)
+        if assigned and validation_finished and validation_finished >= assigned:
+            latencies.append(validation_finished - assigned)
+        if assigned and updated and row.get("status") in {"reward_settled", "rejected"} and updated >= assigned:
+            settlement_delays.append(updated - assigned)
+    avg_validation_latency = (sum(latencies) / len(latencies)) if latencies else 0.0
+    avg_settlement_delay = (sum(settlement_delays) / len(settlement_delays)) if settlement_delays else 0.0
+
+    events = list_audit_events(blockchain.chain, limit=5000)
+    reward_total = 0
+    penalty_total = 0
+    for row in events:
+        tx = row.get("tx") or {}
+        if tx.get("type") == "contract_reward_settlement":
+            reward_total += int(tx.get("amount", 0) or 0)
+        if tx.get("type") == "contract_worker_escrow_penalty":
+            penalty_total += int(tx.get("penalty_amount", 0) or 0)
+    denom = reward_total + penalty_total
+    fraud_loss_ratio = (penalty_total / denom) if denom > 0 else 0.0
+
+    resolved_jobs = 0
+    for row in rows:
+        if row.get("status") in {"reward_settled", "rejected"}:
+            resolved_jobs += 1
+    challenge_rate = (
+        float(runtime.get("challenges_total", 0) or 0) / float(resolved_jobs)
+        if resolved_jobs > 0
+        else 0.0
+    )
+    return {
+        "validation_latency_avg_seconds": round(avg_validation_latency, 3),
+        "challenge_rate": round(challenge_rate, 4),
+        "settlement_delay_avg_seconds": round(avg_settlement_delay, 3),
+        "fraud_loss_ratio": round(fraud_loss_ratio, 6),
+        "runtime_snapshot": runtime,
+    }
+
+
+def _compliance_bundle(*, client_id, amount, currency, country_code=None, operation="withdrawal"):
+    daily_used, monthly_used = _withdrawal_usage(client_id)
+    kyc = evaluate_kyc_tier(client_id=client_id)
+    aml = evaluate_aml_risk(client_id=client_id, amount=amount, currency=currency)
+    jurisdiction = evaluate_jurisdiction(client_id=client_id, country_code=country_code)
+    provider_case = None
+    if COMPLIANCE_PROVIDER_MODE == "simulated":
+        provider_case = simulated_compliance_case(
+            client_id=client_id,
+            operation=(operation or "withdrawal").strip().lower(),
+            amount=amount,
+            currency=currency,
+            country_code=country_code,
+            kyc_tier=kyc.get("kyc_tier", "tier0_unverified"),
+        )
+        case_status = (provider_case.get("status") or "").strip().lower() if isinstance(provider_case, dict) else ""
+        if case_status in {"allow", "review", "reject"}:
+            aml["decision"] = case_status
+            aml["risk_score"] = int(provider_case.get("risk_score", aml.get("risk_score", 0)) or 0)
+            aml["provider_reason"] = provider_case.get("decision_reason")
+            aml["status"] = "simulated-provider"
+        else:
+            aml["decision"] = "review"
+            aml["provider_reason"] = "provider_pending"
+            aml["status"] = "simulated-provider-pending"
+    gate = evaluate_withdrawal_gate(
+        kyc_result=kyc,
+        aml_result=aml,
+        jurisdiction_result=jurisdiction,
+        amount=amount,
+        daily_used=daily_used,
+        monthly_used=monthly_used,
+    )
+    return {
+        "kyc": kyc,
+        "aml": aml,
+        "jurisdiction": jurisdiction,
+        "gate": gate,
+        "provider_case": provider_case,
+        "provider_mode": COMPLIANCE_PROVIDER_MODE,
+    }
+
+
+def _is_compliance_blocked_for_operation(*, operation, amount, gate_decision):
+    normalized_operation = (operation or "").strip().lower()
+    decision = (gate_decision or "").strip().lower()
+    if COMPLIANCE_ENFORCEMENT_MODE == "shadow":
+        return False
+    if decision == "reject":
+        return normalized_operation in {"withdrawal", "convert"}
+    if decision != "review":
+        return False
+    if COMPLIANCE_ENFORCEMENT_MODE == "hard":
+        return normalized_operation in {"withdrawal", "convert"}
+    # adaptive mode: block review only for high-risk/high-amount operations.
+    if normalized_operation == "withdrawal":
+        return int(amount or 0) >= COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT
+    if normalized_operation == "convert":
+        return int(amount or 0) >= COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT
+    return False
 
 
 def _resolve_contract_runtime(contract_id, *, allow_inactive_dynamic=False):
@@ -1071,6 +1434,7 @@ def submit_work():
     result_data = data.get("result_data")
     nonce = data.get("nonce")  # Nonce для строгой проверки контрактом
     job_id = (data.get("job_id") or "").strip() or None
+    attempt_id = data.get("attempt_id", 1)
     output_artifacts = data.get("output_artifacts")
 
     if not all([client_id, contract_id, work_units_done is not None]):
@@ -1080,6 +1444,12 @@ def submit_work():
         work_units_done = int(work_units_done)
     except (TypeError, ValueError):
         return jsonify({"error": "work_units_done must be integer"}), 400
+    try:
+        attempt_id = int(attempt_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "attempt_id must be integer"}), 400
+    if attempt_id <= 0:
+        return jsonify({"error": "attempt_id must be > 0"}), 400
     if work_units_done <= 0:
         return jsonify({"error": "work_units_done must be > 0"}), 400
 
@@ -1087,25 +1457,32 @@ def submit_work():
     if job_id:
         assignment = _get_job_assignment(job_id)
         if not assignment:
-            return jsonify({"error": "Unknown job_id"}), 404
+            return jsonify(error_payload(code_key="JOB_NOT_FOUND", message="Unknown job_id")), 404
         if assignment.get("client_id") != client_id:
-            return jsonify({"error": "job_id belongs to another client"}), 403
+            return jsonify(error_payload(code_key="JOB_FORBIDDEN", message="job_id belongs to another client")), 403
         if assignment.get("contract_id") != contract_id:
-            return jsonify({"error": "job_id contract mismatch"}), 400
+            return jsonify(error_payload(code_key="JOB_CONTRACT_MISMATCH", message="job_id contract mismatch")), 400
         if assignment.get("status") == "expired":
-            return jsonify({"error": "job_id expired, request a new task"}), 409
+            return jsonify(error_payload(code_key="JOB_EXPIRED", message="job_id expired, request a new task")), 409
         if assignment.get("status") == "rejected":
-            return jsonify({"error": "job_id already rejected"}), 409
+            return jsonify(error_payload(code_key="JOB_ALREADY_REJECTED", message="job_id already rejected")), 409
         if assignment.get("status") == "reassigned":
-            return jsonify({"error": "job_id already reassigned"}), 409
+            return jsonify(error_payload(code_key="JOB_ALREADY_REASSIGNED", message="job_id already reassigned")), 409
         existing_result = assignment.get("result_data")
         if existing_result and result_data and existing_result != result_data:
-            return jsonify({"error": "job_id already used with another proof"}), 409
+            return jsonify(error_payload(code_key="JOB_ALREADY_USED_OTHER_PROOF", message="job_id already used with another proof")), 409
         if assignment.get("status") == "reward_settled":
             return jsonify({
                 "status": "success",
                 "message": "Job already settled (idempotent request)",
                 "reward_issued": 0,
+            }), 200
+        if assignment.get("status") == "challenge_window_open":
+            return jsonify({
+                "status": "success",
+                "message": "Job already settled and waiting for challenge window finalization",
+                "reward_issued": 0,
+                "challenge_window_open": True,
             }), 200
 
     # Защита от DoS: проверка размера result_data (хеш должен быть 64 символа, максимум 1KB для безопасности)
@@ -1148,11 +1525,29 @@ def submit_work():
                 "size_bytes": size_bytes,
             }
         )
+    artifact_manifest_hash = _artifact_manifest_hash(normalized_artifacts)
+    if job_id:
+        replay_seed = f"{job_id}|{attempt_id}|{artifact_manifest_hash}"
+        replay_key = hashlib.sha256(replay_seed.encode()).hexdigest()
+        is_replay, replay_row = check_and_register_replay(
+            replay_key=replay_key,
+            job_id=job_id,
+            attempt_id=attempt_id,
+            artifact_manifest_hash=artifact_manifest_hash,
+        )
+        if is_replay:
+            return jsonify(
+                error_payload(
+                    code_key="REPLAY_ATTEMPT",
+                    message="Replay attempt detected for this job attempt and artifact manifest",
+                    extra={"replay": replay_row},
+                )
+            ), 409
 
     # Защита от мошенничества: обязателен nonce для строгой верификации (невозможно подделать результат)
     if nonce is None or nonce == "":
         logger.warning("submit_work: nonce required")
-        return jsonify({"error": "nonce required for verification"}), 400
+        return jsonify(error_payload(code_key="NONCE_REQUIRED", message="nonce required for verification")), 400
 
     # Защита от повторной сдачи (replay): проверяем, используется ли proof уже
     # Если proof используется тем же клиентом и для того же контракта — это идемпотентный запрос (OK)
@@ -1240,11 +1635,13 @@ def submit_work():
                     hint = " That client_id is already in the chain (from a past run), not created now. To avoid this for new runs, start the worker from the dashboard with your calculator selected (64-bit task_seed makes your proof unique)."
                 if assignment:
                     _update_job_assignment(job_id, status="rejected")
-                return jsonify({
-                    "error": "Proof already used by another worker for this contract (task already completed)." + hint,
-                    "code": "proof_used_other_client",
-                    "existing_client_prefix": existing_cid[:8] if existing_cid else None,
-                }), 409
+                return jsonify(
+                    error_payload(
+                        code_key="PROOF_USED_OTHER_CLIENT",
+                        message="Proof already used by another worker for this contract (task already completed)." + hint,
+                        extra={"existing_client_prefix": existing_cid[:8] if existing_cid else None},
+                    )
+                ), 409
 
     runtime = _resolve_contract_runtime(contract_id, allow_inactive_dynamic=True)
     if not runtime:
@@ -1265,13 +1662,128 @@ def submit_work():
             status="completed_submitted",
             result_data=result_data,
             nonce=str(nonce),
+            validation_started_at=time.time(),
         )
     if not runtime["verify"](client_id, contract_id, work_units_done, result_data, nonce):
         logger.warning("submit_work_verification_failed: client_id=%s... contract_id=%s (balance not updated)", client_id[:8], contract_id)
         if assignment:
-            _update_job_assignment(job_id, status="rejected")
-        return jsonify({"error": "Work verification failed"}), 400
+            _, escrow_policy = _runtime_policies(runtime)
+            if escrow_policy.get("enabled") and int(escrow_policy.get("penalty_percent_on_reject", 0) or 0) > 0:
+                _try_penalize_escrow_for_job(
+                    job_id,
+                    penalty_percent=int(escrow_policy.get("penalty_percent_on_reject", 0) or 0),
+                )
+                _update_job_assignment(
+                    job_id,
+                    penalty_code=PENALTY_CODES["VERIFICATION_REJECT"],
+                    penalty_reason="Failed deterministic verification",
+                )
+            bump_reputation(actor_id=client_id, role="worker", delta=-5, reason="verification_failed")
+            _update_job_assignment(job_id, status="rejected", validation_finished_at=time.time())
+        return jsonify(error_payload(code_key="VERIFICATION_FAILED", message="Work verification failed")), 400
     logger.info("submit_work: verification passed for client_id=%s... contract_id=%s", client_id[:8], contract_id)
+
+    validation_policy, escrow_policy = _runtime_policies(runtime)
+    validation_mode = validation_policy.get("mode")
+    replication_factor = int(validation_policy.get("replication_factor", 1) or 1)
+    quorum_threshold = int(validation_policy.get("quorum_threshold", replication_factor) or replication_factor)
+    if (
+        assignment
+        and validation_mode in {"replicated", "challengeable"}
+        and replication_factor > 1
+        and assignment.get("replication_group_id")
+    ):
+        replication_decision = register_replication_submission(
+            group_id=assignment.get("replication_group_id"),
+            job_id=assignment.get("job_id"),
+            client_id=client_id,
+            result_data=result_data,
+            artifact_manifest_hash=artifact_manifest_hash,
+            attempt_id=attempt_id,
+        )
+        decision_status = (replication_decision.get("status") or "").strip()
+        if decision_status == "pending":
+            _update_job_assignment(
+                job_id,
+                status="awaiting_replication",
+                replication_status="pending",
+                replication_quorum_threshold=quorum_threshold,
+            )
+            return jsonify(
+                {
+                    "status": "pending_validation",
+                    "replication": replication_decision,
+                    "message": "Waiting for replicated submissions",
+                    "code": "replication.pending",
+                }
+            ), 202
+        if decision_status == "disputed":
+            dispute = create_dispute(
+                job_id=assignment.get("job_id"),
+                contract_id=assignment.get("contract_id"),
+                opened_by=client_id,
+                reason="Replication quorum not reached",
+                review_deadline_seconds=max(300, int(validation_policy.get("challenge_window_seconds", 0) or 3600)),
+                appeal_deadline_seconds=3600,
+            )
+            if escrow_policy.get("enabled") and int(escrow_policy.get("penalty_percent_on_reject", 0) or 0) > 0:
+                _try_penalize_escrow_for_job(
+                    job_id,
+                    penalty_percent=int(escrow_policy.get("penalty_percent_on_reject", 0) or 0),
+                )
+                _update_job_assignment(
+                    job_id,
+                    penalty_code=PENALTY_CODES["REPLICATION_REJECT"],
+                    penalty_reason="Replication disputed and rejected",
+                )
+            bump_reputation(actor_id=client_id, role="worker", delta=-3, reason="replication_disputed")
+            _update_job_assignment(
+                job_id,
+                status="rejected",
+                replication_status="disputed",
+                reject_reason="Replication dispute detected",
+                reject_code="replication.disputed",
+                dispute_id=dispute.get("dispute_id") if isinstance(dispute, dict) else None,
+            )
+            return jsonify(error_payload(
+                code_key="REPLICATION_DISPUTED",
+                message="Replication dispute detected. Open challenge to resolve.",
+                extra={"replication": replication_decision, "dispute": dispute},
+            )), 409
+        if decision_status == "rejected":
+            if escrow_policy.get("enabled") and int(escrow_policy.get("penalty_percent_on_reject", 0) or 0) > 0:
+                _try_penalize_escrow_for_job(
+                    job_id,
+                    penalty_percent=int(escrow_policy.get("penalty_percent_on_reject", 0) or 0),
+                )
+                _update_job_assignment(
+                    job_id,
+                    penalty_code=PENALTY_CODES["REPLICATION_REJECT"],
+                    penalty_reason="Replication quorum winner differs",
+                )
+            bump_reputation(actor_id=client_id, role="worker", delta=-2, reason="replication_rejected")
+            _update_job_assignment(
+                job_id,
+                status="rejected",
+                replication_status="rejected",
+                reject_reason="Result rejected by replication quorum",
+                reject_code="replication.rejected",
+            )
+            return jsonify(error_payload(
+                code_key="REPLICATION_REJECTED",
+                message="Result rejected by replicated validation consensus",
+                extra={"replication": replication_decision},
+            )), 409
+        _update_job_assignment(
+            job_id,
+            replication_status="accepted",
+            replication_winner_manifest_hash=replication_decision.get("winner_manifest_hash"),
+            validation_finished_at=time.time(),
+        )
+        bump_reputation(actor_id=client_id, role="worker", delta=2, reason="replication_accepted")
+
+    if assignment and validation_mode not in {"replicated", "challengeable"}:
+        _update_job_assignment(job_id, validation_finished_at=time.time())
 
     reward_amount = int(runtime["reward"])
     reward_currency = MARKET_DEFAULT_CURRENCY
@@ -1315,7 +1827,9 @@ def submit_work():
         "client_id": client_id,
         "contract_id": contract_id,
         "work_units": work_units_done,
+        "attempt_id": int(attempt_id),
         "result_data": result_data,
+        "artifact_manifest_hash": artifact_manifest_hash,
         "fee": FEE_PER_WORK_RECEIPT,  # Экономическая модель: комиссия списывается с клиента после начисления награды
         "output_artifacts": normalized_artifacts,
     }
@@ -1379,19 +1893,37 @@ def submit_work():
         if dynamic_reservation and not new_block:
             contract_market.rollback_submission(contract_id=contract_id, reservation=dynamic_reservation)
 
+    challenge_window_seconds = int(validation_policy.get("challenge_window_seconds", 0) or 0)
+    release_after_success = not (
+        validation_policy.get("mode") == "challengeable" and challenge_window_seconds > 0
+    )
+
     if new_block:
         new_balance = blockchain.get_balance(client_id)
         logger.info("block_created: client_id=%s... reward=%s new_balance=%s block_index=%s",
                     client_id[:8], reward_amount, new_balance, new_block.index)
         if assignment:
-            _update_job_assignment(job_id, status="reward_settled", reward_id=reward_id)
+            next_status = "reward_settled" if release_after_success else "challenge_window_open"
+            updates = {"status": next_status, "reward_id": reward_id}
+            if not release_after_success:
+                updates["challenge_deadline_at"] = now_ts() + challenge_window_seconds
+            _update_job_assignment(job_id, **updates)
 
     _push_block_to_peer(new_block)
+
+    if assignment and escrow_policy.get("enabled"):
+        if release_after_success:
+            _, release_err = _try_release_escrow_for_job(job_id)
+            if release_err:
+                return jsonify({"error": f"Failed to release escrow: {release_err}"}), 500
+        else:
+            _update_job_assignment(job_id, escrow_status="held")
 
     return jsonify({
         "status": "success", 
         "reward_issued": reward_amount,
         "reward_currency": reward_currency,
+        "challenge_window_open": bool(assignment and not release_after_success),
     }), 200
 
 @app.route("/me", methods=["GET"])
@@ -1672,6 +2204,29 @@ def market_convert():
         return jsonify({"error": "from_currency and to_currency must differ"}), 400
     if source_amount <= 0:
         return jsonify({"error": "amount must be > 0"}), 400
+    country_code = (data.get("country_code") or "").strip() or None
+    compliance = _compliance_bundle(
+        client_id=client_id,
+        amount=source_amount,
+        currency=source_currency,
+        country_code=country_code,
+        operation="convert",
+    )
+    if _is_compliance_blocked_for_operation(
+        operation="convert",
+        amount=source_amount,
+        gate_decision=(compliance.get("gate") or {}).get("decision"),
+    ):
+        return jsonify(
+            {
+                "error": "Conversion blocked by compliance policy",
+                "compliance": {
+                    **compliance,
+                    "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
+                    "operation": "convert",
+                },
+            }
+        ), 409
     wallet_amount = get_wallet_amount(blockchain.chain, client_id, source_currency)
     if wallet_amount < source_amount:
         return jsonify({"error": "Insufficient wallet balance"}), 409
@@ -1705,6 +2260,11 @@ def market_convert():
         "target_amount": int(target_amount),
         "spread_percent": float(rules.get("spread_percent", 0)),
         "balances": get_wallet_from_chain(blockchain.chain, client_id)["balances"],
+        "compliance": {
+            **compliance,
+            "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
+            "operation": "convert",
+        },
     }), 200
 
 
@@ -1735,6 +2295,30 @@ def market_withdrawals():
     wallet_amount = get_wallet_amount(blockchain.chain, client_id, currency)
     if wallet_amount < amount:
         return jsonify({"error": "Insufficient wallet balance"}), 409
+    country_code = (data.get("country_code") or "").strip() or None
+    compliance = _compliance_bundle(
+        client_id=client_id,
+        amount=amount,
+        currency=currency,
+        country_code=country_code,
+        operation="withdrawal",
+    )
+    gate_result = compliance.get("gate") or {}
+    if _is_compliance_blocked_for_operation(
+        operation="withdrawal",
+        amount=amount,
+        gate_decision=gate_result.get("decision"),
+    ):
+        return jsonify(
+            {
+                "error": "Withdrawal blocked by compliance policy",
+                "compliance": {
+                    **compliance,
+                    "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
+                    "operation": "withdrawal",
+                },
+            }
+        ), 409
     withdrawal_id = f"wd-{uuid.uuid4().hex[:16]}"
     tx = {
         "type": "fiat_withdrawal_request",
@@ -1758,7 +2342,17 @@ def market_withdrawals():
         "card_mask": card_mask,
         "status": "queued",
     }
-    return jsonify({"withdrawal": withdrawal, "wallet": get_wallet_from_chain(blockchain.chain, client_id)}), 201
+    return jsonify(
+        {
+            "withdrawal": withdrawal,
+            "wallet": get_wallet_from_chain(blockchain.chain, client_id),
+            "compliance": {
+                **compliance,
+                "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
+                "operation": "withdrawal",
+            },
+        }
+    ), 201
 
 
 @app.route("/market/audit", methods=["GET"])
@@ -1892,13 +2486,24 @@ def provider_contracts():
         benchmark_meta = {}
     if not isinstance(benchmark_meta, dict):
         return jsonify({"error": "benchmark_meta must be an object"}), 400
-    # Stage 1 (decentralized+fiat): contract-level policy can be passed explicitly.
-    # It is stored in metadata and exposed in task spec without breaking old clients.
-    validation_policy = sanitize_validation_policy(data.get("validation_policy"))
-    escrow_policy = sanitize_escrow_policy(data.get("escrow_policy"))
+    # Stage 2: task-class policy presets with optional manual override.
+    policy_bundle = build_policy_bundle(
+        requested_task_class=data.get("task_class"),
+        computation_type=computation_type,
+        task_name=task_name,
+        task_category=task_category,
+        benchmark_meta=benchmark_meta,
+        raw_validation_policy=data.get("validation_policy"),
+        raw_escrow_policy=data.get("escrow_policy"),
+    )
+    validation_policy = policy_bundle["validation_policy"]
+    escrow_policy = policy_bundle["escrow_policy"]
     policy_bucket = benchmark_meta.get("decentralized_policy")
     if not isinstance(policy_bucket, dict):
         policy_bucket = {}
+    policy_bucket["task_class"] = policy_bundle["task_class"]
+    policy_bucket["task_class_source"] = policy_bundle["task_class_source"]
+    policy_bucket["validation_style"] = policy_bundle["validation_style"]
     policy_bucket["validation_policy"] = validation_policy
     policy_bucket["escrow_policy"] = escrow_policy
     benchmark_meta["decentralized_policy"] = policy_bucket
@@ -2017,6 +2622,16 @@ def provider_contracts():
         return jsonify({"error": append_err}), 500
     wallet_info = get_wallet_from_chain(blockchain.chain, provider_client_id)
     return jsonify({"contract": created, "wallet": wallet_info}), 201
+
+
+@app.route("/provider/task-classes", methods=["GET"])
+@limiter.limit("60 per minute")
+def provider_task_classes():
+    """Каталог поддерживаемых классов задач и рекомендуемых policy-профилей."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify({"task_classes": list_task_class_profiles()}), 200
 
 
 @app.route("/provider/contracts/<contract_id>", methods=["GET"])
@@ -2178,7 +2793,7 @@ def provider_contract_refund(contract_id):
 @app.route("/health", methods=["GET"])
 def health():
     """Проверка живости узла (для балансировщика нагрузки и мониторинга)."""
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok", "protocol_version": NETWORK_PROTOCOL_VERSION}), 200
 
 
 @app.route("/metrics", methods=["GET"])
@@ -2195,6 +2810,8 @@ def metrics():
         # В реальной системе можно добавить поле creator_node_id в блок
         current_leader = get_current_leader()
         is_current_leader = (current_leader == NODE_ID)
+        stage3_slo = _stage3_observability_metrics()
+        governance = governance_snapshot()
     except Exception as e:
         logger.exception("metrics_error")
         return jsonify({"error": "metrics failed"}), 500
@@ -2208,6 +2825,10 @@ def metrics():
         "current_leader": current_leader,
         "is_leader": is_current_leader,
         "all_node_ids": NODE_IDS,
+        "protocol_version": NETWORK_PROTOCOL_VERSION,
+        "supported_protocol_versions": SUPPORTED_PROTOCOL_VERSIONS,
+        "slo": stage3_slo,
+        "governance": governance,
     }
     return jsonify(body), 200
 
@@ -2470,6 +3091,436 @@ def job_status(job_id):
     return jsonify(assignment), 200
 
 
+@app.route("/job/<job_id>/challenge", methods=["POST"])
+@limiter.limit("30 per minute")
+def job_open_challenge(job_id):
+    """Открыть спор по уже засчитанной задаче в challengeable-режиме."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    assignment = _get_job_assignment((job_id or "").strip())
+    if not assignment:
+        return jsonify(error_payload(code_key="JOB_NOT_FOUND", message="Job not found")), 404
+    if assignment.get("status") not in {"challenge_window_open", "reward_settled", "challenged"}:
+        return jsonify(error_payload(code_key="CHALLENGE_DISABLED", message="Job is not in challenge state")), 409
+    runtime = _resolve_contract_runtime(assignment.get("contract_id"), allow_inactive_dynamic=True)
+    if not runtime:
+        return jsonify({"error": "Contract runtime not found"}), 404
+    validation_policy, _ = _runtime_policies(runtime)
+    if validation_policy.get("mode") != "challengeable":
+        return jsonify(error_payload(code_key="CHALLENGE_DISABLED", message="Challenge is disabled for this contract")), 409
+    deadline_at = int(assignment.get("challenge_deadline_at", 0) or 0)
+    if deadline_at and now_ts() > deadline_at:
+        return jsonify(error_payload(code_key="CHALLENGE_WINDOW_EXPIRED", message="Challenge window expired")), 409
+    data = request.get_json(silent=True) or {}
+    reason = (data.get("reason") or "").strip() or "manual_challenge"
+    remaining_window = max(0, deadline_at - now_ts()) if deadline_at else int(
+        validation_policy.get("challenge_window_seconds", 0) or 0
+    )
+    challenge, open_err = open_challenge(
+        job_id=assignment.get("job_id"),
+        contract_id=assignment.get("contract_id"),
+        opened_by=client_id,
+        reason=reason,
+        window_seconds=remaining_window,
+    )
+    if open_err:
+        return jsonify(error_payload(code_key="CHALLENGE_ALREADY_OPEN", message=open_err)), 409
+    dispute = create_dispute(
+        job_id=assignment.get("job_id"),
+        contract_id=assignment.get("contract_id"),
+        opened_by=client_id,
+        reason=reason,
+        review_deadline_seconds=max(300, remaining_window or 3600),
+        appeal_deadline_seconds=3600,
+    )
+    if dispute:
+        transition_dispute(
+            dispute_id=dispute.get("dispute_id"),
+            event="start_review",
+            actor_id=client_id,
+            payload={"source": "job_open_challenge"},
+        )
+    _update_job_assignment(
+        assignment.get("job_id"),
+        status="challenged",
+        challenge_id=challenge.get("challenge_id"),
+        dispute_id=(dispute or {}).get("dispute_id"),
+    )
+    return jsonify({"challenge": challenge, "dispute": dispute}), 201
+
+
+@app.route("/job/<job_id>/challenge/finalize", methods=["POST"])
+@limiter.limit("30 per minute")
+def job_finalize_challenge_window(job_id):
+    """Финализировать challenge-window: release escrow, если споров нет."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    assignment = _get_job_assignment((job_id or "").strip())
+    if not assignment:
+        return jsonify({"error": "Job not found"}), 404
+    if assignment.get("status") not in {"challenge_window_open", "challenged"}:
+        return jsonify({"error": "Job is not in challenge-window state"}), 409
+    runtime = _resolve_contract_runtime(assignment.get("contract_id"), allow_inactive_dynamic=True)
+    if not runtime:
+        return jsonify({"error": "Contract runtime not found"}), 404
+    provider_client_id = (runtime.get("record") or {}).get("provider_client_id")
+    if client_id not in {assignment.get("client_id"), provider_client_id}:
+        return jsonify({"error": "Forbidden"}), 403
+    open_chg = get_open_challenge_by_job(assignment.get("job_id"))
+    if open_chg:
+        return jsonify({"error": "Open challenge exists", "challenge": open_chg}), 409
+    deadline_at = int(assignment.get("challenge_deadline_at", 0) or 0)
+    if deadline_at and now_ts() < deadline_at:
+        return jsonify({"error": "Challenge window is still open"}), 409
+    hold = get_escrow_hold_by_job(assignment.get("job_id"))
+    if hold and hold.get("status") == "held":
+        _, release_err = _try_release_escrow_for_job(assignment.get("job_id"))
+        if release_err:
+            return jsonify({"error": release_err}), 500
+    updated = _update_job_assignment(assignment.get("job_id"), status="reward_settled", escrow_status="released")
+    return jsonify({"status": "finalized", "job": updated}), 200
+
+
+@app.route("/challenges/<challenge_id>/resolve", methods=["POST"])
+@limiter.limit("30 per minute")
+def challenge_resolve(challenge_id):
+    """Решение спора поставщиком контракта."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    challenge = get_challenge((challenge_id or "").strip())
+    if not challenge:
+        return jsonify(error_payload(code_key="JOB_NOT_FOUND", message="Challenge not found")), 404
+    assignment = _get_job_assignment(challenge.get("job_id"))
+    if not assignment:
+        return jsonify({"error": "Job not found"}), 404
+    runtime = _resolve_contract_runtime(assignment.get("contract_id"), allow_inactive_dynamic=True)
+    if not runtime:
+        return jsonify({"error": "Contract runtime not found"}), 404
+    provider_client_id = (runtime.get("record") or {}).get("provider_client_id")
+    if client_id != provider_client_id:
+        return jsonify({"error": "Only contract provider can resolve challenge"}), 403
+    data = request.get_json(silent=True) or {}
+    decision = (data.get("decision") or "").strip().lower()
+    resolved, resolve_err = resolve_challenge(
+        challenge_id=challenge.get("challenge_id"),
+        resolved_by=client_id,
+        decision=decision,
+    )
+    if resolve_err:
+        return jsonify({"error": resolve_err}), 409
+    _, escrow_policy = _runtime_policies(runtime)
+    if decision == "accept_worker":
+        _, release_err = _try_release_escrow_for_job(assignment.get("job_id"))
+        if release_err:
+            return jsonify({"error": release_err}), 500
+        bump_reputation(actor_id=assignment.get("client_id"), role="worker", delta=2, reason="challenge_accept")
+        _update_job_assignment(assignment.get("job_id"), status="reward_settled", escrow_status="released")
+    if decision == "reject_worker":
+        _, penalty_err = _try_penalize_escrow_for_job(
+            assignment.get("job_id"),
+            penalty_percent=int(escrow_policy.get("penalty_percent_on_reject", 0) or 0),
+        )
+        if penalty_err:
+            return jsonify({"error": penalty_err}), 500
+        bump_reputation(actor_id=assignment.get("client_id"), role="worker", delta=-4, reason="challenge_reject")
+        _update_job_assignment(
+            assignment.get("job_id"),
+            status="rejected",
+            escrow_status="penalized",
+            penalty_code=PENALTY_CODES["CHALLENGE_REJECT"],
+            penalty_reason="Challenge resolved against worker",
+            reject_code="challenge.reject_worker",
+            reject_reason="Challenge resolved against worker",
+        )
+    bump_reputation(actor_id=client_id, role="validator", delta=1, reason="challenge_resolve")
+    # Sync dispute machine if dispute_id is known.
+    dispute_id = assignment.get("dispute_id")
+    if dispute_id:
+        transition_dispute(
+            dispute_id=dispute_id,
+            event="resolve_accept" if decision == "accept_worker" else "resolve_reject",
+            actor_id=client_id,
+            payload={"challenge_id": challenge_id},
+        )
+    return jsonify({"challenge": resolved, "dispute_id": dispute_id}), 200
+
+
+@app.route("/replication/<group_id>/verdict", methods=["POST"])
+@limiter.limit("30 per minute")
+def replication_add_verdict(group_id):
+    """Independent validator verdict for replication group arbitration."""
+    validator_id = get_client_id_from_auth()
+    if validator_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if not governance_is_validator_admitted(validator_client_id=validator_id):
+        return jsonify({"error": "Validator is not admitted by governance"}), 403
+    data = request.get_json(silent=True) or {}
+    decision = (data.get("decision") or "").strip().lower()
+    reason = (data.get("reason") or "").strip()
+    verdict, err = add_validator_verdict(
+        group_id=(group_id or "").strip(),
+        validator_client_id=validator_id,
+        decision=decision,
+        reason=reason,
+        weight=int(data.get("weight", 1) or 1),
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    bump_reputation(actor_id=validator_id, role="validator", delta=1, reason="validator_verdict_submitted")
+    summary = summarize_validator_verdicts((group_id or "").strip())
+    return jsonify({"verdict": verdict, "summary": summary}), 201
+
+
+@app.route("/replication/<group_id>/verdicts", methods=["GET"])
+@limiter.limit("60 per minute")
+def replication_verdicts(group_id):
+    validator_id = get_client_id_from_auth()
+    if validator_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify(summarize_validator_verdicts((group_id or "").strip())), 200
+
+
+@app.route("/reputation/<role>/<actor_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def reputation_get(role, actor_id):
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify(get_reputation(actor_id=(actor_id or "").strip(), role=(role or "").strip().lower())), 200
+
+
+@app.route("/disputes/<dispute_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def dispute_get(dispute_id):
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    enforce_dispute_deadlines()
+    row = get_dispute((dispute_id or "").strip())
+    if not row:
+        return jsonify({"error": "Dispute not found"}), 404
+    return jsonify(row), 200
+
+
+@app.route("/disputes/<dispute_id>/event", methods=["POST"])
+@limiter.limit("30 per minute")
+def dispute_event(dispute_id):
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    enforce_dispute_deadlines()
+    data = request.get_json(silent=True) or {}
+    event = (data.get("event") or "").strip()
+    updated, err = transition_dispute(
+        dispute_id=(dispute_id or "").strip(),
+        event=event,
+        actor_id=requester,
+        payload=data.get("payload") if isinstance(data.get("payload"), dict) else {},
+    )
+    if err:
+        return jsonify({"error": err}), 409
+    return jsonify(updated), 200
+
+
+@app.route("/compliance/evaluate", methods=["POST"])
+@limiter.limit("30 per minute")
+def compliance_evaluate():
+    """
+    Stage-3 preparation endpoint: unified KYC/AML/Jurisdiction evaluation interface.
+    Current behavior is stub-only and non-blocking.
+    """
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    target_client_id = (data.get("client_id") or requester).strip()
+    try:
+        amount = int(data.get("amount", 0) or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    currency = (data.get("currency") or "RUB").strip().upper()
+    country_code = (data.get("country_code") or "").strip() or None
+    operation = (data.get("operation") or "withdrawal").strip().lower()
+    compliance = _compliance_bundle(
+        client_id=target_client_id,
+        amount=amount,
+        currency=currency,
+        country_code=country_code,
+        operation=operation,
+    )
+    gate = compliance.get("gate") or {}
+    blocked = _is_compliance_blocked_for_operation(
+        operation=operation,
+        amount=amount,
+        gate_decision=gate.get("decision"),
+    )
+    return jsonify(
+        {
+            **compliance,
+            "gate": gate,
+            "operation": operation,
+            "blocked": blocked,
+            "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
+            "status": "active",
+        }
+    ), 200
+
+
+@app.route("/compliance/provider/cases", methods=["GET"])
+@limiter.limit("60 per minute")
+def compliance_provider_cases():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if COMPLIANCE_PROVIDER_MODE != "simulated":
+        return jsonify({"error": "Simulated provider is disabled"}), 409
+    simulated_process_cases()
+    status = (request.args.get("status") or "").strip() or None
+    limit = request.args.get("limit", 100)
+    rows = simulated_list_cases(limit=limit, status=status)
+    return jsonify({"cases": rows, "provider_mode": COMPLIANCE_PROVIDER_MODE}), 200
+
+
+@app.route("/compliance/provider/cases/<case_id>", methods=["GET"])
+@limiter.limit("60 per minute")
+def compliance_provider_case(case_id):
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if COMPLIANCE_PROVIDER_MODE != "simulated":
+        return jsonify({"error": "Simulated provider is disabled"}), 409
+    simulated_process_cases()
+    row = simulated_get_case((case_id or "").strip())
+    if not row:
+        return jsonify({"error": "Case not found"}), 404
+    return jsonify({"case": row, "provider_mode": COMPLIANCE_PROVIDER_MODE}), 200
+
+
+@app.route("/compliance/provider/webhooks", methods=["GET", "POST"])
+@limiter.limit("60 per minute")
+def compliance_provider_webhooks():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if COMPLIANCE_PROVIDER_MODE != "simulated":
+        return jsonify({"error": "Simulated provider is disabled"}), 409
+    if request.method == "POST":
+        events = simulated_process_cases()
+        return jsonify({"dispatched": events, "count": len(events)}), 200
+    limit = request.args.get("limit", 100)
+    rows = simulated_list_webhook_events(limit=limit)
+    return jsonify({"events": rows}), 200
+
+
+@app.route("/network/governance/info", methods=["GET"])
+@limiter.limit("60 per minute")
+def governance_info():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify(
+        {
+            "node_id": NODE_ID,
+            "protocol_version": NETWORK_PROTOCOL_VERSION,
+            "supported_protocol_versions": SUPPORTED_PROTOCOL_VERSIONS,
+            "governance": governance_snapshot(),
+        }
+    ), 200
+
+
+@app.route("/network/governance/admission", methods=["POST"])
+@limiter.limit("30 per minute")
+def governance_admission():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    if GOVERNANCE_ADMISSION_TOKEN:
+        if str(data.get("admission_token") or "").strip() != GOVERNANCE_ADMISSION_TOKEN:
+            return jsonify({"error": "Invalid admission token"}), 403
+    node_id = (data.get("node_id") or "").strip()
+    rec, err = governance_admit_node(
+        node_id=node_id,
+        admitted_by=requester,
+        node_meta=data.get("meta") if isinstance(data.get("meta"), dict) else {},
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"node": rec, "governance": governance_snapshot()}), 201
+
+
+@app.route("/network/governance/validators/admit", methods=["POST"])
+@limiter.limit("30 per minute")
+def governance_admit_validator_endpoint():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    if GOVERNANCE_ADMISSION_TOKEN:
+        if str(data.get("admission_token") or "").strip() != GOVERNANCE_ADMISSION_TOKEN:
+            return jsonify({"error": "Invalid admission token"}), 403
+    validator_client_id = (data.get("validator_client_id") or "").strip()
+    rec, err = governance_admit_validator(
+        validator_client_id=validator_client_id,
+        admitted_by=requester,
+        validator_meta=data.get("meta") if isinstance(data.get("meta"), dict) else {},
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"validator": rec, "governance": governance_snapshot()}), 201
+
+
+@app.route("/network/governance/rollout/propose", methods=["POST"])
+@limiter.limit("30 per minute")
+def governance_rollout_propose():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    version = (data.get("protocol_version") or "").strip()
+    if version not in SUPPORTED_PROTOCOL_VERSIONS:
+        return jsonify({"error": "Unsupported protocol_version"}), 400
+    try:
+        required_acks = int(data.get("required_acks", max(1, len(NODE_IDS))) or max(1, len(NODE_IDS)))
+    except (TypeError, ValueError):
+        required_acks = max(1, len(NODE_IDS))
+    rollout, err = governance_propose_rollout(
+        protocol_version=version,
+        proposed_by=requester,
+        required_acks=required_acks,
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"rollout": rollout}), 201
+
+
+@app.route("/network/governance/rollout/ack", methods=["POST"])
+@limiter.limit("30 per minute")
+def governance_rollout_ack():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    rollout, err = governance_ack_rollout(node_id=NODE_ID)
+    if err:
+        return jsonify({"error": err}), 409
+    return jsonify({"rollout": rollout, "acked_by": requester, "node_id": NODE_ID}), 200
+
+
+@app.route("/network/governance/rollout/finalize", methods=["POST"])
+@limiter.limit("30 per minute")
+def governance_rollout_finalize():
+    requester = get_client_id_from_auth()
+    if requester is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    rollout, err = governance_finalize_rollout(finalized_by=requester)
+    if err:
+        return jsonify({"error": err}), 409
+    return jsonify({"rollout": rollout}), 200
+
+
 @app.route("/jobs/snapshot", methods=["GET"])
 @require_node_secret
 def jobs_snapshot():
@@ -2478,6 +3529,13 @@ def jobs_snapshot():
     with _job_assignments_lock:
         rows = [dict(v) for v in _job_assignments.values()]
     return jsonify(rows), 200
+
+
+@app.route("/runtime/snapshot", methods=["GET"])
+@require_node_secret
+def runtime_state_snapshot():
+    """Снимок runtime state для синхронизации между оркестраторами."""
+    return jsonify(export_runtime_state()), 200
 
 
 @app.route("/jobs/my", methods=["GET"])

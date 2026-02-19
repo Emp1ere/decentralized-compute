@@ -43,6 +43,13 @@ def _solve_pow(client_id, contract_id, difficulty, max_iter=1_500_000):
     return None, None
 
 
+def _register_worker(client):
+    reg = client.get("/register")
+    assert reg.status_code == 200
+    payload = reg.get_json()
+    return {"Authorization": f"Bearer {payload['api_key']}"}, payload["client_id"]
+
+
 def test_register(client):
     r = client.get("/register")
     assert r.status_code == 200
@@ -342,6 +349,8 @@ def test_metrics(client):
     assert "chain_length" in data
     assert "clients_count" in data
     assert "pending_transactions" in data
+    assert "slo" in data
+    assert "validation_latency_avg_seconds" in (data.get("slo") or {})
 
 
 def test_chain(client):
@@ -530,6 +539,508 @@ def test_provider_contract_flow(client, auth_headers):
     updated = contract_res.get_json()
     assert updated["status"] == "closed"
     assert updated["budget_tokens_available"] == 0
+
+
+def test_provider_task_classes_catalog_and_auto_policy(client, auth_headers):
+    headers, _ = auth_headers
+    classes_res = client.get("/provider/task-classes", headers=headers)
+    assert classes_res.status_code == 200
+    classes_payload = classes_res.get_json()
+    classes = classes_payload.get("task_classes") or []
+    assert any(row.get("task_class") == "scientific_simulation" for row in classes)
+    assert any(row.get("task_class") == "biomedical_modeling" for row in classes)
+    assert any(row.get("task_class") == "ai_training" for row in classes)
+    assert any(row.get("task_class") == "data_analytics" for row in classes)
+
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=headers,
+        json={
+            "sector_name": "Bio sector",
+            "organization_name": "Bio lab",
+            "compute_domain": "protein",
+            "description": "Auto task-class test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=headers,
+        json={"currency": "USD", "amount": 20},
+    )
+    assert topup_res.status_code == 200
+
+    create_res = client.post(
+        "/provider/contracts",
+        headers=headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Protein structure fold",
+            "task_description": "3D protein structure search",
+            "task_category": "biomed",
+            "computation_type": "molecular_dynamics_benchpep",
+            "work_units_required": 120,
+            "reward_per_task": 4,
+            "target_total_work_units": 240,
+            "difficulty": 2,
+            "initial_budget_tokens": 8,
+            "budget_currency": "USD",
+            "activate_now": True,
+        },
+    )
+    assert create_res.status_code == 201
+    contract = (create_res.get_json().get("contract") or create_res.get_json())
+    decentralized_meta = (contract.get("benchmark_meta") or {}).get("decentralized_policy") or {}
+    assert decentralized_meta.get("task_class") == "biomedical_modeling"
+    assert decentralized_meta.get("validation_policy", {}).get("mode") == "challengeable"
+    assert decentralized_meta.get("escrow_policy", {}).get("enabled") is True
+
+
+def test_replicated_validation_requires_quorum(client, auth_headers):
+    provider_headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=provider_headers,
+        json={
+            "sector_name": "Replicated sector",
+            "organization_name": "Replication lab",
+            "compute_domain": "verification",
+            "description": "Quorum flow test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=provider_headers,
+        json={"currency": "RUB", "amount": 20},
+    )
+    assert topup_res.status_code == 200
+
+    create_res = client.post(
+        "/provider/contracts",
+        headers=provider_headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Replicated PoW",
+            "task_description": "Needs 2 replicated submissions",
+            "task_category": "Verification",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 3,
+            "target_total_work_units": 400,
+            "difficulty": 2,
+            "initial_budget_tokens": 12,
+            "budget_currency": "RUB",
+            "activate_now": True,
+            "validation_policy": {"mode": "replicated", "replication_factor": 2},
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    worker1_headers, worker1_id = _register_worker(client)
+    worker2_headers, worker2_id = _register_worker(client)
+
+    task1 = client.get("/get_task", headers=worker1_headers, query_string={"contract_id": contract_id})
+    task2 = client.get("/get_task", headers=worker2_headers, query_string={"contract_id": contract_id})
+    assert task1.status_code == 200
+    assert task2.status_code == 200
+    payload1 = task1.get_json()
+    payload2 = task2.get_json()
+    assert payload1.get("replication_factor") == 2
+    assert payload1.get("replication_group_id")
+    assert payload2.get("replication_group_id") == payload1.get("replication_group_id")
+
+    hash1, nonce1 = _solve_pow(worker1_id, contract_id, payload1["difficulty"])
+    hash2, nonce2 = _solve_pow(worker2_id, contract_id, payload2["difficulty"])
+    assert hash1 is not None
+    assert hash2 is not None
+
+    submit1 = client.post(
+        "/submit_work",
+        headers=worker1_headers,
+        json={
+            "client_id": worker1_id,
+            "contract_id": contract_id,
+            "job_id": payload1["job_id"],
+            "work_units_done": payload1["work_units_required"],
+            "result_data": hash1,
+            "nonce": nonce1,
+        },
+    )
+    assert submit1.status_code == 202
+    assert submit1.get_json().get("status") == "pending_validation"
+
+    submit2 = client.post(
+        "/submit_work",
+        headers=worker2_headers,
+        json={
+            "client_id": worker2_id,
+            "contract_id": contract_id,
+            "job_id": payload2["job_id"],
+            "work_units_done": payload2["work_units_required"],
+            "result_data": hash2,
+            "nonce": nonce2,
+        },
+    )
+    assert submit2.status_code == 200
+    assert submit2.get_json().get("status") == "success"
+
+
+def test_replication_m_of_n_threshold_allows_early_resolution(client, auth_headers):
+    provider_headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=provider_headers,
+        json={
+            "sector_name": "M-of-N sector",
+            "organization_name": "Quorum lab",
+            "compute_domain": "validation",
+            "description": "M-of-N early quorum",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=provider_headers,
+        json={"currency": "RUB", "amount": 30},
+    )
+    assert topup_res.status_code == 200
+    create_res = client.post(
+        "/provider/contracts",
+        headers=provider_headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "M of N PoW",
+            "task_description": "3 replicas, threshold 2",
+            "task_category": "Validation",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 3,
+            "target_total_work_units": 400,
+            "difficulty": 2,
+            "initial_budget_tokens": 12,
+            "budget_currency": "RUB",
+            "activate_now": True,
+            "validation_policy": {"mode": "replicated", "replication_factor": 3, "quorum_threshold": 2},
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    w1_headers, w1_id = _register_worker(client)
+    w2_headers, w2_id = _register_worker(client)
+
+    t1 = client.get("/get_task", headers=w1_headers, query_string={"contract_id": contract_id})
+    t2 = client.get("/get_task", headers=w2_headers, query_string={"contract_id": contract_id})
+    assert t1.status_code == 200
+    assert t2.status_code == 200
+    p1 = t1.get_json()
+    p2 = t2.get_json()
+    assert p1.get("replication_factor") == 3
+    assert p1.get("quorum_threshold") == 2
+
+    h1, n1 = _solve_pow(w1_id, contract_id, p1["difficulty"])
+    h2, n2 = _solve_pow(w2_id, contract_id, p2["difficulty"])
+    assert h1 is not None and h2 is not None
+
+    s1 = client.post(
+        "/submit_work",
+        headers=w1_headers,
+        json={
+            "client_id": w1_id,
+            "contract_id": contract_id,
+            "job_id": p1["job_id"],
+            "attempt_id": 1,
+            "work_units_done": p1["work_units_required"],
+            "result_data": h1,
+            "nonce": n1,
+        },
+    )
+    assert s1.status_code == 202
+    s2 = client.post(
+        "/submit_work",
+        headers=w2_headers,
+        json={
+            "client_id": w2_id,
+            "contract_id": contract_id,
+            "job_id": p2["job_id"],
+            "attempt_id": 1,
+            "work_units_done": p2["work_units_required"],
+            "result_data": h2,
+            "nonce": n2,
+        },
+    )
+    assert s2.status_code == 200
+
+
+def test_submit_work_attempt_manifest_replay_guard(client, auth_headers):
+    headers, client_id = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=headers,
+        json={
+            "sector_name": "Replay sector",
+            "organization_name": "Replay lab",
+            "compute_domain": "validation",
+            "description": "Replay guard test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=headers,
+        json={"currency": "RUB", "amount": 20},
+    )
+    assert topup_res.status_code == 200
+    create_res = client.post(
+        "/provider/contracts",
+        headers=headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Replay replicated PoW",
+            "task_description": "Replay guard should trigger on same attempt",
+            "task_category": "Validation",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 2,
+            "target_total_work_units": 200,
+            "difficulty": 2,
+            "initial_budget_tokens": 6,
+            "budget_currency": "RUB",
+            "activate_now": True,
+            "validation_policy": {"mode": "replicated", "replication_factor": 2, "quorum_threshold": 2},
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    task_res = client.get("/get_task", headers=headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    result_hash, nonce = _solve_pow(client_id, contract_id, task["difficulty"])
+    assert result_hash is not None
+    first = client.post(
+        "/submit_work",
+        headers=headers,
+        json={
+            "client_id": client_id,
+            "contract_id": contract_id,
+            "job_id": task["job_id"],
+            "attempt_id": 1,
+            "work_units_done": task["work_units_required"],
+            "result_data": result_hash,
+            "nonce": nonce,
+            "output_artifacts": [{"name": "r.txt", "sha256": "a" * 64, "uri": "s3://bucket/r.txt", "size_bytes": 1}],
+        },
+    )
+    assert first.status_code == 202
+    assert first.get_json().get("code") == "replication.pending"
+    second = client.post(
+        "/submit_work",
+        headers=headers,
+        json={
+            "client_id": client_id,
+            "contract_id": contract_id,
+            "job_id": task["job_id"],
+            "attempt_id": 1,
+            "work_units_done": task["work_units_required"],
+            "result_data": result_hash,
+            "nonce": nonce,
+            "output_artifacts": [{"name": "r.txt", "sha256": "a" * 64, "uri": "s3://bucket/r.txt", "size_bytes": 1}],
+        },
+    )
+    assert second.status_code == 409
+    assert second.get_json().get("code") == "replay.attempt_detected"
+
+
+def test_challengeable_escrow_and_dispute_resolution(client, auth_headers):
+    provider_headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=provider_headers,
+        json={
+            "sector_name": "Challenge sector",
+            "organization_name": "Dispute lab",
+            "compute_domain": "challenge",
+            "description": "Challenge + escrow lifecycle",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+
+    topup_provider = client.post(
+        "/market/wallet/topup",
+        headers=provider_headers,
+        json={"currency": "RUB", "amount": 20},
+    )
+    assert topup_provider.status_code == 200
+
+    create_res = client.post(
+        "/provider/contracts",
+        headers=provider_headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Challengeable PoW",
+            "task_description": "Escrow should remain locked during challenge window",
+            "task_category": "Verification",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 4,
+            "target_total_work_units": 300,
+            "difficulty": 2,
+            "initial_budget_tokens": 12,
+            "budget_currency": "RUB",
+            "activate_now": True,
+            "validation_policy": {
+                "mode": "challengeable",
+                "replication_factor": 1,
+                "challenge_window_seconds": 300,
+            },
+            "escrow_policy": {
+                "enabled": True,
+                "worker_collateral": 2,
+                "penalty_percent_on_reject": 50,
+            },
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    worker_headers, worker_id = _register_worker(client)
+    topup_worker = client.post(
+        "/market/wallet/topup",
+        headers=worker_headers,
+        json={"currency": "RUB", "amount": 10},
+    )
+    assert topup_worker.status_code == 200
+
+    task_res = client.get("/get_task", headers=worker_headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    job_id = task["job_id"]
+    result_hash, nonce = _solve_pow(worker_id, contract_id, task["difficulty"])
+    assert result_hash is not None
+
+    submit_res = client.post(
+        "/submit_work",
+        headers=worker_headers,
+        json={
+            "client_id": worker_id,
+            "contract_id": contract_id,
+            "job_id": job_id,
+            "work_units_done": task["work_units_required"],
+            "result_data": result_hash,
+            "nonce": nonce,
+        },
+    )
+    assert submit_res.status_code == 200
+    assert submit_res.get_json().get("challenge_window_open") is True
+
+    challenger_headers, _ = _register_worker(client)
+    open_challenge_res = client.post(
+        f"/job/{job_id}/challenge",
+        headers=challenger_headers,
+        json={"reason": "need manual review"},
+    )
+    assert open_challenge_res.status_code == 201
+    challenge_id = open_challenge_res.get_json()["challenge"]["challenge_id"]
+
+    resolve_res = client.post(
+        f"/challenges/{challenge_id}/resolve",
+        headers=provider_headers,
+        json={"decision": "reject_worker"},
+    )
+    assert resolve_res.status_code == 200
+    assert resolve_res.get_json()["challenge"]["decision"] == "reject_worker"
+
+    job_status_res = client.get(f"/job/{job_id}", headers=worker_headers)
+    assert job_status_res.status_code == 200
+    assert job_status_res.get_json().get("status") == "rejected"
+
+
+def test_validator_verdict_reputation_and_compliance_stubs(client, auth_headers):
+    provider_headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=provider_headers,
+        json={
+            "sector_name": "Validator sector",
+            "organization_name": "Validation lab",
+            "compute_domain": "validation",
+            "description": "Validator verdict path",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=provider_headers,
+        json={"currency": "RUB", "amount": 20},
+    )
+    assert topup_res.status_code == 200
+    create_res = client.post(
+        "/provider/contracts",
+        headers=provider_headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Validator PoW",
+            "task_description": "Need replication group for verdict",
+            "task_category": "Validation",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 2,
+            "target_total_work_units": 300,
+            "difficulty": 2,
+            "initial_budget_tokens": 10,
+            "budget_currency": "RUB",
+            "activate_now": True,
+            "validation_policy": {"mode": "replicated", "replication_factor": 2},
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    worker_headers, _ = _register_worker(client)
+    task_res = client.get("/get_task", headers=worker_headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    group_id = task_res.get_json().get("replication_group_id")
+    assert group_id
+
+    validator_headers, validator_id = _register_worker(client)
+    admit_res = client.post(
+        "/network/governance/validators/admit",
+        headers=provider_headers,
+        json={"validator_client_id": validator_id, "meta": {"role": "validator"}},
+    )
+    assert admit_res.status_code == 201
+    verdict_res = client.post(
+        f"/replication/{group_id}/verdict",
+        headers=validator_headers,
+        json={"decision": "accept", "reason": "artifacts look consistent", "weight": 2},
+    )
+    assert verdict_res.status_code == 201
+    summary = verdict_res.get_json().get("summary") or {}
+    assert summary.get("accept_weight", 0) >= 2
+
+    rep_res = client.get(f"/reputation/validator/{validator_id}", headers=validator_headers)
+    assert rep_res.status_code == 200
+    assert rep_res.get_json().get("score", 0) >= 1
+
+    compliance_res = client.post(
+        "/compliance/evaluate",
+        headers=validator_headers,
+        json={"amount": 2500, "currency": "USD", "country_code": "US"},
+    )
+    assert compliance_res.status_code == 200
+    payload = compliance_res.get_json()
+    assert payload.get("status") == "active"
+    assert "kyc" in payload and "aml" in payload and "jurisdiction" in payload and "gate" in payload
 
 
 def test_market_currency_budget_and_withdrawal_flow(client, auth_headers):
