@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, List, Tuple
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -14,7 +14,7 @@ if PROJECT_ROOT not in sys.path:
 from shared.computation_types import COMPUTATION_TYPES, compute_simple_pow, deterministic_seed
 
 
-RunnerResult = Tuple[int, str, str]
+RunnerResult = Tuple[int, str, str, List[Dict[str, object]]]
 
 
 def _safe_seed(task: Dict, client_id: str, contract_id: str) -> int:
@@ -42,12 +42,12 @@ def _run_python_compute(task: Dict, cfg: Dict, push_log: Callable[[str], None], 
             seed=task.get("task_seed"),
             progress_callback=progress_callback,
         )
-        return target_work, result_data, nonce
+        return target_work, result_data, nonce, []
     seed = _safe_seed(task, cfg["client_id"], contract_id)
     result_data, computed_seed = compute_func(
         cfg["client_id"], contract_id, target_work, seed=seed, progress_callback=progress_callback
     )
-    return target_work, result_data, (computed_seed if computed_seed else str(seed))
+    return target_work, result_data, (computed_seed if computed_seed else str(seed)), []
 
 
 def _run_external(
@@ -56,6 +56,7 @@ def _run_external(
     push_log: Callable[[str], None],
     timeout_seconds: int,
     progress_callback,
+    should_stop,
 ) -> RunnerResult:
     benchmark_meta = task.get("benchmark_meta") if isinstance(task.get("benchmark_meta"), dict) else {}
     runner = benchmark_meta.get("runner") if isinstance(benchmark_meta.get("runner"), dict) else {}
@@ -101,6 +102,9 @@ def _run_external(
     )
     while proc.poll() is None:
         elapsed = int(time.monotonic() - started)
+        if callable(should_stop) and should_stop():
+            proc.kill()
+            raise InterruptedError("Agent stop requested")
         if progress_callback:
             progress_callback(min(elapsed, max(1, timeout_seconds - 1)), timeout_seconds)
         if elapsed >= timeout_seconds:
@@ -113,10 +117,50 @@ def _run_external(
     if proc.returncode != 0:
         tail = "\n".join(output.strip().splitlines()[-5:])
         raise RuntimeError(f"Runner exited with code {proc.returncode}. Tail:\n{tail}")
-    return int(task.get("work_units_required") or 0), output_hash, str(seed)
+    artifacts = []
+    try:
+        cwd_files = os.listdir(os.getcwd())
+    except OSError:
+        cwd_files = []
+    for filename in cwd_files:
+        if not filename.startswith(out_prefix):
+            continue
+        abs_path = os.path.join(os.getcwd(), filename)
+        if not os.path.isfile(abs_path):
+            continue
+        try:
+            with open(abs_path, "rb") as f:
+                blob = f.read()
+        except OSError:
+            continue
+        artifacts.append(
+            {
+                "name": filename,
+                "sha256": hashlib.sha256(blob).hexdigest(),
+                "uri": f"file://{abs_path}",
+                "size_bytes": len(blob),
+            }
+        )
+    if not artifacts:
+        artifacts.append(
+            {
+                "name": f"{out_prefix}-stdout.log",
+                "sha256": output_hash,
+                "uri": "local://runner-stdout",
+                "size_bytes": len(output.encode("utf-8", errors="ignore")),
+            }
+        )
+    return int(task.get("work_units_required") or 0), output_hash, str(seed), artifacts
 
 
-def run_task(task: Dict, cfg: Dict, push_log: Callable[[str], None], progress_callback, submit_timeout_seconds: int):
+def run_task(
+    task: Dict,
+    cfg: Dict,
+    push_log: Callable[[str], None],
+    progress_callback,
+    submit_timeout_seconds: int,
+    should_stop=None,
+):
     benchmark_meta = task.get("benchmark_meta") if isinstance(task.get("benchmark_meta"), dict) else {}
     runner = benchmark_meta.get("runner") if isinstance(benchmark_meta.get("runner"), dict) else {}
     engine = (
@@ -127,5 +171,5 @@ def run_task(task: Dict, cfg: Dict, push_log: Callable[[str], None], progress_ca
     if engine in ("", "python_compute"):
         return _run_python_compute(task, cfg, push_log, progress_callback)
     if engine in ("python_cli", "gromacs"):
-        return _run_external(task, cfg, push_log, submit_timeout_seconds, progress_callback)
+        return _run_external(task, cfg, push_log, submit_timeout_seconds, progress_callback, should_stop)
     raise ValueError(f"Unsupported runner engine: {engine}")

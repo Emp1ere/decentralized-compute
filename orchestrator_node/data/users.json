@@ -6,6 +6,20 @@
       "client_id": "aeb3dec0-5718-4df2-9f0a-47df060e8b4c",
       "api_key": "fQ5MZt5DN9WkBZNGQYKegPiAG8Rpg_RhIMkEljlBoQk",
       "nickname": "Первый поставщик"
+    },
+    {
+      "login": "emp1re",
+      "password_hash": "pbkdf2:sha256:1000000$MQaLYGHRomH6bcuH$e0e47b61c4a1900513fb5b5286d2f3fa4c9f61ef1f0e1968e2f8bb7acf195adc",
+      "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+      "api_key": "P3MPYmC1FT1HFm2jZSiRL0Fplwa6QN0jpvRq1MWgbo4",
+      "nickname": "emp1re"
+    },
+    {
+      "login": "hesh1k",
+      "password_hash": "pbkdf2:sha256:1000000$KMiY7CiP0EmPlbtM$d6078ba248cede22bd5c5cf0d6a69d10a66ddd3294d540b509215439588e71f3",
+      "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+      "api_key": "bBOUJzl16E9scyY2b4aifdo1m20M_gQcPWXNgcqBIzQ",
+      "nickname": "heshik"
     }
   ]
 }

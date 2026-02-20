@@ -16,7 +16,6 @@ from contract_market import (
 )
 from onchain_accounting import (
     DEFAULT_CURRENCY as MARKET_DEFAULT_CURRENCY,
-    convert_with_rules,
     get_effective_fx_rules,
     get_wallet_amount,
     get_wallet_from_chain,
@@ -29,17 +28,44 @@ from onchain_accounting import (
     now_ts,
 )
 from fx_oracles import (
+    ORACLE_REQUIRE_COMMIT_REVEAL,
     ORACLE_PENALTY_POINTS,
     ORACLE_QUORUM,
+    build_commit_hash,
     build_oracle_scores,
+    calculate_confidence_score,
     calculate_median_rates,
+    calculate_volatility_score,
+    calculate_weighted_median_rates,
     current_epoch_id,
     detect_outliers,
+    epoch_time_bounds,
+    get_epoch_commits,
     get_epoch_finalization,
+    get_latest_finalization,
     get_epoch_submissions,
     get_oracle_public_info,
     normalize_rates_payload,
     verify_submission_signature,
+)
+from treasury_engine import (
+    compute_dynamic_spread,
+    compute_treasury_state,
+    convert_with_dynamic_spread,
+    estimate_liquidity_pressure,
+)
+from payment_hub_adapter import (
+    PAYMENT_HUB_ENGINE_VERSION,
+    PAYMENT_HUB_POLICY_VERSION,
+    apply_webhook as payment_apply_webhook,
+    dispatch_pending as payment_dispatch_pending,
+    ensure_operation as payment_ensure_operation,
+    list_documents as payment_list_documents,
+    list_operations as payment_list_operations,
+    list_reconciliations as payment_list_reconciliations,
+    list_webhook_events as payment_list_webhook_events,
+    mark_onchain_status as payment_mark_onchain_status,
+    reconcile_with_withdrawals as payment_reconcile_with_withdrawals,
 )
 from device_registry import (
     register_or_update_device,
@@ -98,11 +124,14 @@ from simulated_compliance_provider import (
     process_cases as simulated_process_cases,
     get_case as simulated_get_case,
 )
+from workload_presets import get_workload_preset, list_workload_presets
 import hashlib
 import uuid
 import os
 import io
 import zipfile
+import json
+import math
 import requests
 import threading
 import time
@@ -110,6 +139,7 @@ import secrets
 from functools import wraps
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address  # для rate_limit_key по IP
+from werkzeug.utils import secure_filename
 
 from logger_config import setup_logging, get_logger
 
@@ -118,7 +148,7 @@ logger = get_logger("orchestrator")
 
 app = Flask(__name__)
 # Защита от DoS: ограничение размера запросов (16 MB максимум)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "2048")) * 1024 * 1024
 
 # Счётчики для мониторинга (запросы по эндпоинтам и ошибки)
 _request_counts = {}
@@ -170,6 +200,10 @@ JOB_TTL_SECONDS = int(os.environ.get("JOB_TTL_SECONDS", "3600"))
 JOB_REASSIGN_COOLDOWN_SECONDS = int(os.environ.get("JOB_REASSIGN_COOLDOWN_SECONDS", "30"))
 JOB_MAX_REASSIGN_ATTEMPTS = int(os.environ.get("JOB_MAX_REASSIGN_ATTEMPTS", "3"))
 JOB_STATUSES_FINAL = {"reward_settled", "rejected", "expired", "reassigned"}
+
+# Runtime chunk scheduler (MVP ingestion path).
+_contract_chunk_runtime = {}
+_contract_chunk_runtime_lock = threading.Lock()
 
 
 def _expire_job_assignments(now_ts_value=None):
@@ -231,6 +265,245 @@ def _update_job_assignment(job_id, **updates):
         assignment.update(updates)
         assignment["updated_at"] = time.time()
         return dict(assignment)
+
+
+def _normalize_ingestion_artifacts(rows):
+    if rows is None:
+        return []
+    if not isinstance(rows, list):
+        raise ValueError("dataset_artifacts must be an array")
+    normalized = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("dataset_artifacts rows must be objects")
+        name = str(row.get("name") or "").strip()
+        uri = str(row.get("uri") or "").strip()
+        sha256 = str(row.get("sha256") or "").strip().lower()
+        try:
+            size_bytes = int(row.get("size_bytes", 0) or 0)
+        except (TypeError, ValueError):
+            raise ValueError("dataset_artifact.size_bytes must be integer")
+        if not name:
+            raise ValueError("dataset_artifact.name is required")
+        if not uri:
+            raise ValueError("dataset_artifact.uri is required")
+        if len(sha256) != 64:
+            raise ValueError("dataset_artifact.sha256 must be 64 hex chars")
+        if size_bytes < 0:
+            raise ValueError("dataset_artifact.size_bytes must be >= 0")
+        normalized.append(
+            {
+                "name": name,
+                "uri": uri,
+                "sha256": sha256,
+                "size_bytes": size_bytes,
+            }
+        )
+    return normalized
+
+
+def _build_chunk_plan(*, total_units, chunk_size, chunk_unit="units"):
+    total_units = int(total_units)
+    chunk_size = int(chunk_size)
+    if total_units <= 0:
+        raise ValueError("total_units must be > 0")
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be > 0")
+    chunks = []
+    cursor = 0
+    index = 1
+    while cursor < total_units:
+        upper = min(total_units, cursor + chunk_size)
+        chunks.append(
+            {
+                "chunk_id": f"chunk-{index:04d}",
+                "index": index,
+                "range_start": cursor,
+                "range_end": upper,
+                "units": upper - cursor,
+                "chunk_unit": chunk_unit,
+            }
+        )
+        cursor = upper
+        index += 1
+    return chunks
+
+
+def _estimate_total_units_from_artifacts(*, artifacts, work_units_required, units_per_mb=None):
+    rows = artifacts if isinstance(artifacts, list) else []
+    total_bytes = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            total_bytes += max(0, int(row.get("size_bytes", 0) or 0))
+        except (TypeError, ValueError):
+            continue
+    fallback_units = max(1, int(work_units_required or 1))
+    if total_bytes <= 0:
+        return fallback_units, total_bytes
+    if units_per_mb is None:
+        units_per_mb = fallback_units
+    units_per_mb = max(1, int(units_per_mb))
+    total_mb = max(1, int(math.ceil(float(total_bytes) / float(1024 * 1024))))
+    estimated = max(fallback_units, total_mb * units_per_mb)
+    return estimated, total_bytes
+
+
+def _store_uploaded_artifacts(*, contract_id, files):
+    manifest_id = f"ing-{uuid.uuid4().hex[:16]}"
+    target_dir = os.path.join(INGESTION_STORAGE_DIR, contract_id, manifest_id)
+    os.makedirs(target_dir, exist_ok=True)
+    artifacts = []
+    for storage in files:
+        filename = secure_filename(storage.filename or "")
+        if not filename:
+            continue
+        abs_path = os.path.join(target_dir, filename)
+        storage.save(abs_path)
+        with open(abs_path, "rb") as f:
+            blob = f.read()
+        artifacts.append(
+            {
+                "name": filename,
+                "uri": f"file://{abs_path}",
+                "sha256": hashlib.sha256(blob).hexdigest(),
+                "size_bytes": len(blob),
+            }
+        )
+    return manifest_id, artifacts
+
+
+def _collect_contract_result_artifacts(contract_id):
+    rows = []
+    receipts = 0
+    for block in blockchain.chain:
+        for tx in list(getattr(block, "transactions", []) or []):
+            if not isinstance(tx, dict):
+                continue
+            if tx.get("type") != "work_receipt":
+                continue
+            if tx.get("contract_id") != contract_id:
+                continue
+            receipts += 1
+            artifacts = tx.get("output_artifacts")
+            if not isinstance(artifacts, list):
+                continue
+            for item in artifacts:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                sha256 = str(item.get("sha256") or "").strip().lower()
+                uri = str(item.get("uri") or "").strip()
+                try:
+                    size_bytes = int(item.get("size_bytes", 0) or 0)
+                except (TypeError, ValueError):
+                    size_bytes = 0
+                if not name or len(sha256) != 64:
+                    continue
+                rows.append(
+                    {
+                        "name": name,
+                        "sha256": sha256,
+                        "uri": uri,
+                        "size_bytes": max(0, size_bytes),
+                        "is_local_uri": uri.startswith("file://"),
+                    }
+                )
+    dedup = {}
+    for row in rows:
+        key = (row.get("sha256"), row.get("name"))
+        if key not in dedup:
+            dedup[key] = row
+    items = list(dedup.values())
+    items.sort(key=lambda x: (x.get("name", ""), x.get("sha256", "")))
+    local_items = [item for item in items if item.get("is_local_uri")]
+    remote_items = [item for item in items if not item.get("is_local_uri")]
+    return {
+        "total_work_receipts": receipts,
+        "items": items,
+        "artifacts_total": len(items),
+        "artifacts_local_uri": len(local_items),
+        "artifacts_remote_uri": len(remote_items),
+    }
+
+
+def _build_contract_results_manifest(contract):
+    contract_id = contract.get("contract_id")
+    collection = _collect_contract_result_artifacts(contract_id)
+    items = collection.get("items", [])
+    onchain_rows = list_contracts_onchain(blockchain.chain)
+    onchain = next((row for row in onchain_rows if row.get("contract_id") == contract_id), None)
+    return {
+        "contract_id": contract_id,
+        "status": contract.get("status"),
+        "generated_at": now_ts(),
+        "artifact_manifest_hash": _artifact_manifest_hash(items),
+        "artifacts_total": collection.get("artifacts_total", 0),
+        "artifacts_local_uri": collection.get("artifacts_local_uri", 0),
+        "artifacts_remote_uri": collection.get("artifacts_remote_uri", 0),
+        "total_work_receipts": collection.get("total_work_receipts", 0),
+        "onchain": onchain,
+        "items": items,
+    }
+
+
+def _persist_contract_results_manifest(*, contract_id, manifest):
+    contract_dir = os.path.join(RESULTS_STORAGE_DIR, contract_id)
+    os.makedirs(contract_dir, exist_ok=True)
+    filename = f"results-{now_ts()}.json"
+    abs_path = os.path.join(contract_dir, filename)
+    with open(abs_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    return abs_path
+
+
+def _ensure_contract_chunk_runtime(contract_id, chunk_plan):
+    plan = chunk_plan if isinstance(chunk_plan, list) else []
+    with _contract_chunk_runtime_lock:
+        runtime = _contract_chunk_runtime.get(contract_id)
+        if not runtime:
+            runtime = {"cursor": 0, "completed_chunk_ids": set(), "failed_chunk_ids": set()}
+            _contract_chunk_runtime[contract_id] = runtime
+        runtime["plan_size"] = len(plan)
+        return runtime
+
+
+def _next_contract_chunk(contract_id, chunk_plan):
+    plan = chunk_plan if isinstance(chunk_plan, list) else []
+    if not plan:
+        return None
+    runtime = _ensure_contract_chunk_runtime(contract_id, plan)
+    with _contract_chunk_runtime_lock:
+        completed = runtime.get("completed_chunk_ids") or set()
+        failed = runtime.get("failed_chunk_ids") or set()
+        total = len(plan)
+        for _ in range(total):
+            idx = int(runtime.get("cursor", 0) or 0) % total
+            runtime["cursor"] = (idx + 1) % total
+            candidate = plan[idx]
+            chunk_id = candidate.get("chunk_id")
+            if chunk_id in completed:
+                continue
+            if chunk_id in failed:
+                continue
+            return dict(candidate)
+    return None
+
+
+def _mark_chunk_status(contract_id, chunk_id, *, success):
+    if not contract_id or not chunk_id:
+        return
+    with _contract_chunk_runtime_lock:
+        runtime = _contract_chunk_runtime.get(contract_id)
+        if not runtime:
+            runtime = {"cursor": 0, "completed_chunk_ids": set(), "failed_chunk_ids": set()}
+            _contract_chunk_runtime[contract_id] = runtime
+        if success:
+            runtime["completed_chunk_ids"].add(chunk_id)
+            runtime["failed_chunk_ids"].discard(chunk_id)
+        else:
+            runtime["failed_chunk_ids"].add(chunk_id)
 
 
 def _task_requirements_from_runtime(runtime):
@@ -489,6 +762,19 @@ def _issue_task_for_client(
     spec["job_ttl_seconds"] = JOB_TTL_SECONDS
     # Возвращаем effective-профиль для наблюдаемости и отладки adaptive-логики.
     spec["scheduler_profile_effective"] = effective_profile
+    benchmark_meta = spec.get("benchmark_meta") if isinstance(spec.get("benchmark_meta"), dict) else {}
+    ingestion = benchmark_meta.get("ingestion") if isinstance(benchmark_meta.get("ingestion"), dict) else {}
+    if (ingestion.get("status") or "").strip() == "published":
+        chunk_plan = ingestion.get("chunk_plan")
+        chunk = _next_contract_chunk(runtime["contract_id"], chunk_plan)
+        if chunk:
+            spec["chunk"] = chunk
+            _update_job_assignment(
+                assignment["job_id"],
+                chunk_id=chunk.get("chunk_id"),
+                chunk_index=chunk.get("index"),
+                chunk_total=len(chunk_plan) if isinstance(chunk_plan, list) else None,
+            )
     if replication_group_id:
         spec["replication_group_id"] = replication_group_id
         spec["replication_factor"] = replication_factor
@@ -604,11 +890,22 @@ if NETWORK_PROTOCOL_VERSION not in SUPPORTED_PROTOCOL_VERSIONS:
 GOVERNANCE_ADMISSION_TOKEN = os.environ.get("GOVERNANCE_ADMISSION_TOKEN", "")
 COMPLIANCE_ENFORCEMENT_MODE = os.environ.get("COMPLIANCE_ENFORCEMENT_MODE", "shadow").strip().lower()
 COMPLIANCE_PROVIDER_MODE = os.environ.get("COMPLIANCE_PROVIDER_MODE", "deterministic").strip().lower()
+DEMO_MODE = os.environ.get("DEMO_MODE", "false").strip().lower() in {"1", "true", "yes", "on"}
 COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT = int(
     os.environ.get("COMPLIANCE_REVIEW_BLOCK_WITHDRAWAL_MIN_AMOUNT", "500")
 )
 COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT = int(
     os.environ.get("COMPLIANCE_REVIEW_BLOCK_CONVERT_MIN_AMOUNT", "1000")
+)
+ECON_POLICY_VERSION = os.environ.get("ECON_POLICY_VERSION", "econ-policy-v1")
+FX_ENGINE_VERSION = os.environ.get("FX_ENGINE_VERSION", "fx-engine-v2")
+INGESTION_STORAGE_DIR = os.environ.get(
+    "INGESTION_STORAGE_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "ingestion"),
+)
+RESULTS_STORAGE_DIR = os.environ.get(
+    "RESULTS_STORAGE_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "results"),
 )
 
 
@@ -1177,18 +1474,42 @@ def _append_onchain_events(event_txs):
 
 
 def _oracle_epoch_summary(epoch_id):
+    commits = get_epoch_commits(blockchain.chain, epoch_id)
     submissions = get_epoch_submissions(blockchain.chain, epoch_id)
     finalization = get_epoch_finalization(blockchain.chain, epoch_id)
+    oracle_scores_map = build_oracle_scores(blockchain.chain)
     median_rates = calculate_median_rates(submissions) if submissions else None
-    outliers = detect_outliers(submissions, median_rates) if submissions and median_rates else {}
+    weighted_median_rates = (
+        calculate_weighted_median_rates(submissions, oracle_scores_map) if submissions else None
+    )
+    outliers = (
+        detect_outliers(submissions, weighted_median_rates or median_rates)
+        if submissions and (weighted_median_rates or median_rates)
+        else {}
+    )
+    confidence_preview = (
+        calculate_confidence_score(
+            submissions=submissions,
+            selected_rates=(weighted_median_rates or median_rates or {}),
+            outliers=outliers,
+            quorum=ORACLE_QUORUM,
+        )
+        if submissions
+        else 0.0
+    )
     return {
         "epoch_id": epoch_id,
         "oracle_config": get_oracle_public_info(),
-        "oracle_scores": list(build_oracle_scores(blockchain.chain).values()),
+        "oracle_scores": list(oracle_scores_map.values()),
+        "commits_count": len(commits),
+        "commits": sorted(list(commits.values()), key=lambda x: x.get("oracle_id", "")),
         "submissions_count": len(submissions),
         "submissions": sorted(list(submissions.values()), key=lambda x: x.get("oracle_id", "")),
         "median_rates_preview": median_rates,
+        "weighted_median_rates_preview": weighted_median_rates,
         "outliers_preview": list(outliers.values()),
+        "confidence_preview": confidence_preview,
+        "volatility_score_preview": (finalization or {}).get("volatility_score", 0.0),
         "finalization": finalization,
         "is_finalized": finalization is not None,
     }
@@ -1454,6 +1775,7 @@ def submit_work():
         return jsonify({"error": "work_units_done must be > 0"}), 400
 
     assignment = None
+    assignment_chunk_id = None
     if job_id:
         assignment = _get_job_assignment(job_id)
         if not assignment:
@@ -1484,6 +1806,7 @@ def submit_work():
                 "reward_issued": 0,
                 "challenge_window_open": True,
             }), 200
+        assignment_chunk_id = (assignment.get("chunk_id") or "").strip() or None
 
     # Защита от DoS: проверка размера result_data (хеш должен быть 64 символа, максимум 1KB для безопасности)
     if result_data:
@@ -1680,6 +2003,7 @@ def submit_work():
                 )
             bump_reputation(actor_id=client_id, role="worker", delta=-5, reason="verification_failed")
             _update_job_assignment(job_id, status="rejected", validation_finished_at=time.time())
+            _mark_chunk_status(contract_id, assignment_chunk_id, success=False)
         return jsonify(error_payload(code_key="VERIFICATION_FAILED", message="Work verification failed")), 400
     logger.info("submit_work: verification passed for client_id=%s... contract_id=%s", client_id[:8], contract_id)
 
@@ -1745,6 +2069,7 @@ def submit_work():
                 reject_code="replication.disputed",
                 dispute_id=dispute.get("dispute_id") if isinstance(dispute, dict) else None,
             )
+            _mark_chunk_status(contract_id, assignment_chunk_id, success=False)
             return jsonify(error_payload(
                 code_key="REPLICATION_DISPUTED",
                 message="Replication dispute detected. Open challenge to resolve.",
@@ -1769,6 +2094,7 @@ def submit_work():
                 reject_reason="Result rejected by replication quorum",
                 reject_code="replication.rejected",
             )
+            _mark_chunk_status(contract_id, assignment_chunk_id, success=False)
             return jsonify(error_payload(
                 code_key="REPLICATION_REJECTED",
                 message="Result rejected by replicated validation consensus",
@@ -1919,6 +2245,9 @@ def submit_work():
         else:
             _update_job_assignment(job_id, escrow_status="held")
 
+    if assignment:
+        _mark_chunk_status(contract_id, assignment_chunk_id, success=True)
+
     return jsonify({
         "status": "success", 
         "reward_issued": reward_amount,
@@ -1987,7 +2316,18 @@ def get_balance(client_id):
 @limiter.limit("120 per minute")
 def market_rates():
     """On-chain курсы валют и спред рыночной конвертации."""
-    return jsonify(get_effective_fx_rules(blockchain.chain)), 200
+    rules = get_effective_fx_rules(blockchain.chain)
+    treasury = compute_treasury_state(chain=blockchain.chain, rules=rules)
+    latest_epoch_final = get_latest_finalization(blockchain.chain)
+    return jsonify(
+        {
+            **rules,
+            "treasury": treasury,
+            "latest_oracle_epoch": latest_epoch_final,
+            "policy_version": ECON_POLICY_VERSION,
+            "engine_version": FX_ENGINE_VERSION,
+        }
+    ), 200
 
 
 @app.route("/market/rates/update", methods=["POST"])
@@ -2015,6 +2355,23 @@ def market_rates_update():
     return jsonify(get_effective_fx_rules(blockchain.chain)), 200
 
 
+@app.route("/market/treasury/status", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_treasury_status():
+    """Состояние treasury: резервы, целевые коридоры, буферы."""
+    rules = get_effective_fx_rules(blockchain.chain)
+    treasury = compute_treasury_state(chain=blockchain.chain, rules=rules)
+    return jsonify(
+        {
+            "treasury": treasury,
+            "rates_to_rub": rules.get("rates_to_rub"),
+            "spread_percent": rules.get("spread_percent"),
+            "policy_version": ECON_POLICY_VERSION,
+            "engine_version": FX_ENGINE_VERSION,
+        }
+    ), 200
+
+
 @app.route("/market/fx/oracles", methods=["GET"])
 @limiter.limit("120 per minute")
 def market_fx_oracles():
@@ -2033,6 +2390,7 @@ def market_fx_oracle_submit():
     epoch_id = (data.get("epoch_id") or "").strip() or current_epoch_id()
     rates_payload = data.get("rates_to_rub")
     signature = (data.get("signature") or "").strip()
+    reveal_nonce = (data.get("reveal_nonce") or "").strip()
 
     if not oracle_id:
         return jsonify({"error": "oracle_id is required"}), 400
@@ -2053,6 +2411,27 @@ def market_fx_oracle_submit():
 
     if get_epoch_finalization(blockchain.chain, epoch_id):
         return jsonify({"error": "Epoch already finalized"}), 409
+    if ORACLE_REQUIRE_COMMIT_REVEAL:
+        bounds = epoch_time_bounds(epoch_id)
+        if not bounds:
+            return jsonify({"error": "Invalid epoch_id format"}), 400
+        if bounds["phase"] == "commit":
+            return jsonify({"error": "Reveal phase has not started yet", "epoch_bounds": bounds}), 409
+        if bounds["phase"] == "closed":
+            return jsonify({"error": "Reveal phase is closed for this epoch", "epoch_bounds": bounds}), 409
+    epoch_commits = get_epoch_commits(blockchain.chain, epoch_id)
+    if ORACLE_REQUIRE_COMMIT_REVEAL:
+        commit_row = epoch_commits.get(oracle_id)
+        if not commit_row:
+            return jsonify({"error": "Commit is required before reveal submit"}), 409
+        expected_commit = build_commit_hash(
+            oracle_id=oracle_id,
+            epoch_id=epoch_id,
+            rates_to_rub=normalized_rates,
+            nonce=reveal_nonce,
+        )
+        if expected_commit != commit_row.get("commit_hash"):
+            return jsonify({"error": "Commit/reveal hash mismatch"}), 409
     existing = get_epoch_submissions(blockchain.chain, epoch_id)
     if oracle_id in existing:
         return jsonify({"error": "Oracle already submitted for this epoch"}), 409
@@ -2063,6 +2442,7 @@ def market_fx_oracle_submit():
         "epoch_id": epoch_id,
         "rates_to_rub": normalized_rates,
         "signature": signature,
+        "reveal_nonce": reveal_nonce or None,
         "submitted_at": now_ts(),
     }
     _, err = _append_onchain_events([tx])
@@ -2073,6 +2453,45 @@ def market_fx_oracle_submit():
     return jsonify(summary), 201
 
 
+@app.route("/market/fx/oracle-commit", methods=["POST"])
+@limiter.limit("120 per minute")
+def market_fx_oracle_commit():
+    """Commit шага oracle (для commit/reveal режима)."""
+    data = request.get_json(silent=True) or {}
+    oracle_id = (data.get("oracle_id") or "").strip()
+    epoch_id = (data.get("epoch_id") or "").strip() or current_epoch_id()
+    commit_hash = (data.get("commit_hash") or "").strip().lower()
+    if not oracle_id:
+        return jsonify({"error": "oracle_id is required"}), 400
+    if not epoch_id:
+        return jsonify({"error": "epoch_id is required"}), 400
+    if len(commit_hash) != 64 or any(ch not in "0123456789abcdef" for ch in commit_hash):
+        return jsonify({"error": "commit_hash must be 64 hex chars"}), 400
+    if get_epoch_finalization(blockchain.chain, epoch_id):
+        return jsonify({"error": "Epoch already finalized"}), 409
+    if ORACLE_REQUIRE_COMMIT_REVEAL:
+        bounds = epoch_time_bounds(epoch_id)
+        if not bounds:
+            return jsonify({"error": "Invalid epoch_id format"}), 400
+        if bounds["phase"] != "commit":
+            return jsonify({"error": "Commit phase is closed for this epoch", "epoch_bounds": bounds}), 409
+    existing_commits = get_epoch_commits(blockchain.chain, epoch_id)
+    if oracle_id in existing_commits:
+        return jsonify({"error": "Oracle already committed for this epoch"}), 409
+    tx = {
+        "type": "fx_oracle_commit",
+        "oracle_id": oracle_id,
+        "epoch_id": epoch_id,
+        "commit_hash": commit_hash,
+        "committed_at": now_ts(),
+    }
+    _, err = _append_onchain_events([tx])
+    if err:
+        return jsonify({"error": err}), 400
+    summary = _oracle_epoch_summary(epoch_id)
+    return jsonify(summary), 201
+
+
 @app.route("/market/fx/finalize", methods=["POST"])
 @require_node_secret
 @limiter.limit("30 per minute")
@@ -2080,6 +2499,12 @@ def market_fx_finalize():
     """Финализация эпохи oracle-курсов: медиана, outlier, штрафы, запись on-chain."""
     data = request.get_json(silent=True) or {}
     epoch_id = (data.get("epoch_id") or "").strip() or current_epoch_id()
+    if ORACLE_REQUIRE_COMMIT_REVEAL:
+        bounds = epoch_time_bounds(epoch_id)
+        if not bounds:
+            return jsonify({"error": "Invalid epoch_id format"}), 400
+        if bounds["phase"] != "closed":
+            return jsonify({"error": "Reveal phase not closed yet", "epoch_bounds": bounds}), 409
 
     existing_final = get_epoch_finalization(blockchain.chain, epoch_id)
     if existing_final:
@@ -2096,16 +2521,32 @@ def market_fx_finalize():
             }
         ), 409
 
+    oracle_scores_map = build_oracle_scores(blockchain.chain)
     median_rates = calculate_median_rates(submissions)
-    outliers = detect_outliers(submissions, median_rates)
+    weighted_median_rates = calculate_weighted_median_rates(submissions, oracle_scores_map)
+    outliers = detect_outliers(submissions, weighted_median_rates)
     current_rules = get_effective_fx_rules(blockchain.chain)
+    current_rates = current_rules.get("rates_to_rub") or {}
+    confidence = calculate_confidence_score(
+        submissions=submissions,
+        selected_rates=weighted_median_rates,
+        outliers=outliers,
+        quorum=ORACLE_QUORUM,
+    )
+    volatility_score = calculate_volatility_score(
+        previous_rates=current_rates,
+        current_rates=weighted_median_rates,
+    )
     spread_percent = data.get("spread_percent")
     if spread_percent is None:
         spread_percent = current_rules.get("spread_percent")
     txs = [
         {
-            "type": "fx_rules_update",
-            "rates_to_rub": median_rates,
+            "type": "fx_epoch_finalized",
+            "epoch_id": epoch_id,
+            "rates_to_rub": weighted_median_rates,
+            "confidence": confidence,
+            "volatility_score": volatility_score,
             "spread_percent": spread_percent,
             "updated_at": now_ts(),
             "meta": {
@@ -2113,6 +2554,26 @@ def market_fx_finalize():
                 "epoch_id": epoch_id,
                 "oracle_count": len(submissions),
                 "outliers": sorted(outliers.keys()),
+                "policy_version": ECON_POLICY_VERSION,
+                "engine_version": FX_ENGINE_VERSION,
+                "aggregation_mode": "weighted_median",
+            },
+        },
+        {
+            "type": "fx_rules_update",
+            "rates_to_rub": weighted_median_rates,
+            "spread_percent": spread_percent,
+            "updated_at": now_ts(),
+            "meta": {
+                "source": "multi_oracle",
+                "epoch_id": epoch_id,
+                "oracle_count": len(submissions),
+                "outliers": sorted(outliers.keys()),
+                "confidence": confidence,
+                "volatility_score": volatility_score,
+                "policy_version": ECON_POLICY_VERSION,
+                "engine_version": FX_ENGINE_VERSION,
+                "aggregation_mode": "weighted_median",
             },
         }
     ]
@@ -2130,7 +2591,18 @@ def market_fx_finalize():
     _, err = _append_onchain_events(txs)
     if err:
         return jsonify({"error": err}), 400
-    return jsonify({"status": "finalized", "epoch": _oracle_epoch_summary(epoch_id)}), 200
+    return jsonify(
+        {
+            "status": "finalized",
+            "epoch": _oracle_epoch_summary(epoch_id),
+            "fx_epoch_finalized": {
+                "epoch_id": epoch_id,
+                "rates_to_rub": weighted_median_rates,
+                "confidence": confidence,
+                "volatility_score": volatility_score,
+            },
+        }
+    ), 200
 
 
 @app.route("/market/fx/epoch/<epoch_id>", methods=["GET"])
@@ -2231,11 +2703,27 @@ def market_convert():
     if wallet_amount < source_amount:
         return jsonify({"error": "Insufficient wallet balance"}), 409
     rules = get_effective_fx_rules(blockchain.chain)
-    target_amount, convert_err = convert_with_rules(
-        rules=rules,
+    treasury = compute_treasury_state(chain=blockchain.chain, rules=rules)
+    latest_epoch = get_latest_finalization(blockchain.chain)
+    volatility_score = float((latest_epoch or {}).get("meta", {}).get("volatility_score", 0.0) or 0.0)
+    liquidity_pressure = estimate_liquidity_pressure(
+        treasury_state=treasury,
+        source_currency=source_currency,
+        source_amount=source_amount,
+    )
+    dynamic_spread = compute_dynamic_spread(
+        base_spread_percent=float(rules.get("spread_percent", 0) or 0),
+        volatility_score=volatility_score,
+        liquidity_pressure=liquidity_pressure,
+    )
+    effective_rules = dict(rules)
+    effective_rules["spread_percent"] = dynamic_spread
+    target_amount, convert_err, quote_meta = convert_with_dynamic_spread(
+        rules=effective_rules,
         from_currency=source_currency,
         to_currency=target_currency,
         amount=source_amount,
+        dynamic_spread_percent=dynamic_spread,
     )
     if convert_err:
         return jsonify({"error": convert_err}), 400
@@ -2246,8 +2734,15 @@ def market_convert():
         "to_currency": target_currency,
         "source_amount": source_amount,
         "target_amount": int(target_amount),
-        "spread_percent": float(rules.get("spread_percent", 0)),
+        "spread_percent": float(dynamic_spread),
         "created_at": now_ts(),
+        "meta": {
+            "oracle_epoch_id": (latest_epoch or {}).get("epoch_id"),
+            "volatility_score": volatility_score,
+            "liquidity_pressure": liquidity_pressure,
+            "policy_version": ECON_POLICY_VERSION,
+            "engine_version": FX_ENGINE_VERSION,
+        },
     }
     _, err = _append_onchain_events([tx])
     if err:
@@ -2258,8 +2753,17 @@ def market_convert():
         "to_currency": target_currency,
         "source_amount": source_amount,
         "target_amount": int(target_amount),
-        "spread_percent": float(rules.get("spread_percent", 0)),
+        "spread_percent": float(dynamic_spread),
         "balances": get_wallet_from_chain(blockchain.chain, client_id)["balances"],
+        "treasury": {
+            "liquidity_pressure": liquidity_pressure,
+            "reserve_buffer": treasury.get("reserve_buffer"),
+            "pnl_rub_estimate": int((quote_meta or {}).get("pnl_rub_estimate", 0)),
+        },
+        "quote": quote_meta or {},
+        "oracle_epoch_id": (latest_epoch or {}).get("epoch_id"),
+        "policy_version": ECON_POLICY_VERSION,
+        "engine_version": FX_ENGINE_VERSION,
         "compliance": {
             **compliance,
             "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
@@ -2334,6 +2838,16 @@ def market_withdrawals():
     _, err = _append_onchain_events([tx])
     if err:
         return jsonify({"error": err}), 400
+    payment_op, _ = payment_ensure_operation(
+        {
+            "withdrawal_id": withdrawal_id,
+            "client_id": client_id,
+            "currency": currency,
+            "amount": amount,
+            "card_mask": card_mask,
+        }
+    )
+    latest_epoch = get_latest_finalization(blockchain.chain)
     withdrawal = {
         "withdrawal_id": withdrawal_id,
         "client_id": client_id,
@@ -2346,6 +2860,10 @@ def market_withdrawals():
         {
             "withdrawal": withdrawal,
             "wallet": get_wallet_from_chain(blockchain.chain, client_id),
+            "payment_operation": payment_op,
+            "oracle_epoch_id": (latest_epoch or {}).get("epoch_id"),
+            "policy_version": ECON_POLICY_VERSION,
+            "engine_version": PAYMENT_HUB_ENGINE_VERSION,
             "compliance": {
                 **compliance,
                 "enforcement_mode": COMPLIANCE_ENFORCEMENT_MODE,
@@ -2353,6 +2871,135 @@ def market_withdrawals():
             },
         }
     ), 201
+
+
+@app.route("/market/payments/operations", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_payments_operations():
+    """Операции payment-hub (идемпотентные записи выплат)."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    status = (request.args.get("status") or "").strip() or None
+    payload = payment_list_operations(status=status, limit=request.args.get("limit", 200))
+    # Возвращаем только операции текущего пользователя.
+    rows = [row for row in payload.get("operations", []) if row.get("client_id") == client_id]
+    return jsonify({"operations": rows, "provider": payload.get("provider")}), 200
+
+
+@app.route("/market/payments/dispatch", methods=["POST"])
+@require_node_secret
+@limiter.limit("30 per minute")
+def market_payments_dispatch():
+    """Диспетчер payment-hub: ретраи/финализация + запись on-chain статусов."""
+    data = request.get_json(silent=True) or {}
+    result = payment_dispatch_pending(max_batch=data.get("max_batch", 50))
+    status_events = []
+    onchain_txs = []
+    for row in result.get("updated_operations", []):
+        operation_id = row.get("operation_id")
+        status = str(row.get("status") or "").strip().lower()
+        if status not in {"processing", "completed", "rejected", "retry"}:
+            continue
+        if status == "retry":
+            # В on-chain отражаем retry как processing, чтобы UI показывал "в работе".
+            status = "processing"
+        tx = {
+            "type": "fiat_withdrawal_status",
+            "withdrawal_id": operation_id,
+            "status": status,
+            "updated_at": now_ts(),
+        }
+        onchain_txs.append(tx)
+        status_events.append({"withdrawal_id": operation_id, "status": status})
+    if onchain_txs:
+        _, err = _append_onchain_events(onchain_txs)
+        if err:
+            return jsonify({"error": err, "dispatch": result}), 400
+        for event in status_events:
+            payment_mark_onchain_status(
+                operation_id=event["withdrawal_id"],
+                status=event["status"],
+            )
+    return jsonify(
+        {
+            "dispatch": result,
+            "onchain_status_updates": status_events,
+            "policy_version": PAYMENT_HUB_POLICY_VERSION,
+            "engine_version": PAYMENT_HUB_ENGINE_VERSION,
+        }
+    ), 200
+
+
+@app.route("/market/payments/webhooks", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_payments_webhooks():
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    payload = payment_list_webhook_events(limit=request.args.get("limit", 200))
+    operations = payment_list_operations(limit=1000).get("operations", [])
+    rows = []
+    for row in payload.get("events", []):
+        operation_id = (row.get("operation_id") or "").strip()
+        op = next((item for item in operations if item.get("operation_id") == operation_id), None)
+        if op and op.get("client_id") == client_id:
+            rows.append(row)
+    return jsonify({"events": rows, "provider": payload.get("provider")}), 200
+
+
+@app.route("/market/payments/webhook/<provider>", methods=["POST"])
+@require_node_secret
+@limiter.limit("120 per minute")
+def market_payments_webhook(provider):
+    payload = request.get_json(silent=True) or {}
+    data, err = payment_apply_webhook(provider=provider, payload=payload)
+    if err:
+        return jsonify({"error": err}), 400
+    operation = data.get("operation") or {}
+    status = (operation.get("status") or "").strip().lower()
+    if status in {"completed", "rejected", "processing"}:
+        tx = {
+            "type": "fiat_withdrawal_status",
+            "withdrawal_id": operation.get("operation_id"),
+            "status": status,
+            "updated_at": now_ts(),
+        }
+        _, append_err = _append_onchain_events([tx])
+        if append_err:
+            return jsonify({"error": append_err, "webhook": data}), 400
+        payment_mark_onchain_status(operation_id=operation.get("operation_id"), status=status)
+    return jsonify(data), 200
+
+
+@app.route("/market/payments/reconcile", methods=["GET", "POST"])
+@limiter.limit("60 per minute")
+def market_payments_reconcile():
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    if request.method == "GET":
+        payload = payment_list_reconciliations(limit=request.args.get("limit", 50), client_id=client_id)
+        return jsonify(payload), 200
+    rows = list_withdrawals_from_chain(blockchain.chain, client_id=client_id, limit=1000)
+    report = payment_reconcile_with_withdrawals(onchain_rows=rows, client_id=client_id)
+    return jsonify(report), 200
+
+
+@app.route("/market/audit/documents", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_audit_documents():
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    payload = payment_list_documents(limit=request.args.get("limit", 200), client_id=client_id)
+    return jsonify(
+        {
+            **payload,
+            "policy_version": PAYMENT_HUB_POLICY_VERSION,
+            "engine_version": PAYMENT_HUB_ENGINE_VERSION,
+        }
+    ), 200
 
 
 @app.route("/market/audit", methods=["GET"])
@@ -2486,6 +3133,25 @@ def provider_contracts():
         benchmark_meta = {}
     if not isinstance(benchmark_meta, dict):
         return jsonify({"error": "benchmark_meta must be an object"}), 400
+    workload_preset_id = (data.get("workload_preset_id") or "").strip()
+    workload_preset = None
+    if workload_preset_id:
+        workload_preset = get_workload_preset(workload_preset_id)
+        if not workload_preset:
+            return jsonify({"error": "Unknown workload_preset_id"}), 400
+        preset_meta = workload_preset.get("benchmark_meta") if isinstance(workload_preset.get("benchmark_meta"), dict) else {}
+        merged_meta = dict(preset_meta)
+        merged_meta.update(benchmark_meta)
+        benchmark_meta = merged_meta
+        if not data.get("task_class"):
+            data["task_class"] = workload_preset.get("task_class")
+        if not task_category and workload_preset.get("task_category"):
+            task_category = str(workload_preset.get("task_category"))
+        if (
+            (not data.get("computation_type"))
+            and workload_preset.get("recommended_computation_type")
+        ):
+            computation_type = str(workload_preset.get("recommended_computation_type"))
     # Stage 2: task-class policy presets with optional manual override.
     policy_bundle = build_policy_bundle(
         requested_task_class=data.get("task_class"),
@@ -2507,6 +3173,43 @@ def provider_contracts():
     policy_bucket["validation_policy"] = validation_policy
     policy_bucket["escrow_policy"] = escrow_policy
     benchmark_meta["decentralized_policy"] = policy_bucket
+    if workload_preset_id:
+        benchmark_meta["workload_preset_id"] = workload_preset_id
+
+    def _validate_artifact_spec(field):
+        rows = benchmark_meta.get(field)
+        if rows is None:
+            return None
+        if not isinstance(rows, list):
+            return f"{field} must be an array"
+        for row in rows:
+            if not isinstance(row, dict):
+                return f"{field} rows must be objects"
+            name = str(row.get("name") or "").strip()
+            formats = row.get("formats")
+            if not name:
+                return f"{field}.name is required"
+            if not isinstance(formats, list) or not formats:
+                return f"{field}.formats must be a non-empty array"
+        return None
+
+    err = _validate_artifact_spec("input_artifacts")
+    if err:
+        return jsonify({"error": err}), 400
+    err = _validate_artifact_spec("output_artifacts_spec")
+    if err:
+        return jsonify({"error": err}), 400
+    chunking = benchmark_meta.get("chunking")
+    if chunking is not None:
+        if not isinstance(chunking, dict):
+            return jsonify({"error": "chunking must be an object"}), 400
+        chunk_size = chunking.get("chunk_size")
+        if chunk_size is not None:
+            try:
+                if int(chunk_size) <= 0:
+                    return jsonify({"error": "chunking.chunk_size must be > 0"}), 400
+            except (TypeError, ValueError):
+                return jsonify({"error": "chunking.chunk_size must be integer"}), 400
 
     if not sector_id:
         return jsonify({"error": "sector_id is required: create/select sector first"}), 400
@@ -2624,6 +3327,137 @@ def provider_contracts():
     return jsonify({"contract": created, "wallet": wallet_info}), 201
 
 
+@app.route("/provider/workload-presets", methods=["GET"])
+@limiter.limit("60 per minute")
+def provider_workload_presets():
+    """Каталог прикладных workload-пресетов: форматы артефактов и рекомендации по chunking."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    return jsonify({"workload_presets": list_workload_presets()}), 200
+
+
+@app.route("/provider/model1/bootstrap", methods=["POST"])
+@limiter.limit("10 per minute")
+def provider_model1_bootstrap():
+    """
+    Быстрый bootstrap под запрос пользователя:
+    - сектор Model_1;
+    - контракт benchPEP;
+    - опциональная привязка локального source_path к ingestion manifest.
+    """
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    data = request.get_json(silent=True) or {}
+    source_path = (data.get("source_path") or "").strip()
+
+    sectors = contract_market.list_owner_sectors(provider_client_id)
+    sector = next((row for row in sectors if (row.get("sector_name") or "").strip() == "Model_1"), None)
+    if not sector:
+        sector = contract_market.create_sector(
+            owner_client_id=provider_client_id,
+            sector_name="Model_1",
+            organization_name="Model_1 Lab",
+            compute_domain="biomedical_modeling",
+            description="Applied compute sector for benchPEP workloads",
+        )
+
+    contracts = contract_market.list_provider_contracts(provider_client_id, sector_id=sector["sector_id"])
+    contract = next((row for row in contracts if (row.get("task_name") or "").lower().startswith("benchpep")), None)
+    if not contract:
+        preset = get_workload_preset("biomedical_protein_modeling") or {}
+        benchmark_meta = preset.get("benchmark_meta") if isinstance(preset.get("benchmark_meta"), dict) else {}
+        benchmark_meta = dict(benchmark_meta)
+        benchmark_meta["workload_preset_id"] = "biomedical_protein_modeling"
+        benchmark_meta["decentralized_policy"] = {
+            "task_class": "biomedical_modeling",
+            "task_class_source": "bootstrap_model1",
+            "validation_style": "stochastic_or_metric",
+            "validation_policy": {
+                "mode": "challengeable",
+                "replication_factor": 2,
+                "quorum_threshold": 2,
+                "challenge_window_seconds": 3600,
+            },
+            "escrow_policy": {"enabled": True, "worker_collateral": 8, "penalty_percent_on_reject": 30},
+        }
+        contract = contract_market.create_contract(
+            provider_client_id=provider_client_id,
+            sector_id=sector["sector_id"],
+            task_name="benchPEP molecular workload",
+            task_description="benchPEP-based biomedical simulation contract",
+            task_category="Biomedical Modeling",
+            computation_type="molecular_dynamics_benchpep",
+            work_units_required=1000,
+            reward_per_task=12,
+            target_total_work_units=20000,
+            difficulty=2,
+            initial_budget_tokens=0,
+            budget_currency=MARKET_DEFAULT_CURRENCY,
+            benchmark_meta=benchmark_meta,
+            status=STATUS_DRAFT,
+        )
+
+    ingest_info = {"status": "not_configured"}
+    source_bound = False
+    source_error = None
+    if source_path:
+        if os.path.exists(source_path) and os.path.isfile(source_path):
+            with open(source_path, "rb") as f:
+                blob = f.read()
+            artifact = {
+                "name": os.path.basename(source_path),
+                "uri": f"file://{source_path}",
+                "sha256": hashlib.sha256(blob).hexdigest(),
+                "size_bytes": len(blob),
+            }
+            total_units, total_bytes = _estimate_total_units_from_artifacts(
+                artifacts=[artifact],
+                work_units_required=int(contract.get("work_units_required", 1) or 1),
+            )
+            chunk_size = int(contract.get("work_units_required", 1) or 1)
+            chunk_plan = _build_chunk_plan(total_units=total_units, chunk_size=chunk_size, chunk_unit="steps")
+            ingestion = {
+                "status": "configured",
+                "manifest_id": f"ing-{uuid.uuid4().hex[:16]}",
+                "dataset_artifacts": [artifact],
+                "chunking": {
+                    "strategy": "partition",
+                    "chunk_unit": "steps",
+                    "chunk_size": chunk_size,
+                    "total_units": total_units,
+                    "total_source_bytes": total_bytes,
+                    "recommended_parallel_jobs": max(1, min(64, len(chunk_plan))),
+                },
+                "chunk_plan": chunk_plan,
+                "updated_at": now_ts(),
+            }
+            updated, err = contract_market.upsert_benchmark_meta(
+                contract_id=contract["contract_id"],
+                provider_client_id=provider_client_id,
+                patch={"ingestion": ingestion},
+            )
+            if err:
+                return _provider_contract_error_response(err)
+            contract = updated
+            ingest_info = ingestion
+            source_bound = True
+        else:
+            source_error = "source_path is not accessible on orchestrator host"
+
+    return jsonify(
+        {
+            "sector": sector,
+            "contract": contract,
+            "source_path": source_path or None,
+            "source_bound": source_bound,
+            "source_error": source_error,
+            "ingestion": ingest_info,
+        }
+    ), 200
+
+
 @app.route("/provider/task-classes", methods=["GET"])
 @limiter.limit("60 per minute")
 def provider_task_classes():
@@ -2649,6 +3483,206 @@ def provider_contract_details(contract_id):
         payload["onchain"] = onchain
         return jsonify(payload), 200
     return jsonify({"error": "Forbidden"}), 403
+
+
+@app.route("/provider/contracts/<contract_id>/ingestion", methods=["GET"])
+@limiter.limit("60 per minute")
+def provider_contract_ingestion_details(contract_id):
+    """Текущее состояние ingestion/chunking профиля контракта."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    benchmark_meta = contract.get("benchmark_meta") if isinstance(contract.get("benchmark_meta"), dict) else {}
+    ingestion = benchmark_meta.get("ingestion") if isinstance(benchmark_meta.get("ingestion"), dict) else {}
+    chunk_plan = ingestion.get("chunk_plan") if isinstance(ingestion.get("chunk_plan"), list) else []
+    return jsonify(
+        {
+            "contract_id": contract_id,
+            "status": ingestion.get("status", "not_configured"),
+            "manifest_id": ingestion.get("manifest_id"),
+            "chunking": ingestion.get("chunking"),
+            "dataset_artifacts": ingestion.get("dataset_artifacts", []),
+            "chunk_total": len(chunk_plan),
+            "chunk_preview": chunk_plan[:10],
+        }
+    ), 200
+
+
+@app.route("/provider/contracts/<contract_id>/ingestion/manifest", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_ingestion_manifest(contract_id):
+    """Загрузить/обновить ingestion manifest и рассчитать chunk plan."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    benchmark_meta = contract.get("benchmark_meta") if isinstance(contract.get("benchmark_meta"), dict) else {}
+    default_chunking = benchmark_meta.get("chunking") if isinstance(benchmark_meta.get("chunking"), dict) else {}
+    raw_chunking = data.get("chunking") if isinstance(data.get("chunking"), dict) else {}
+    chunking = dict(default_chunking)
+    chunking.update(raw_chunking)
+    try:
+        total_units_raw = data.get("total_units")
+        total_units = int(total_units_raw) if total_units_raw is not None else 0
+        chunk_size = int(chunking.get("chunk_size", 0) or 0)
+        units_per_mb_raw = data.get("units_per_mb")
+        units_per_mb = int(units_per_mb_raw) if units_per_mb_raw is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "total_units/chunk_size/units_per_mb must be integers"}), 400
+    chunk_unit = str(chunking.get("chunk_unit") or "units").strip() or "units"
+    try:
+        dataset_artifacts = _normalize_ingestion_artifacts(data.get("dataset_artifacts"))
+        if total_units <= 0:
+            total_units, _ = _estimate_total_units_from_artifacts(
+                artifacts=dataset_artifacts,
+                work_units_required=int(contract.get("work_units_required", 1) or 1),
+                units_per_mb=units_per_mb,
+            )
+        if chunk_size <= 0:
+            chunk_size = max(1, int(contract.get("work_units_required", 1) or 1))
+        chunk_plan = _build_chunk_plan(
+            total_units=total_units,
+            chunk_size=chunk_size,
+            chunk_unit=chunk_unit,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    manifest_id = f"ing-{uuid.uuid4().hex[:16]}"
+    ingestion = {
+        "status": "configured",
+        "manifest_id": manifest_id,
+        "dataset_artifacts": dataset_artifacts,
+        "chunking": {
+            "strategy": str(chunking.get("strategy") or "partition"),
+            "chunk_unit": chunk_unit,
+            "chunk_size": chunk_size,
+            "total_units": total_units,
+            "recommended_parallel_jobs": int(chunking.get("recommended_parallel_jobs", 1) or 1),
+        },
+        "chunk_plan": chunk_plan,
+        "updated_at": now_ts(),
+    }
+    updated, err = contract_market.upsert_benchmark_meta(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        patch={"ingestion": ingestion},
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    return jsonify({"contract": updated, "ingestion": ingestion, "chunk_total": len(chunk_plan)}), 200
+
+
+@app.route("/provider/contracts/<contract_id>/ingestion/upload", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_ingestion_upload(contract_id):
+    """
+    Боевой ingest v1:
+    - принимает file/files (multipart/form-data),
+    - сохраняет источники в локальное ingestion-хранилище,
+    - автоматически считает total_units по реальному размеру файлов,
+    - генерирует chunk plan без ручного total_units.
+    """
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    files = request.files.getlist("files")
+    if not files:
+        one = request.files.get("file")
+        if one:
+            files = [one]
+    if not files:
+        return jsonify({"error": "No files uploaded (use multipart field file/files)"}), 400
+    chunk_unit = (request.form.get("chunk_unit") or "rows").strip() or "rows"
+    try:
+        chunk_size_raw = request.form.get("chunk_size")
+        chunk_size = int(chunk_size_raw) if chunk_size_raw is not None else int(contract.get("work_units_required", 1) or 1)
+        units_per_mb_raw = request.form.get("units_per_mb")
+        units_per_mb = int(units_per_mb_raw) if units_per_mb_raw is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "chunk_size/units_per_mb must be integers"}), 400
+    if chunk_size <= 0:
+        return jsonify({"error": "chunk_size must be > 0"}), 400
+    manifest_id, artifacts = _store_uploaded_artifacts(contract_id=contract_id, files=files)
+    total_units, total_bytes = _estimate_total_units_from_artifacts(
+        artifacts=artifacts,
+        work_units_required=int(contract.get("work_units_required", 1) or 1),
+        units_per_mb=units_per_mb,
+    )
+    chunk_plan = _build_chunk_plan(total_units=total_units, chunk_size=chunk_size, chunk_unit=chunk_unit)
+    ingestion = {
+        "status": "configured",
+        "manifest_id": manifest_id,
+        "dataset_artifacts": artifacts,
+        "chunking": {
+            "strategy": "partition",
+            "chunk_unit": chunk_unit,
+            "chunk_size": chunk_size,
+            "total_units": total_units,
+            "total_source_bytes": total_bytes,
+            "recommended_parallel_jobs": max(1, min(64, len(chunk_plan))),
+        },
+        "chunk_plan": chunk_plan,
+        "updated_at": now_ts(),
+    }
+    updated, err = contract_market.upsert_benchmark_meta(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        patch={"ingestion": ingestion},
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    return jsonify({"contract": updated, "ingestion": ingestion, "chunk_total": len(chunk_plan)}), 200
+
+
+@app.route("/provider/contracts/<contract_id>/ingestion/publish", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_ingestion_publish(contract_id):
+    """Опубликовать chunk plan на биржу jobs."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    benchmark_meta = contract.get("benchmark_meta") if isinstance(contract.get("benchmark_meta"), dict) else {}
+    ingestion = benchmark_meta.get("ingestion") if isinstance(benchmark_meta.get("ingestion"), dict) else {}
+    chunk_plan = ingestion.get("chunk_plan") if isinstance(ingestion.get("chunk_plan"), list) else []
+    if not chunk_plan:
+        return jsonify({"error": "Configure ingestion manifest first"}), 409
+    ingestion["status"] = "published"
+    ingestion["published_at"] = now_ts()
+    updated, err = contract_market.upsert_benchmark_meta(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        patch={"ingestion": ingestion},
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    with _contract_chunk_runtime_lock:
+        _contract_chunk_runtime[contract_id] = {
+            "cursor": 0,
+            "completed_chunk_ids": set(),
+            "failed_chunk_ids": set(),
+            "plan_size": len(chunk_plan),
+        }
+    return jsonify({"contract": updated, "ingestion": ingestion, "chunk_total": len(chunk_plan)}), 200
 
 
 @app.route("/provider/contracts/<contract_id>/fund", methods=["POST"])
@@ -2790,6 +3824,112 @@ def provider_contract_refund(contract_id):
     return jsonify({"contract": updated, "refunded_amount": refunded_amount, "wallet": wallet_info}), 200
 
 
+@app.route("/provider/contracts/<contract_id>/results", methods=["GET"])
+@limiter.limit("60 per minute")
+def provider_contract_results(contract_id):
+    """Итоговый манифест результатов контракта для заказчика."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    benchmark_meta = contract.get("benchmark_meta") if isinstance(contract.get("benchmark_meta"), dict) else {}
+    results = benchmark_meta.get("results") if isinstance(benchmark_meta.get("results"), dict) else {}
+    finalized_manifest = results.get("finalized_manifest") if isinstance(results.get("finalized_manifest"), dict) else None
+    live_manifest = _build_contract_results_manifest(contract)
+    return jsonify(
+        {
+            "contract_id": contract_id,
+            "contract_status": contract.get("status"),
+            "finalized": finalized_manifest is not None,
+            "finalized_manifest": finalized_manifest,
+            "live_manifest": live_manifest,
+            "hint": (
+                "Для фиксированного итогового снимка вызовите POST /provider/contracts/<contract_id>/results/finalize."
+                if finalized_manifest is None
+                else "Доступен финализированный снимок и актуальный live-срез."
+            ),
+        }
+    ), 200
+
+
+@app.route("/provider/contracts/<contract_id>/results/finalize", methods=["POST"])
+@limiter.limit("20 per minute")
+def provider_contract_results_finalize(contract_id):
+    """Зафиксировать итоговый снимок артефактов по контракту."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    manifest = _build_contract_results_manifest(contract)
+    manifest_path = _persist_contract_results_manifest(contract_id=contract_id, manifest=manifest)
+    result_meta = {
+        "finalized_at": now_ts(),
+        "manifest_path": manifest_path,
+        "finalized_manifest": manifest,
+    }
+    updated, err = contract_market.upsert_benchmark_meta(
+        contract_id=contract_id,
+        provider_client_id=provider_client_id,
+        patch={"results": result_meta},
+    )
+    if err:
+        return _provider_contract_error_response(err)
+    return jsonify({"contract": updated, "results": result_meta}), 200
+
+
+@app.route("/provider/contracts/<contract_id>/results/download", methods=["GET"])
+@limiter.limit("30 per minute")
+def provider_contract_results_download(contract_id):
+    """Скачать ZIP с итоговым манифестом и доступными локальными артефактами."""
+    provider_client_id = get_client_id_from_auth()
+    if provider_client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    contract = contract_market.get_contract(contract_id)
+    if not contract:
+        return jsonify({"error": "Contract not found"}), 404
+    if contract.get("provider_client_id") != provider_client_id:
+        return jsonify({"error": "Forbidden"}), 403
+    benchmark_meta = contract.get("benchmark_meta") if isinstance(contract.get("benchmark_meta"), dict) else {}
+    results = benchmark_meta.get("results") if isinstance(benchmark_meta.get("results"), dict) else {}
+    manifest = results.get("finalized_manifest") if isinstance(results.get("finalized_manifest"), dict) else None
+    if manifest is None:
+        return jsonify({"error": "Results are not finalized yet"}), 409
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        for item in manifest.get("items", []):
+            if not isinstance(item, dict):
+                continue
+            uri = str(item.get("uri") or "")
+            if not uri.startswith("file://"):
+                continue
+            abs_path = uri[7:]
+            if not os.path.isfile(abs_path):
+                continue
+            safe_name = secure_filename(item.get("name") or os.path.basename(abs_path))
+            if not safe_name:
+                safe_name = os.path.basename(abs_path)
+            try:
+                zf.write(abs_path, arcname=f"artifacts/{safe_name}")
+            except OSError:
+                continue
+    archive.seek(0)
+    return send_file(
+        archive,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{contract_id}-results.zip",
+    )
+
+
 @app.route("/health", methods=["GET"])
 def health():
     """Проверка живости узла (для балансировщика нагрузки и мониторинга)."""
@@ -2815,6 +3955,8 @@ def metrics():
     except Exception as e:
         logger.exception("metrics_error")
         return jsonify({"error": "metrics failed"}), 500
+    with _job_assignments_lock:
+        jobs_rows = [dict(v) for v in _job_assignments.values()]
     body = {
         "chain_length": chain_len,
         "clients_count": num_clients,
@@ -2829,8 +3971,177 @@ def metrics():
         "supported_protocol_versions": SUPPORTED_PROTOCOL_VERSIONS,
         "slo": stage3_slo,
         "governance": governance,
+        "demo_mode": DEMO_MODE,
+        "demo_stats": {
+            "jobs_total": len(jobs_rows),
+            "jobs_in_progress": len(
+                [
+                    1
+                    for row in jobs_rows
+                    if (row.get("status") or "").strip() not in JOB_STATUSES_FINAL
+                ]
+            ),
+            "jobs_final": len(
+                [
+                    1
+                    for row in jobs_rows
+                    if (row.get("status") or "").strip() in JOB_STATUSES_FINAL
+                ]
+            ),
+            "runtime_snapshot": runtime_snapshot(),
+        },
     }
     return jsonify(body), 200
+
+
+@app.route("/demo/claims", methods=["GET"])
+def demo_claims():
+    """Карта ключевых MVP-аргументов: решение -> риск -> proof-point."""
+    return jsonify(
+        {
+            "claims": [
+                {
+                    "id": "trustless_compute",
+                    "title": "Недоверенная вычислительная плоскость",
+                    "risk": "Один исполнитель может прислать некорректный результат",
+                    "solution": "quorum validation + challenge/dispute",
+                    "proof_point": "submit_work -> pending_validation/challenge/dispute",
+                },
+                {
+                    "id": "economic_security",
+                    "title": "Экономические стимулы",
+                    "risk": "Исполнителю выгодно мошенничать без потерь",
+                    "solution": "escrow hold/release/penalty + reputation",
+                    "proof_point": "on-chain tx contract_worker_escrow_* + reputation endpoints",
+                },
+                {
+                    "id": "compliance_gate",
+                    "title": "Контроль рисков фиат-операций",
+                    "risk": "Вывод/конвертация без KYC/AML контуров",
+                    "solution": "compliance gate + provider cases/webhooks",
+                    "proof_point": "market/withdrawals, market/convert, compliance/provider/cases",
+                },
+                {
+                    "id": "auditability",
+                    "title": "Аудируемость",
+                    "risk": "Невозможно доказать ход расчетов и выплат",
+                    "solution": "chain + explorer + event trail",
+                    "proof_point": "Explorer block/address views + on-chain events",
+                },
+            ]
+        }
+    ), 200
+
+
+@app.route("/demo/script", methods=["GET"])
+def demo_script():
+    """Фиксированный сценарий презентации MVP."""
+    return jsonify(
+        {
+            "duration_minutes": 20,
+            "steps": [
+                "1) Login provider/worker в Dashboard",
+                "2) Создать контракт и активировать его",
+                "3) Взять задачу через agent-flow и отправить submit_work",
+                "4) Показать pending_validation или финализацию challenge-window",
+                "5) Открыть challenge/dispute и пройти resolve/finalize",
+                "6) Показать финансы/комплаенс (convert/withdraw + cases/webhooks)",
+                "7) Подтвердить trail в Explorer (block/address/tx)",
+            ],
+        }
+    ), 200
+
+
+@app.route("/demo/seed", methods=["POST"])
+@limiter.limit("5 per minute")
+def demo_seed():
+    """Dev-only инициализация демо-данных (сектор + контракты + демо-аккаунты)."""
+    if not DEMO_MODE:
+        return jsonify({"error": "DEMO_MODE is disabled"}), 403
+    if auth_ensure_user is None:
+        return jsonify({"error": "Auth storage not available"}), 503
+
+    provider, provider_err = auth_ensure_user(
+        "demo_provider",
+        "demo_provider_change_me",
+        nickname="Demo Provider",
+    )
+    if provider_err:
+        return jsonify({"error": provider_err}), 400
+    api_key_to_client[provider["api_key"]] = provider["client_id"]
+    for login in ("demo_worker_1", "demo_worker_2", "demo_validator_1"):
+        user, err = auth_ensure_user(login, f"{login}_change_me", nickname=login)
+        if err:
+            return jsonify({"error": err}), 400
+        api_key_to_client[user["api_key"]] = user["client_id"]
+    sector = None
+    sectors = contract_market.list_owner_sectors(provider["client_id"])
+    for row in sectors:
+        if row.get("sector_name") == "Demo Compute":
+            sector = row
+            break
+    if not sector:
+        sector = contract_market.create_sector(
+            owner_client_id=provider["client_id"],
+            sector_name="Demo Compute",
+            organization_name="Demo Org",
+            compute_domain="hybrid-compute",
+            description="Demo sector for MVP walkthrough",
+        )
+    existing = contract_market.list_provider_contracts(provider["client_id"], sector_id=sector["sector_id"])
+    if not existing:
+        preset_ids = [
+            "scientific_simulation_climate",
+            "biomedical_protein_modeling",
+            "ai_llm_inference_batch",
+            "data_analytics_risk",
+        ]
+        for preset_id in preset_ids:
+            preset = get_workload_preset(preset_id) or {}
+            benchmark_meta = preset.get("benchmark_meta") if isinstance(preset.get("benchmark_meta"), dict) else {}
+            task_class = str(preset.get("task_class") or "scientific_simulation")
+            if task_class == "data_analytics":
+                validation_policy = {"mode": "replicated", "replication_factor": 2, "quorum_threshold": 2}
+            else:
+                validation_policy = {
+                    "mode": "challengeable",
+                    "replication_factor": 2,
+                    "quorum_threshold": 2,
+                    "challenge_window_seconds": 900,
+                }
+            benchmark_meta["decentralized_policy"] = {
+                "task_class": task_class,
+                "task_class_source": "demo_seed",
+                "validation_style": "artifact_and_metric_validation",
+                "validation_policy": validation_policy,
+                "escrow_policy": {"enabled": True, "worker_collateral": 5, "penalty_percent_on_reject": 20},
+            }
+            benchmark_meta["workload_preset_id"] = preset_id
+            contract_market.create_contract(
+                provider_client_id=provider["client_id"],
+                sector_id=sector["sector_id"],
+                task_name=f"Demo {preset.get('title', preset_id)}",
+                task_description=f"Applied workload preset: {preset_id}",
+                task_category=str(preset.get("task_category") or "MVP"),
+                computation_type=str(preset.get("recommended_computation_type") or "simple_pow"),
+                work_units_required=1000,
+                reward_per_task=12,
+                target_total_work_units=8000,
+                difficulty=2,
+                initial_budget_tokens=3000,
+                budget_currency=MARKET_DEFAULT_CURRENCY,
+                benchmark_meta=benchmark_meta,
+                status=STATUS_ACTIVE,
+            )
+
+    return jsonify(
+        {
+            "ok": True,
+            "provider": {"login": provider["login"], "client_id": provider["client_id"], "api_key": provider["api_key"]},
+            "sector": sector,
+            "contracts": contract_market.list_provider_contracts(provider["client_id"], sector_id=sector["sector_id"]),
+        }
+    ), 200
 
 @app.route("/chain", methods=["GET"])
 @limiter.limit("120 per minute")  # Публичный read-only; лимит от DDoS

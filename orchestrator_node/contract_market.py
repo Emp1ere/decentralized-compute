@@ -450,6 +450,33 @@ class ContractMarket:
                 return reservation, None
         return None, "Contract not found"
 
+    def upsert_benchmark_meta(self, *, contract_id, provider_client_id, patch):
+        if not isinstance(patch, dict):
+            return None, "benchmark_meta patch must be object"
+        with _lock:
+            state = _load_state()
+            for c in state["contracts"]:
+                if c.get("contract_id") != contract_id:
+                    continue
+                if c.get("provider_client_id") != provider_client_id:
+                    return None, "Forbidden"
+                sector = next((s for s in state["sectors"] if s.get("sector_id") == c.get("sector_id")), None)
+                if not sector or sector.get("owner_client_id") != provider_client_id:
+                    return None, "Forbidden"
+                current_meta = c.get("benchmark_meta")
+                if not isinstance(current_meta, dict):
+                    current_meta = {}
+                next_meta = copy.deepcopy(current_meta)
+                for key, value in patch.items():
+                    next_meta[key] = copy.deepcopy(value)
+                c["benchmark_meta"] = next_meta
+                c["updated_at"] = _now()
+                _save_state(state)
+                out = _enrich_contract(c)
+                out["sector_name"] = sector.get("sector_name", "")
+                return out, None
+        return None, "Contract not found"
+
     def rollback_submission(self, *, contract_id, reservation):
         if not reservation:
             return

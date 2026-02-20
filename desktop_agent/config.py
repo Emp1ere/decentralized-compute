@@ -58,7 +58,6 @@ def read_settings():
         return {}
     encrypted = data.pop("api_key_encrypted", "")
     data["api_key"] = decrypt_api_key(encrypted)
-    data.pop("api_key", None)
     return data
 
 

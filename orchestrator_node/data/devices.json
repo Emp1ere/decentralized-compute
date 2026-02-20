@@ -1,0 +1,61 @@
+{
+  "devices": [
+    {
+      "device_id": "dev-1771441482",
+      "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+      "device_name": "Desktop agent",
+      "agent_version": "0.3.0",
+      "created_at": 1771535273,
+      "last_seen_at": 1771535358,
+      "is_disabled": false,
+      "capabilities": {
+        "cpu_cores": 8,
+        "ram_gb": 0.0,
+        "has_gpu": false,
+        "supported_engines": [
+          "python_cli",
+          "python_compute"
+        ],
+        "os": "windows"
+      }
+    },
+    {
+      "device_id": "emp1re-dex",
+      "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+      "device_name": "Desktop agent",
+      "agent_version": "0.3.0",
+      "created_at": 1771536635,
+      "last_seen_at": 1771536845,
+      "is_disabled": false,
+      "capabilities": {
+        "cpu_cores": 8,
+        "ram_gb": 0.0,
+        "has_gpu": false,
+        "supported_engines": [
+          "python_cli",
+          "python_compute"
+        ],
+        "os": "windows"
+      }
+    },
+    {
+      "device_id": "hesh1k-dev",
+      "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+      "device_name": "Desktop agent1",
+      "agent_version": "0.3.0",
+      "created_at": 1771536686,
+      "last_seen_at": 1771537126,
+      "is_disabled": false,
+      "capabilities": {
+        "cpu_cores": 8,
+        "ram_gb": 0.0,
+        "has_gpu": false,
+        "supported_engines": [
+          "python_cli",
+          "python_compute"
+        ],
+        "os": "windows"
+      }
+    }
+  ]
+}

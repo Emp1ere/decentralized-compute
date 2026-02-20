@@ -31,8 +31,10 @@ CONTRACT_STATUSES = {"draft", "active", "paused", "closed"}
 
 ONCHAIN_ECONOMIC_TX_TYPES = {
     "fx_rules_update",
+    "fx_oracle_commit",
     "fx_oracle_submit",
     "fx_oracle_penalty",
+    "fx_epoch_finalized",
     "fiat_topup",
     "fiat_conversion",
     "fiat_withdrawal_request",
@@ -155,6 +157,17 @@ def is_valid_onchain_economic_tx(tx: dict) -> bool:
             and bool(tx.get("signature"))
         )
 
+    if tx_type == "fx_oracle_commit":
+        commit_hash = (tx.get("commit_hash") or "").strip().lower()
+        return (
+            isinstance(tx.get("oracle_id"), str)
+            and bool(tx.get("oracle_id"))
+            and isinstance(tx.get("epoch_id"), str)
+            and bool(tx.get("epoch_id"))
+            and len(commit_hash) == 64
+            and all(ch in "0123456789abcdef" for ch in commit_hash)
+        )
+
     if tx_type == "fx_oracle_penalty":
         return (
             isinstance(tx.get("oracle_id"), str)
@@ -164,6 +177,23 @@ def is_valid_onchain_economic_tx(tx: dict) -> bool:
             and _positive_int(tx.get("penalty_points")) is not None
             and isinstance(tx.get("reason"), str)
             and bool(tx.get("reason"))
+        )
+
+    if tx_type == "fx_epoch_finalized":
+        rates = tx.get("rates_to_rub")
+        if not isinstance(rates, dict):
+            return False
+        for c in SUPPORTED_BUDGET_CURRENCIES:
+            if c not in rates:
+                return False
+            if _non_negative_float(rates.get(c)) is None or float(rates.get(c)) <= 0:
+                return False
+        return (
+            isinstance(tx.get("epoch_id"), str)
+            and bool(tx.get("epoch_id"))
+            and _non_negative_float(tx.get("confidence", 0)) is not None
+            and _non_negative_float(tx.get("volatility_score", 0)) is not None
+            and _non_negative_float(tx.get("spread_percent", 0)) is not None
         )
 
     if tx_type == "fiat_topup":

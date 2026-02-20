@@ -681,6 +681,380 @@
       "is_archived": false,
       "created_at": 1771455227,
       "updated_at": 1771455227
+    },
+    {
+      "sector_id": "sec-f3d458b07f80",
+      "owner_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+      "sector_name": "Model_1",
+      "organization_name": "АО \"Делаем\"",
+      "compute_domain": "Биомедицина",
+      "description": "benchPEP-h 12 M atoms, peptides in water, 2 fs time step, h-bonds constrained",
+      "is_archived": false,
+      "created_at": 1771530947,
+      "updated_at": 1771530947
+    },
+    {
+      "sector_id": "sec-72f85a50d4f3",
+      "owner_client_id": "8cb4e432-3e06-459c-8bbb-fcedc3d15697",
+      "sector_name": "MD policy sector",
+      "organization_name": "Policy org",
+      "compute_domain": "molecular_dynamics",
+      "description": "Capabilities matching test",
+      "is_archived": false,
+      "created_at": 1771540707,
+      "updated_at": 1771540707
+    },
+    {
+      "sector_id": "sec-2cb43acb84ed",
+      "owner_client_id": "75c5cccf-367b-48fb-b15b-a637204b7948",
+      "sector_name": "Astro BOINC sector",
+      "organization_name": "Test institute",
+      "compute_domain": "astrophysics",
+      "description": "Integration test sector",
+      "is_archived": false,
+      "created_at": 1771540708,
+      "updated_at": 1771540708
+    },
+    {
+      "sector_id": "sec-549a6bda12bb",
+      "owner_client_id": "27af8026-64f5-4496-a580-1177b3a9bcb1",
+      "sector_name": "Bio sector",
+      "organization_name": "Bio lab",
+      "compute_domain": "protein",
+      "description": "Auto task-class test",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-9554f8a20dba",
+      "owner_client_id": "e368db21-dcbd-4be7-ba3b-acf9973fdf74",
+      "sector_name": "Ingestion sector",
+      "organization_name": "Ingestion lab",
+      "compute_domain": "data",
+      "description": "Ingestion flow test",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-ca9232627e1e",
+      "owner_client_id": "eef7f860-c003-477a-8eda-e19ba98b0215",
+      "sector_name": "Upload ingestion sector",
+      "organization_name": "Upload lab",
+      "compute_domain": "biomed",
+      "description": "Upload flow test",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-2c6fe5d97134",
+      "owner_client_id": "f19630cd-c6a3-4fee-8324-19fca2ec3ad7",
+      "sector_name": "Model_1",
+      "organization_name": "Model_1 Lab",
+      "compute_domain": "biomedical_modeling",
+      "description": "Applied compute sector for benchPEP workloads",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-8eb6dbd13c8c",
+      "owner_client_id": "1ac8fc7c-ede6-4063-960c-7b8b426b430d",
+      "sector_name": "Replicated sector",
+      "organization_name": "Replication lab",
+      "compute_domain": "verification",
+      "description": "Quorum flow test",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-263fb2c1a111",
+      "owner_client_id": "82f6818b-6250-4dac-bcc5-5828e14f1b55",
+      "sector_name": "M-of-N sector",
+      "organization_name": "Quorum lab",
+      "compute_domain": "validation",
+      "description": "M-of-N early quorum",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-88fbba7fc479",
+      "owner_client_id": "e116e7e5-fb3b-4579-9dba-4395fb436d86",
+      "sector_name": "Replay sector",
+      "organization_name": "Replay lab",
+      "compute_domain": "validation",
+      "description": "Replay guard test",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-37c6617fc182",
+      "owner_client_id": "856d13da-d3fd-4ad4-a87a-63d15637bfa7",
+      "sector_name": "Challenge sector",
+      "organization_name": "Dispute lab",
+      "compute_domain": "challenge",
+      "description": "Challenge + escrow lifecycle",
+      "is_archived": false,
+      "created_at": 1771540709,
+      "updated_at": 1771540709
+    },
+    {
+      "sector_id": "sec-c66333513f5b",
+      "owner_client_id": "1cd00f1e-a9b9-40e8-83b6-24362ddfd5da",
+      "sector_name": "Validator sector",
+      "organization_name": "Validation lab",
+      "compute_domain": "validation",
+      "description": "Validator verdict path",
+      "is_archived": false,
+      "created_at": 1771540710,
+      "updated_at": 1771540710
+    },
+    {
+      "sector_id": "sec-85c1275328a8",
+      "owner_client_id": "4ed90cf3-6393-408a-8469-c77dda4dbebd",
+      "sector_name": "Finance sector",
+      "organization_name": "Market Lab",
+      "compute_domain": "market",
+      "description": "USD payout integration",
+      "is_archived": false,
+      "created_at": 1771540710,
+      "updated_at": 1771540710
+    },
+    {
+      "sector_id": "sec-e54264390287",
+      "owner_client_id": "ec834acf-cb6c-4016-88b7-5760e01b447f",
+      "sector_name": "Research sector",
+      "organization_name": "Lab",
+      "compute_domain": "simulation",
+      "description": "For contract grouping",
+      "is_archived": false,
+      "created_at": 1771540710,
+      "updated_at": 1771540710
+    },
+    {
+      "sector_id": "sec-1c6de6b949c3",
+      "owner_client_id": "62c24ff5-673c-474c-9a9e-372f453ca04f",
+      "sector_name": "Owner-only sector",
+      "organization_name": "Owner org",
+      "compute_domain": "restricted",
+      "description": "Only sector creator can create contracts here",
+      "is_archived": false,
+      "created_at": 1771540710,
+      "updated_at": 1771540710
+    },
+    {
+      "sector_id": "sec-0755c2c915b3",
+      "owner_client_id": "a83f6a6f-080c-49e6-a3a1-43bbf497b8bd",
+      "sector_name": "Private owner sector",
+      "organization_name": "Owner org",
+      "compute_domain": "private",
+      "description": "Should not be listed by foreign account",
+      "is_archived": false,
+      "created_at": 1771540710,
+      "updated_at": 1771540710
+    },
+    {
+      "sector_id": "sec-81badb8900d9",
+      "owner_client_id": "59566b7b-521a-4bc9-a56b-74cd8cdaa639",
+      "sector_name": "Results sector",
+      "organization_name": "Results lab",
+      "compute_domain": "data",
+      "description": "Final results flow test",
+      "is_archived": false,
+      "created_at": 1771544285,
+      "updated_at": 1771544285
+    },
+    {
+      "sector_id": "sec-3dab6458c996",
+      "owner_client_id": "a5d945d9-aed8-479c-97b3-1721548e7341",
+      "sector_name": "Results sector",
+      "organization_name": "Results lab",
+      "compute_domain": "data",
+      "description": "Final results flow test",
+      "is_archived": false,
+      "created_at": 1771544334,
+      "updated_at": 1771544334
+    },
+    {
+      "sector_id": "sec-52e9a8247429",
+      "owner_client_id": "8c4cfd84-ca5f-444c-a8c4-a5884dea1f21",
+      "sector_name": "MD policy sector",
+      "organization_name": "Policy org",
+      "compute_domain": "molecular_dynamics",
+      "description": "Capabilities matching test",
+      "is_archived": false,
+      "created_at": 1771544365,
+      "updated_at": 1771544365
+    },
+    {
+      "sector_id": "sec-a0e51f26fa5b",
+      "owner_client_id": "712322ac-7931-4807-a1bb-5b3419bc341f",
+      "sector_name": "Astro BOINC sector",
+      "organization_name": "Test institute",
+      "compute_domain": "astrophysics",
+      "description": "Integration test sector",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-ccf9a7b624d5",
+      "owner_client_id": "2cb91afa-5ffe-449b-a894-18a32aa78ce9",
+      "sector_name": "Results sector",
+      "organization_name": "Results lab",
+      "compute_domain": "data",
+      "description": "Final results flow test",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-eaeb385dd8af",
+      "owner_client_id": "5c6581f3-aca3-4595-93a0-1c260489536a",
+      "sector_name": "Bio sector",
+      "organization_name": "Bio lab",
+      "compute_domain": "protein",
+      "description": "Auto task-class test",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-85f472a57fb7",
+      "owner_client_id": "f71bd07b-00a5-4931-8c1a-3bd06cb29b89",
+      "sector_name": "Ingestion sector",
+      "organization_name": "Ingestion lab",
+      "compute_domain": "data",
+      "description": "Ingestion flow test",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-3ff2f75220cd",
+      "owner_client_id": "e3b9ab0e-2881-405c-8ddc-6f055ad542f2",
+      "sector_name": "Upload ingestion sector",
+      "organization_name": "Upload lab",
+      "compute_domain": "biomed",
+      "description": "Upload flow test",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-d030d9dcdd56",
+      "owner_client_id": "60d2ab52-0beb-43b9-b2e9-c805d944a597",
+      "sector_name": "Model_1",
+      "organization_name": "Model_1 Lab",
+      "compute_domain": "biomedical_modeling",
+      "description": "Applied compute sector for benchPEP workloads",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-a04a40ca86f0",
+      "owner_client_id": "366642e6-7bca-4de4-8596-888f01f8e791",
+      "sector_name": "Replicated sector",
+      "organization_name": "Replication lab",
+      "compute_domain": "verification",
+      "description": "Quorum flow test",
+      "is_archived": false,
+      "created_at": 1771544378,
+      "updated_at": 1771544378
+    },
+    {
+      "sector_id": "sec-7d0e72f41248",
+      "owner_client_id": "247f76ab-8033-4fb2-9c20-9f48887e2510",
+      "sector_name": "M-of-N sector",
+      "organization_name": "Quorum lab",
+      "compute_domain": "validation",
+      "description": "M-of-N early quorum",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-edf3f16e6c70",
+      "owner_client_id": "7a281801-caed-4292-ae7d-ae5f56195bb8",
+      "sector_name": "Replay sector",
+      "organization_name": "Replay lab",
+      "compute_domain": "validation",
+      "description": "Replay guard test",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-db2fc2b9002e",
+      "owner_client_id": "52f0b70f-6026-474a-9d91-9f88b2e6e472",
+      "sector_name": "Challenge sector",
+      "organization_name": "Dispute lab",
+      "compute_domain": "challenge",
+      "description": "Challenge + escrow lifecycle",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-f13cd9e4c4ca",
+      "owner_client_id": "d4e1509e-8202-49ba-8e23-b3c423785433",
+      "sector_name": "Validator sector",
+      "organization_name": "Validation lab",
+      "compute_domain": "validation",
+      "description": "Validator verdict path",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-14339e417116",
+      "owner_client_id": "77b48eb9-a693-49b9-85c3-395708d54434",
+      "sector_name": "Finance sector",
+      "organization_name": "Market Lab",
+      "compute_domain": "market",
+      "description": "USD payout integration",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-24b4158dd050",
+      "owner_client_id": "3f4fed64-6501-4d99-9397-1eaffdb0e411",
+      "sector_name": "Research sector",
+      "organization_name": "Lab",
+      "compute_domain": "simulation",
+      "description": "For contract grouping",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-fd1e51691c74",
+      "owner_client_id": "1a3a2c20-9225-4200-9f82-9ac91032681e",
+      "sector_name": "Owner-only sector",
+      "organization_name": "Owner org",
+      "compute_domain": "restricted",
+      "description": "Only sector creator can create contracts here",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
+    },
+    {
+      "sector_id": "sec-874a3b074958",
+      "owner_client_id": "28da7ed2-f212-4dc7-9cc4-1b60286dbe34",
+      "sector_name": "Private owner sector",
+      "organization_name": "Owner org",
+      "compute_domain": "private",
+      "description": "Should not be listed by foreign account",
+      "is_archived": false,
+      "created_at": 1771544379,
+      "updated_at": 1771544379
     }
   ],
   "contracts": [
@@ -696,14 +1070,14 @@
       "budget_currency": "RUB",
       "target_total_work_units": 1000,
       "difficulty": 1,
-      "status": "active",
+      "status": "closed",
       "budget_tokens_total": 20,
-      "budget_tokens_spent": 14,
+      "budget_tokens_spent": 20,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 700,
-      "jobs_completed": 7,
+      "completed_work_units": 1000,
+      "jobs_completed": 10,
       "created_at": 1771101828,
-      "updated_at": 1771455226,
+      "updated_at": 1771544378,
       "sector_id": "sec-d56b154e8703"
     },
     {
@@ -897,12 +1271,12 @@
       "difficulty": 4,
       "status": "active",
       "budget_tokens_total": 12000,
-      "budget_tokens_spent": 0,
+      "budget_tokens_spent": 120,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 0,
-      "jobs_completed": 0,
+      "completed_work_units": 12000,
+      "jobs_completed": 1,
       "created_at": 1771342800,
-      "updated_at": 1771342800,
+      "updated_at": 1771537032,
       "benchmark_meta": {
         "benchmark_name": "benchPEP",
         "input_format": "gromacs_tpr",
@@ -1841,14 +2215,14 @@
       "budget_currency": "USD",
       "target_total_work_units": 300,
       "difficulty": 2,
-      "status": "active",
+      "status": "closed",
       "budget_tokens_total": 10,
-      "budget_tokens_spent": 5,
+      "budget_tokens_spent": 10,
       "budget_tokens_refunded": 0,
-      "completed_work_units": 150,
-      "jobs_completed": 1,
+      "completed_work_units": 300,
+      "jobs_completed": 2,
       "created_at": 1771455114,
-      "updated_at": 1771455114,
+      "updated_at": 1771544365,
       "benchmark_meta": {
         "decentralized_policy": {
           "task_class": "deterministic_baseline",
@@ -2219,6 +2593,1877 @@
       "jobs_completed": 1,
       "created_at": 1771455227,
       "updated_at": 1771455227,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-696322e634b8",
+      "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+      "sector_id": "sec-f3d458b07f80",
+      "task_name": "Peptides",
+      "task_description": "12 M atoms, peptides in water, 2 fs time step, h-bonds constrained",
+      "task_category": "Пользовательская",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 1000,
+      "reward_per_task": 1000,
+      "budget_currency": "RUB",
+      "target_total_work_units": 10000,
+      "difficulty": 3,
+      "status": "closed",
+      "budget_tokens_total": 30000,
+      "budget_tokens_spent": 10000,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 10000,
+      "jobs_completed": 10,
+      "created_at": 1771532316,
+      "updated_at": 1771537556,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        },
+        "ingestion": {
+          "status": "published",
+          "manifest_id": "ing-16bbf9cfee2a453c",
+          "dataset_artifacts": [
+            {
+              "name": "benchPEP.tpr",
+              "uri": "file:///app/data/ingestion/usr-696322e634b8/ing-16bbf9cfee2a453c/benchPEP.tpr",
+              "sha256": "b97f14e8911ee89fe69f135e0f0d87b46c34d1762d77e5b9c3f0e68990afdce7",
+              "size_bytes": 306702880
+            }
+          ],
+          "chunking": {
+            "strategy": "partition",
+            "chunk_unit": "rows",
+            "chunk_size": 10000,
+            "total_units": 293000,
+            "total_source_bytes": 306702880,
+            "recommended_parallel_jobs": 30
+          },
+          "chunk_plan": [
+            {
+              "chunk_id": "chunk-0001",
+              "index": 1,
+              "range_start": 0,
+              "range_end": 10000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0002",
+              "index": 2,
+              "range_start": 10000,
+              "range_end": 20000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0003",
+              "index": 3,
+              "range_start": 20000,
+              "range_end": 30000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0004",
+              "index": 4,
+              "range_start": 30000,
+              "range_end": 40000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0005",
+              "index": 5,
+              "range_start": 40000,
+              "range_end": 50000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0006",
+              "index": 6,
+              "range_start": 50000,
+              "range_end": 60000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0007",
+              "index": 7,
+              "range_start": 60000,
+              "range_end": 70000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0008",
+              "index": 8,
+              "range_start": 70000,
+              "range_end": 80000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0009",
+              "index": 9,
+              "range_start": 80000,
+              "range_end": 90000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0010",
+              "index": 10,
+              "range_start": 90000,
+              "range_end": 100000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0011",
+              "index": 11,
+              "range_start": 100000,
+              "range_end": 110000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0012",
+              "index": 12,
+              "range_start": 110000,
+              "range_end": 120000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0013",
+              "index": 13,
+              "range_start": 120000,
+              "range_end": 130000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0014",
+              "index": 14,
+              "range_start": 130000,
+              "range_end": 140000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0015",
+              "index": 15,
+              "range_start": 140000,
+              "range_end": 150000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0016",
+              "index": 16,
+              "range_start": 150000,
+              "range_end": 160000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0017",
+              "index": 17,
+              "range_start": 160000,
+              "range_end": 170000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0018",
+              "index": 18,
+              "range_start": 170000,
+              "range_end": 180000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0019",
+              "index": 19,
+              "range_start": 180000,
+              "range_end": 190000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0020",
+              "index": 20,
+              "range_start": 190000,
+              "range_end": 200000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0021",
+              "index": 21,
+              "range_start": 200000,
+              "range_end": 210000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0022",
+              "index": 22,
+              "range_start": 210000,
+              "range_end": 220000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0023",
+              "index": 23,
+              "range_start": 220000,
+              "range_end": 230000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0024",
+              "index": 24,
+              "range_start": 230000,
+              "range_end": 240000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0025",
+              "index": 25,
+              "range_start": 240000,
+              "range_end": 250000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0026",
+              "index": 26,
+              "range_start": 250000,
+              "range_end": 260000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0027",
+              "index": 27,
+              "range_start": 260000,
+              "range_end": 270000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0028",
+              "index": 28,
+              "range_start": 270000,
+              "range_end": 280000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0029",
+              "index": 29,
+              "range_start": 280000,
+              "range_end": 290000,
+              "units": 10000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0030",
+              "index": 30,
+              "range_start": 290000,
+              "range_end": 293000,
+              "units": 3000,
+              "chunk_unit": "rows"
+            }
+          ],
+          "updated_at": 1771533233,
+          "published_at": 1771533295
+        }
+      }
+    },
+    {
+      "contract_id": "usr-d90c53dd588e",
+      "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+      "sector_id": "sec-f3d458b07f80",
+      "task_name": "benchPEP molecular workload",
+      "task_description": "benchPEP-based biomedical simulation contract",
+      "task_category": "Biomedical Modeling",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 1000,
+      "reward_per_task": 12,
+      "budget_currency": "RUB",
+      "target_total_work_units": 20000,
+      "difficulty": 2,
+      "status": "draft",
+      "budget_tokens_total": 0,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771532342,
+      "updated_at": 1771532342,
+      "benchmark_meta": {
+        "domain": "protein_structure",
+        "input_artifacts": [
+          {
+            "name": "sequence_or_seed",
+            "formats": [
+              "fasta",
+              "pdb",
+              "json"
+            ]
+          },
+          {
+            "name": "constraints",
+            "formats": [
+              "json",
+              "yaml"
+            ]
+          }
+        ],
+        "output_artifacts_spec": [
+          {
+            "name": "predicted_structure",
+            "formats": [
+              "pdb",
+              "cif"
+            ],
+            "required": true
+          },
+          {
+            "name": "confidence_report",
+            "formats": [
+              "json"
+            ],
+            "required": true
+          }
+        ],
+        "chunking": {
+          "strategy": "candidate_batch",
+          "chunk_unit": "candidates",
+          "chunk_size": 32,
+          "recommended_parallel_jobs": 4
+        },
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 24,
+          "require_gpu": true
+        },
+        "workload_preset_id": "biomedical_protein_modeling",
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "bootstrap_model1",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 3600
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-64fec68d9436",
+      "provider_client_id": "8cb4e432-3e06-459c-8bbb-fcedc3d15697",
+      "sector_id": "sec-72f85a50d4f3",
+      "task_name": "Capability-gated benchmark",
+      "task_description": "Should require higher capabilities",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 500,
+      "reward_per_task": 5,
+      "budget_currency": "RUB",
+      "target_total_work_units": 5000,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540707,
+      "updated_at": 1771540707,
+      "benchmark_meta": {
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 16,
+          "require_gpu": true
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-730f3be0494f",
+      "provider_client_id": "75c5cccf-367b-48fb-b15b-a637204b7948",
+      "sector_id": "sec-2cb43acb84ed",
+      "task_name": "Provider PoW demo",
+      "task_description": "User-defined contract for integration test",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 200,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "closed",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 6,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 400,
+      "jobs_completed": 2,
+      "created_at": 1771540708,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "input_format": "none",
+        "runner": {
+          "command_template": "python --version",
+          "engine": "python_cli"
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-54cc1ec7624a",
+      "provider_client_id": "27af8026-64f5-4496-a580-1177b3a9bcb1",
+      "sector_id": "sec-549a6bda12bb",
+      "task_name": "Protein structure fold",
+      "task_description": "3D protein structure search",
+      "task_category": "biomed",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 120,
+      "reward_per_task": 4,
+      "budget_currency": "USD",
+      "target_total_work_units": 240,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 8,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-4256973b5e04",
+      "provider_client_id": "e368db21-dcbd-4be7-ba3b-acf9973fdf74",
+      "sector_id": "sec-9554f8a20dba",
+      "task_name": "Ingestion contract",
+      "task_description": "Chunked data processing",
+      "task_category": "Data",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 8,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        },
+        "ingestion": {
+          "status": "published",
+          "manifest_id": "ing-2dddc8ec5ed446c2",
+          "dataset_artifacts": [
+            {
+              "name": "dataset.parquet",
+              "uri": "s3://demo/dataset.parquet",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size_bytes": 1024
+            }
+          ],
+          "chunking": {
+            "strategy": "partition",
+            "chunk_unit": "rows",
+            "chunk_size": 5000,
+            "total_units": 25000,
+            "recommended_parallel_jobs": 1
+          },
+          "chunk_plan": [
+            {
+              "chunk_id": "chunk-0001",
+              "index": 1,
+              "range_start": 0,
+              "range_end": 5000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0002",
+              "index": 2,
+              "range_start": 5000,
+              "range_end": 10000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0003",
+              "index": 3,
+              "range_start": 10000,
+              "range_end": 15000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0004",
+              "index": 4,
+              "range_start": 15000,
+              "range_end": 20000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0005",
+              "index": 5,
+              "range_start": 20000,
+              "range_end": 25000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            }
+          ],
+          "updated_at": 1771540709,
+          "published_at": 1771540709
+        }
+      }
+    },
+    {
+      "contract_id": "usr-608bf9d7c355",
+      "provider_client_id": "eef7f860-c003-477a-8eda-e19ba98b0215",
+      "sector_id": "sec-ca9232627e1e",
+      "task_name": "Upload benchPEP",
+      "task_description": "Upload and auto chunk",
+      "task_category": "Biomedical Modeling",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 1000,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 4000,
+      "difficulty": 2,
+      "status": "draft",
+      "budget_tokens_total": 0,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        },
+        "ingestion": {
+          "status": "configured",
+          "manifest_id": "ing-2d3a1db0f6b5457d",
+          "dataset_artifacts": [
+            {
+              "name": "benchPEP.tpr",
+              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-608bf9d7c355\\ing-2d3a1db0f6b5457d\\benchPEP.tpr",
+              "sha256": "e98f77b3ddba82ef801e849e9a1a80b6f0ed13513fd26f65d35a94d05c1456c3",
+              "size_bytes": 23
+            }
+          ],
+          "chunking": {
+            "strategy": "partition",
+            "chunk_unit": "rows",
+            "chunk_size": 500,
+            "total_units": 1000,
+            "total_source_bytes": 23,
+            "recommended_parallel_jobs": 2
+          },
+          "chunk_plan": [
+            {
+              "chunk_id": "chunk-0001",
+              "index": 1,
+              "range_start": 0,
+              "range_end": 500,
+              "units": 500,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0002",
+              "index": 2,
+              "range_start": 500,
+              "range_end": 1000,
+              "units": 500,
+              "chunk_unit": "rows"
+            }
+          ],
+          "updated_at": 1771540709
+        }
+      }
+    },
+    {
+      "contract_id": "usr-a55a02ab6070",
+      "provider_client_id": "f19630cd-c6a3-4fee-8324-19fca2ec3ad7",
+      "sector_id": "sec-2c6fe5d97134",
+      "task_name": "benchPEP molecular workload",
+      "task_description": "benchPEP-based biomedical simulation contract",
+      "task_category": "Biomedical Modeling",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 1000,
+      "reward_per_task": 12,
+      "budget_currency": "RUB",
+      "target_total_work_units": 20000,
+      "difficulty": 2,
+      "status": "draft",
+      "budget_tokens_total": 0,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "domain": "protein_structure",
+        "input_artifacts": [
+          {
+            "name": "sequence_or_seed",
+            "formats": [
+              "fasta",
+              "pdb",
+              "json"
+            ]
+          },
+          {
+            "name": "constraints",
+            "formats": [
+              "json",
+              "yaml"
+            ]
+          }
+        ],
+        "output_artifacts_spec": [
+          {
+            "name": "predicted_structure",
+            "formats": [
+              "pdb",
+              "cif"
+            ],
+            "required": true
+          },
+          {
+            "name": "confidence_report",
+            "formats": [
+              "json"
+            ],
+            "required": true
+          }
+        ],
+        "chunking": {
+          "strategy": "candidate_batch",
+          "chunk_unit": "candidates",
+          "chunk_size": 32,
+          "recommended_parallel_jobs": 4
+        },
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 24,
+          "require_gpu": true
+        },
+        "workload_preset_id": "biomedical_protein_modeling",
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "bootstrap_model1",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 3600
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-513332789c73",
+      "provider_client_id": "1ac8fc7c-ede6-4063-960c-7b8b426b430d",
+      "sector_id": "sec-8eb6dbd13c8c",
+      "task_name": "Replicated PoW",
+      "task_description": "Needs 2 replicated submissions",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-6a067ffebce1",
+      "provider_client_id": "82f6818b-6250-4dac-bcc5-5828e14f1b55",
+      "sector_id": "sec-263fb2c1a111",
+      "task_name": "M of N PoW",
+      "task_description": "3 replicas, threshold 2",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 3,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-06d411487588",
+      "provider_client_id": "e116e7e5-fb3b-4579-9dba-4395fb436d86",
+      "sector_id": "sec-88fbba7fc479",
+      "task_name": "Replay replicated PoW",
+      "task_description": "Replay guard should trigger on same attempt",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 200,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540709,
+      "updated_at": 1771540709,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-cf3131974016",
+      "provider_client_id": "856d13da-d3fd-4ad4-a87a-63d15637bfa7",
+      "sector_id": "sec-37c6617fc182",
+      "task_name": "Challengeable PoW",
+      "task_description": "Escrow should remain locked during challenge window",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 4,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 4,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771540709,
+      "updated_at": 1771540710,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 300
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 2,
+            "penalty_percent_on_reject": 50
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-b78d47bdf5b0",
+      "provider_client_id": "1cd00f1e-a9b9-40e8-83b6-24362ddfd5da",
+      "sector_id": "sec-c66333513f5b",
+      "task_name": "Validator PoW",
+      "task_description": "Need replication group for verdict",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771540710,
+      "updated_at": 1771540710,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-9ba87f314209",
+      "provider_client_id": "4ed90cf3-6393-408a-8469-c77dda4dbebd",
+      "sector_id": "sec-85c1275328a8",
+      "task_name": "USD contract",
+      "task_description": "Market economy test",
+      "task_category": "Finance",
+      "computation_type": "simple_pow",
+      "work_units_required": 150,
+      "reward_per_task": 5,
+      "budget_currency": "USD",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 5,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 150,
+      "jobs_completed": 1,
+      "created_at": 1771540710,
+      "updated_at": 1771540710,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-90d3c03ffccb",
+      "provider_client_id": "59566b7b-521a-4bc9-a56b-74cd8cdaa639",
+      "sector_id": "sec-81badb8900d9",
+      "task_name": "Results PoW demo",
+      "task_description": "Collect output artifacts into final snapshot",
+      "task_category": "Data",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 200,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 2,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771544285,
+      "updated_at": 1771544286,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-8558ae680196",
+      "provider_client_id": "a5d945d9-aed8-479c-97b3-1721548e7341",
+      "sector_id": "sec-3dab6458c996",
+      "task_name": "Results PoW demo",
+      "task_description": "Collect output artifacts into final snapshot",
+      "task_category": "Data",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 200,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 2,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771544334,
+      "updated_at": 1771544334,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        },
+        "results": {
+          "finalized_at": 1771544334,
+          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\results\\usr-8558ae680196\\results-1771544334.json",
+          "finalized_manifest": {
+            "contract_id": "usr-8558ae680196",
+            "status": "active",
+            "generated_at": 1771544334,
+            "artifact_manifest_hash": "e8b5a7e9b6451ceb556ed5a1f5637743f4f50599eac7f8c690ca9900404d8473",
+            "artifacts_total": 1,
+            "artifacts_local_uri": 0,
+            "artifacts_remote_uri": 1,
+            "total_work_receipts": 1,
+            "onchain": {
+              "contract_id": "usr-8558ae680196",
+              "provider_client_id": "a5d945d9-aed8-479c-97b3-1721548e7341",
+              "budget_currency": "RUB",
+              "status": "active",
+              "task_name": "Results PoW demo",
+              "reward_per_task": 2,
+              "created_at": 1771544334,
+              "updated_at": 1771544334,
+              "funded_total": 6,
+              "settled_total": 2,
+              "jobs_completed": 1,
+              "work_units_done": 100,
+              "budget_total": 6,
+              "budget_spent": 2,
+              "budget_refunded": 0,
+              "budget_available": 4
+            },
+            "items": [
+              {
+                "name": "result-1.txt",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "uri": "s3://bucket/result-1.txt",
+                "size_bytes": 123,
+                "is_local_uri": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-236f105c21ec",
+      "provider_client_id": "8c4cfd84-ca5f-444c-a8c4-a5884dea1f21",
+      "sector_id": "sec-52e9a8247429",
+      "task_name": "Capability-gated benchmark",
+      "task_description": "Should require higher capabilities",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 500,
+      "reward_per_task": 5,
+      "budget_currency": "RUB",
+      "target_total_work_units": 5000,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544365,
+      "updated_at": 1771544365,
+      "benchmark_meta": {
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 16,
+          "require_gpu": true
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-b51962d8aff4",
+      "provider_client_id": "712322ac-7931-4807-a1bb-5b3419bc341f",
+      "sector_id": "sec-a0e51f26fa5b",
+      "task_name": "Provider PoW demo",
+      "task_description": "User-defined contract for integration test",
+      "task_category": "Пользовательская",
+      "computation_type": "simple_pow",
+      "work_units_required": 200,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "closed",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 6,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 400,
+      "jobs_completed": 2,
+      "created_at": 1771544378,
+      "updated_at": 1771544378,
+      "benchmark_meta": {
+        "input_format": "none",
+        "runner": {
+          "command_template": "python --version",
+          "engine": "python_cli"
+        },
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-93d1d8933941",
+      "provider_client_id": "2cb91afa-5ffe-449b-a894-18a32aa78ce9",
+      "sector_id": "sec-ccf9a7b624d5",
+      "task_name": "Results PoW demo",
+      "task_description": "Collect output artifacts into final snapshot",
+      "task_category": "Data",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 200,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 2,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771544378,
+      "updated_at": 1771544378,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        },
+        "results": {
+          "finalized_at": 1771544378,
+          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\results\\usr-93d1d8933941\\results-1771544378.json",
+          "finalized_manifest": {
+            "contract_id": "usr-93d1d8933941",
+            "status": "active",
+            "generated_at": 1771544378,
+            "artifact_manifest_hash": "e8b5a7e9b6451ceb556ed5a1f5637743f4f50599eac7f8c690ca9900404d8473",
+            "artifacts_total": 1,
+            "artifacts_local_uri": 0,
+            "artifacts_remote_uri": 1,
+            "total_work_receipts": 1,
+            "onchain": {
+              "contract_id": "usr-93d1d8933941",
+              "provider_client_id": "2cb91afa-5ffe-449b-a894-18a32aa78ce9",
+              "budget_currency": "RUB",
+              "status": "active",
+              "task_name": "Results PoW demo",
+              "reward_per_task": 2,
+              "created_at": 1771544378,
+              "updated_at": 1771544378,
+              "funded_total": 6,
+              "settled_total": 2,
+              "jobs_completed": 1,
+              "work_units_done": 100,
+              "budget_total": 6,
+              "budget_spent": 2,
+              "budget_refunded": 0,
+              "budget_available": 4
+            },
+            "items": [
+              {
+                "name": "result-1.txt",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "uri": "s3://bucket/result-1.txt",
+                "size_bytes": 123,
+                "is_local_uri": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-8c44e0c529fa",
+      "provider_client_id": "5c6581f3-aca3-4595-93a0-1c260489536a",
+      "sector_id": "sec-eaeb385dd8af",
+      "task_name": "Protein structure fold",
+      "task_description": "3D protein structure search",
+      "task_category": "biomed",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 120,
+      "reward_per_task": 4,
+      "budget_currency": "USD",
+      "target_total_work_units": 240,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 8,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544378,
+      "updated_at": 1771544378,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-2c5398ae1830",
+      "provider_client_id": "f71bd07b-00a5-4931-8c1a-3bd06cb29b89",
+      "sector_id": "sec-85f472a57fb7",
+      "task_name": "Ingestion contract",
+      "task_description": "Chunked data processing",
+      "task_category": "Data",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 8,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544378,
+      "updated_at": 1771544378,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "deterministic",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        },
+        "ingestion": {
+          "status": "published",
+          "manifest_id": "ing-43b17dfd8fca49bc",
+          "dataset_artifacts": [
+            {
+              "name": "dataset.parquet",
+              "uri": "s3://demo/dataset.parquet",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size_bytes": 1024
+            }
+          ],
+          "chunking": {
+            "strategy": "partition",
+            "chunk_unit": "rows",
+            "chunk_size": 5000,
+            "total_units": 25000,
+            "recommended_parallel_jobs": 1
+          },
+          "chunk_plan": [
+            {
+              "chunk_id": "chunk-0001",
+              "index": 1,
+              "range_start": 0,
+              "range_end": 5000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0002",
+              "index": 2,
+              "range_start": 5000,
+              "range_end": 10000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0003",
+              "index": 3,
+              "range_start": 10000,
+              "range_end": 15000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0004",
+              "index": 4,
+              "range_start": 15000,
+              "range_end": 20000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0005",
+              "index": 5,
+              "range_start": 20000,
+              "range_end": 25000,
+              "units": 5000,
+              "chunk_unit": "rows"
+            }
+          ],
+          "updated_at": 1771544378,
+          "published_at": 1771544378
+        }
+      }
+    },
+    {
+      "contract_id": "usr-cbade4b2590a",
+      "provider_client_id": "e3b9ab0e-2881-405c-8ddc-6f055ad542f2",
+      "sector_id": "sec-3ff2f75220cd",
+      "task_name": "Upload benchPEP",
+      "task_description": "Upload and auto chunk",
+      "task_category": "Biomedical Modeling",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 1000,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 4000,
+      "difficulty": 2,
+      "status": "draft",
+      "budget_tokens_total": 0,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544378,
+      "updated_at": 1771544378,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "auto",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 14400
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        },
+        "ingestion": {
+          "status": "configured",
+          "manifest_id": "ing-9ce718dcb8504a56",
+          "dataset_artifacts": [
+            {
+              "name": "benchPEP.tpr",
+              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-cbade4b2590a\\ing-9ce718dcb8504a56\\benchPEP.tpr",
+              "sha256": "e98f77b3ddba82ef801e849e9a1a80b6f0ed13513fd26f65d35a94d05c1456c3",
+              "size_bytes": 23
+            }
+          ],
+          "chunking": {
+            "strategy": "partition",
+            "chunk_unit": "rows",
+            "chunk_size": 500,
+            "total_units": 1000,
+            "total_source_bytes": 23,
+            "recommended_parallel_jobs": 2
+          },
+          "chunk_plan": [
+            {
+              "chunk_id": "chunk-0001",
+              "index": 1,
+              "range_start": 0,
+              "range_end": 500,
+              "units": 500,
+              "chunk_unit": "rows"
+            },
+            {
+              "chunk_id": "chunk-0002",
+              "index": 2,
+              "range_start": 500,
+              "range_end": 1000,
+              "units": 500,
+              "chunk_unit": "rows"
+            }
+          ],
+          "updated_at": 1771544378
+        }
+      }
+    },
+    {
+      "contract_id": "usr-f35b3f598523",
+      "provider_client_id": "60d2ab52-0beb-43b9-b2e9-c805d944a597",
+      "sector_id": "sec-d030d9dcdd56",
+      "task_name": "benchPEP molecular workload",
+      "task_description": "benchPEP-based biomedical simulation contract",
+      "task_category": "Biomedical Modeling",
+      "computation_type": "molecular_dynamics_benchpep",
+      "work_units_required": 1000,
+      "reward_per_task": 12,
+      "budget_currency": "RUB",
+      "target_total_work_units": 20000,
+      "difficulty": 2,
+      "status": "draft",
+      "budget_tokens_total": 0,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544378,
+      "updated_at": 1771544378,
+      "benchmark_meta": {
+        "domain": "protein_structure",
+        "input_artifacts": [
+          {
+            "name": "sequence_or_seed",
+            "formats": [
+              "fasta",
+              "pdb",
+              "json"
+            ]
+          },
+          {
+            "name": "constraints",
+            "formats": [
+              "json",
+              "yaml"
+            ]
+          }
+        ],
+        "output_artifacts_spec": [
+          {
+            "name": "predicted_structure",
+            "formats": [
+              "pdb",
+              "cif"
+            ],
+            "required": true
+          },
+          {
+            "name": "confidence_report",
+            "formats": [
+              "json"
+            ],
+            "required": true
+          }
+        ],
+        "chunking": {
+          "strategy": "candidate_batch",
+          "chunk_unit": "candidates",
+          "chunk_size": 32,
+          "recommended_parallel_jobs": 4
+        },
+        "requirements": {
+          "min_cpu_cores": 8,
+          "min_ram_gb": 24,
+          "require_gpu": true
+        },
+        "workload_preset_id": "biomedical_protein_modeling",
+        "decentralized_policy": {
+          "task_class": "biomedical_modeling",
+          "task_class_source": "bootstrap_model1",
+          "validation_style": "stochastic_or_metric",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 3600
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 8,
+            "penalty_percent_on_reject": 30
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-d447c1ffd8e2",
+      "provider_client_id": "366642e6-7bca-4de4-8596-888f01f8e791",
+      "sector_id": "sec-a04a40ca86f0",
+      "task_name": "Replicated PoW",
+      "task_description": "Needs 2 replicated submissions",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771544378,
+      "updated_at": 1771544379,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-2c4c01b46a97",
+      "provider_client_id": "247f76ab-8033-4fb2-9c20-9f48887e2510",
+      "sector_id": "sec-7d0e72f41248",
+      "task_name": "M of N PoW",
+      "task_description": "3 replicas, threshold 2",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 3,
+      "budget_currency": "RUB",
+      "target_total_work_units": 400,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 3,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771544379,
+      "updated_at": 1771544379,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 3,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-11d1860cb00d",
+      "provider_client_id": "7a281801-caed-4292-ae7d-ae5f56195bb8",
+      "sector_id": "sec-edf3f16e6c70",
+      "task_name": "Replay replicated PoW",
+      "task_description": "Replay guard should trigger on same attempt",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 200,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 6,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544379,
+      "updated_at": 1771544379,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-83437c980a7d",
+      "provider_client_id": "52f0b70f-6026-474a-9d91-9f88b2e6e472",
+      "sector_id": "sec-db2fc2b9002e",
+      "task_name": "Challengeable PoW",
+      "task_description": "Escrow should remain locked during challenge window",
+      "task_category": "Verification",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 4,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 12,
+      "budget_tokens_spent": 4,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 100,
+      "jobs_completed": 1,
+      "created_at": 1771544379,
+      "updated_at": 1771544379,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 1,
+            "quorum_threshold": 1,
+            "challenge_window_seconds": 300
+          },
+          "escrow_policy": {
+            "enabled": true,
+            "worker_collateral": 2,
+            "penalty_percent_on_reject": 50
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-5645f9658b72",
+      "provider_client_id": "d4e1509e-8202-49ba-8e23-b3c423785433",
+      "sector_id": "sec-f13cd9e4c4ca",
+      "task_name": "Validator PoW",
+      "task_description": "Need replication group for verdict",
+      "task_category": "Validation",
+      "computation_type": "simple_pow",
+      "work_units_required": 100,
+      "reward_per_task": 2,
+      "budget_currency": "RUB",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 0,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 0,
+      "jobs_completed": 0,
+      "created_at": 1771544379,
+      "updated_at": 1771544379,
+      "benchmark_meta": {
+        "decentralized_policy": {
+          "task_class": "deterministic_baseline",
+          "task_class_source": "auto",
+          "validation_style": "bitwise_or_hash_match",
+          "validation_policy": {
+            "mode": "replicated",
+            "replication_factor": 2,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 0
+          },
+          "escrow_policy": {
+            "enabled": false,
+            "worker_collateral": 0,
+            "penalty_percent_on_reject": 0
+          }
+        }
+      }
+    },
+    {
+      "contract_id": "usr-97ca3a479d31",
+      "provider_client_id": "77b48eb9-a693-49b9-85c3-395708d54434",
+      "sector_id": "sec-14339e417116",
+      "task_name": "USD contract",
+      "task_description": "Market economy test",
+      "task_category": "Finance",
+      "computation_type": "simple_pow",
+      "work_units_required": 150,
+      "reward_per_task": 5,
+      "budget_currency": "USD",
+      "target_total_work_units": 300,
+      "difficulty": 2,
+      "status": "active",
+      "budget_tokens_total": 10,
+      "budget_tokens_spent": 5,
+      "budget_tokens_refunded": 0,
+      "completed_work_units": 150,
+      "jobs_completed": 1,
+      "created_at": 1771544379,
+      "updated_at": 1771544379,
       "benchmark_meta": {
         "decentralized_policy": {
           "task_class": "deterministic_baseline",

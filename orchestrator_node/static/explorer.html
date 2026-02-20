@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Block Explorer — Distributed Compute</title>
+  <title>Эксплорер блокчейна — decentralized-compute</title>
   <style>
     :root {
       --bg: #1a1d23;
@@ -94,6 +94,32 @@
     #block-detail.active, #address-result.active { display: block; }
     .tx-type-reward { color: var(--success); }
     .tx-type-work_receipt { color: var(--accent); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      line-height: 1.5;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .badge-reward { background: rgba(124, 179, 66, 0.15); color: var(--success); }
+    .badge-work-receipt { background: rgba(92, 158, 173, 0.2); color: #9dd8e4; }
+    .badge-convert { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .badge-withdraw { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .badge-contract { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
+    .badge-default { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .filters select,
+    .filters input {
+      min-width: 180px;
+    }
     #blocks-table { min-width: 700px; }
     #detail-tx-table { min-width: 960px; }
     #address-tx-table { min-width: 680px; }
@@ -118,7 +144,7 @@
   </style>
 </head>
 <body>
-  <h1>Block Explorer</h1>
+  <h1>Эксплорер блокчейна</h1>
   <div class="links">
     <a href="/dashboard">← Дашборд</a>
     <span class="muted">Узел: <span id="base-url"></span></span>
@@ -127,7 +153,7 @@
   <div class="overview-grid">
     <div class="card"><div class="label">Длина цепочки</div><div id="ex-chain-len" class="value">—</div></div>
     <div class="card"><div class="label">Последний блок</div><div id="ex-last-index" class="value">—</div></div>
-    <div class="card"><div class="label">В очереди (pending)</div><div id="ex-pending" class="value">—</div></div>
+    <div class="card"><div class="label">В очереди (pending-транзакции)</div><div id="ex-pending" class="value">—</div></div>
   </div>
 
   <div class="section">
@@ -159,6 +185,23 @@
       <div><span class="k">Время:</span> <span id="detail-time"></span></div>
       <div><span class="k">Транзакций:</span> <span id="detail-tx-count"></span></div>
     </div>
+    <div class="filters">
+      <select id="detail-filter-type">
+        <option value="">Все типы tx</option>
+        <option value="reward">reward</option>
+        <option value="work_receipt">work_receipt</option>
+        <option value="fiat_topup">fiat_topup</option>
+        <option value="fiat_withdrawal_request">fiat_withdrawal_request</option>
+        <option value="fiat_conversion">fiat_conversion</option>
+        <option value="contract_reward_settlement">contract_reward_settlement</option>
+        <option value="contract_create_event">contract_create_event</option>
+        <option value="contract_budget_fund_event">contract_budget_fund_event</option>
+        <option value="contract_budget_refund_event">contract_budget_refund_event</option>
+        <option value="contract_status_event">contract_status_event</option>
+      </select>
+      <input id="detail-filter-contract" placeholder="Фильтр по contract_id">
+      <button type="button" id="btn-detail-filter-clear">Сброс</button>
+    </div>
     <div class="table-responsive">
       <table id="detail-tx-table">
         <thead><tr><th>Тип</th><th>От / Вычислитель</th><th>Кому</th><th>Сумма / Комиссия</th><th>Контракт</th><th>Ед. работы</th></tr></thead>
@@ -185,6 +228,23 @@
       <div><span class="k">Chain points:</span> <span id="addr-chain-points"></span></div>
       <div><span class="k">Транзакций:</span> <span id="addr-tx-count"></span></div>
     </div>
+    <div class="filters">
+      <select id="address-filter-type">
+        <option value="">Все типы tx</option>
+        <option value="reward">reward</option>
+        <option value="work_receipt">work_receipt</option>
+        <option value="fiat_topup">fiat_topup</option>
+        <option value="fiat_withdrawal_request">fiat_withdrawal_request</option>
+        <option value="fiat_conversion">fiat_conversion</option>
+        <option value="contract_reward_settlement">contract_reward_settlement</option>
+        <option value="contract_create_event">contract_create_event</option>
+        <option value="contract_budget_fund_event">contract_budget_fund_event</option>
+        <option value="contract_budget_refund_event">contract_budget_refund_event</option>
+        <option value="contract_status_event">contract_status_event</option>
+      </select>
+      <input id="address-filter-contract" placeholder="Фильтр по contract_id">
+      <button type="button" id="btn-address-filter-clear">Сброс</button>
+    </div>
     <div class="table-responsive">
       <table id="address-tx-table">
         <thead><tr><th>Блок</th><th>Тип</th><th>Детали</th></tr></thead>
@@ -195,6 +255,10 @@
 
   <script>
     const base = window.location.origin;
+    const explorerState = {
+      currentBlock: null,
+      currentAddressPayload: null,
+    };
     document.getElementById('base-url').textContent = base;
 
     function api(path) {
@@ -207,6 +271,29 @@
     function formatWalletBalances(balances) {
       const safe = balances || {};
       return ['RUB', 'USD', 'EUR'].map(cur => `${cur}: ${safe[cur] ?? 0}`).join(' · ');
+    }
+
+    function txBadgeClass(type) {
+      if (type === 'reward' || type === 'contract_reward_settlement') return 'badge badge-reward';
+      if (type === 'work_receipt') return 'badge badge-work-receipt';
+      if (type === 'fiat_conversion') return 'badge badge-convert';
+      if (type === 'fiat_withdrawal_request') return 'badge badge-withdraw';
+      if (
+        type === 'contract_create_event' ||
+        type === 'contract_budget_fund_event' ||
+        type === 'contract_budget_refund_event' ||
+        type === 'contract_status_event'
+      ) return 'badge badge-contract';
+      return 'badge badge-default';
+    }
+
+    function txMatchesFilters(tx, { typeFilter, contractFilter }) {
+      if (typeFilter && (tx.type || '') !== typeFilter) return false;
+      if (contractFilter) {
+        const contractId = (tx.contract_id || '').toString().toLowerCase();
+        if (!contractId.includes(contractFilter.toLowerCase())) return false;
+      }
+      return true;
     }
 
     function loadSummary() {
@@ -244,28 +331,40 @@
       table.style.display = list.length ? 'table' : 'none';
     }
 
+    function renderBlockTransactions() {
+      const block = explorerState.currentBlock;
+      if (!block) return;
+      const typeFilter = document.getElementById('detail-filter-type').value;
+      const contractFilter = document.getElementById('detail-filter-contract').value.trim();
+      const tbody = document.querySelector('#detail-tx-table tbody');
+      tbody.innerHTML = '';
+      const allTx = block.transactions || [];
+      const filtered = allTx.filter((tx) => txMatchesFilters(tx, { typeFilter, contractFilter }));
+      document.getElementById('detail-tx-count').textContent = filtered.length + ' / ' + allTx.length;
+
+      filtered.forEach(tx => {
+        const tr = document.createElement('tr');
+        const type = tx.type || '—';
+        const from = (tx.from || tx.client_id || '—').toString().slice(0, 20);
+        const to = (tx.to || '—').toString().slice(0, 20);
+        const amount = tx.amount != null ? tx.amount : (tx.fee != null ? '−' + tx.fee : '—');
+        const contract = tx.contract_id || '—';
+        const work = tx.work_units != null ? tx.work_units : '—';
+        tr.innerHTML = '<td><span class="' + txBadgeClass(type) + '">' + type + '</span></td><td class="mono">' + from + '</td><td class="mono">' + to + '</td><td>' + amount + '</td><td class="mono">' + contract + '</td><td>' + work + '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
     function showBlock(index) {
       api('/explorer/block/' + index)
         .then(block => {
+          explorerState.currentBlock = block;
           document.getElementById('block-detail').classList.add('active');
           document.getElementById('detail-index').textContent = block.index;
           document.getElementById('detail-hash').textContent = block.hash || '—';
           document.getElementById('detail-prev').textContent = block.previous_hash || '—';
           document.getElementById('detail-time').textContent = block.timestamp ? new Date(block.timestamp * 1000).toLocaleString() : '—';
-          document.getElementById('detail-tx-count').textContent = (block.transactions && block.transactions.length) || 0;
-          const tbody = document.querySelector('#detail-tx-table tbody');
-          tbody.innerHTML = '';
-          (block.transactions || []).forEach(tx => {
-            const tr = document.createElement('tr');
-            const type = tx.type || '—';
-            const from = (tx.from || tx.client_id || '—').toString().slice(0, 20);
-            const to = (tx.to || '—').toString().slice(0, 20);
-            const amount = tx.amount != null ? tx.amount : (tx.fee != null ? '−' + tx.fee : '—');
-            const contract = tx.contract_id || '—';
-            const work = tx.work_units != null ? tx.work_units : '—';
-            tr.innerHTML = '<td class="tx-type-' + type + '">' + type + '</td><td class="mono">' + from + '</td><td class="mono">' + to + '</td><td>' + amount + '</td><td>' + contract + '</td><td>' + work + '</td>';
-            tbody.appendChild(tr);
-          });
+          renderBlockTransactions();
           document.getElementById('block-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         })
         .catch(e => {
@@ -273,6 +372,39 @@
           document.getElementById('block-search-msg').className = 'msg err';
           document.getElementById('block-search-msg').style.display = 'block';
         });
+    }
+
+    function renderAddressTransactions() {
+      const data = explorerState.currentAddressPayload;
+      if (!data) return;
+      const typeFilter = document.getElementById('address-filter-type').value;
+      const contractFilter = document.getElementById('address-filter-contract').value.trim();
+      const tbody = document.querySelector('#address-tx-table tbody');
+      tbody.innerHTML = '';
+      const allRows = data.transactions || [];
+      const filtered = allRows.filter(({ tx }) => txMatchesFilters(tx || {}, { typeFilter, contractFilter }));
+      document.getElementById('addr-tx-count').textContent = filtered.length + ' / ' + allRows.length;
+
+      filtered.forEach(({ block_index, tx }) => {
+        const tr = document.createElement('tr');
+        let details = '';
+        if (tx.type === 'reward') details = 'Награда +' + (tx.amount ?? 0) + ' за ' + (tx.contract_id || '');
+        if (tx.type === 'work_receipt') details = 'Работа: ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0) + ', комиссия ' + (tx.fee ?? 0);
+        if (tx.type === 'fiat_topup') details = 'Пополнение: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
+        if (tx.type === 'fiat_withdrawal_request') details = 'Вывод: ' + (tx.amount ?? 0) + ' ' + (tx.currency || '') + ', статус ' + (tx.status || 'queued');
+        if (tx.type === 'fiat_conversion') details = 'Конвертация: ' + (tx.source_amount ?? 0) + ' ' + (tx.from_currency || '') + ' -> ' + (tx.target_amount ?? 0) + ' ' + (tx.to_currency || '');
+        if (tx.type === 'contract_reward_settlement') details = 'Выплата за контракт: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '') + ', контракт ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0);
+        if (tx.type === 'contract_create_event') details = 'Создан контракт: ' + (tx.contract_id || '') + ' (' + (tx.task_name || '') + ')';
+        if (tx.type === 'contract_budget_fund_event') details = 'Пополнение бюджета контракта: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
+        if (tx.type === 'contract_budget_refund_event') details = 'Возврат бюджета контракта: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
+        if (tx.type === 'contract_status_event') details = 'Статус контракта: ' + (tx.status || '');
+        if (!details) details = 'tx_id: ' + ((tx.event_id || tx.id || 'n/a').toString().slice(0, 24));
+        tr.innerHTML = '<td><a href="#" class="mono block-link" data-index="' + block_index + '">' + block_index + '</a></td><td><span class="' + txBadgeClass(tx.type || '') + '">' + (tx.type || '—') + '</span></td><td>' + details + '</td>';
+        tbody.appendChild(tr);
+      });
+      document.querySelectorAll('#address-tx-table .block-link').forEach(el => {
+        el.addEventListener('click', e => { e.preventDefault(); showBlock(parseInt(el.dataset.index, 10)); });
+      });
     }
 
     document.getElementById('btn-search-block').addEventListener('click', () => {
@@ -296,6 +428,7 @@
       if (!clientId) return;
       api('/explorer/address/' + encodeURIComponent(clientId))
         .then(data => {
+          explorerState.currentAddressPayload = data;
           if (data.resolved_from) {
             document.getElementById('address-msg').textContent = 'Префикс ' + data.resolved_from + ' распознан как ' + data.client_id;
             document.getElementById('address-msg').className = 'msg ok';
@@ -308,29 +441,7 @@
           document.getElementById('addr-fiat-wallet').textContent = formatWalletBalances(data.fiat_wallet || {});
           document.getElementById('addr-fiat-rub-estimate').textContent = data.fiat_total_rub_estimate ?? 0;
           document.getElementById('addr-chain-points').textContent = data.chain_points ?? data.balance ?? 0;
-          document.getElementById('addr-tx-count').textContent = (data.transactions && data.transactions.length) || 0;
-          const tbody = document.querySelector('#address-tx-table tbody');
-          tbody.innerHTML = '';
-          (data.transactions || []).forEach(({ block_index, block_hash, tx }) => {
-            const tr = document.createElement('tr');
-            let details = '';
-            if (tx.type === 'reward') details = 'Награда +' + (tx.amount ?? 0) + ' за ' + (tx.contract_id || '');
-            if (tx.type === 'work_receipt') details = 'Работа: ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0) + ', комиссия ' + (tx.fee ?? 0);
-            if (tx.type === 'fiat_topup') details = 'Пополнение: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
-            if (tx.type === 'fiat_withdrawal_request') details = 'Вывод: ' + (tx.amount ?? 0) + ' ' + (tx.currency || '') + ', статус ' + (tx.status || 'queued');
-            if (tx.type === 'fiat_conversion') details = 'Конвертация: ' + (tx.source_amount ?? 0) + ' ' + (tx.from_currency || '') + ' -> ' + (tx.target_amount ?? 0) + ' ' + (tx.to_currency || '');
-            if (tx.type === 'contract_reward_settlement') details = 'Выплата за контракт: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '') + ', контракт ' + (tx.contract_id || '') + ', ед. ' + (tx.work_units ?? 0);
-            if (tx.type === 'contract_create_event') details = 'Создан контракт: ' + (tx.contract_id || '') + ' (' + (tx.task_name || '') + ')';
-            if (tx.type === 'contract_budget_fund_event') details = 'Пополнение бюджета контракта: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
-            if (tx.type === 'contract_budget_refund_event') details = 'Возврат бюджета контракта: +' + (tx.amount ?? 0) + ' ' + (tx.currency || '');
-            if (tx.type === 'contract_status_event') details = 'Статус контракта: ' + (tx.status || '');
-            if (!details) details = 'tx_id: ' + ((tx.event_id || tx.id || 'n/a').toString().slice(0, 24));
-            tr.innerHTML = '<td><a href="#" class="mono block-link" data-index="' + block_index + '">' + block_index + '</a></td><td class="tx-type-' + (tx.type || '') + '">' + (tx.type || '—') + '</td><td>' + details + '</td>';
-            tbody.appendChild(tr);
-          });
-          document.querySelectorAll('#address-tx-table .block-link').forEach(el => {
-            el.addEventListener('click', e => { e.preventDefault(); showBlock(parseInt(el.dataset.index, 10)); });
-          });
+          renderAddressTransactions();
           document.getElementById('address-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         })
         .catch(e => {
@@ -381,6 +492,22 @@
         e.preventDefault();
         e.target.value = pasted.trim();
       }
+    });
+
+    document.getElementById('detail-filter-type').addEventListener('change', renderBlockTransactions);
+    document.getElementById('detail-filter-contract').addEventListener('input', renderBlockTransactions);
+    document.getElementById('btn-detail-filter-clear').addEventListener('click', () => {
+      document.getElementById('detail-filter-type').value = '';
+      document.getElementById('detail-filter-contract').value = '';
+      renderBlockTransactions();
+    });
+
+    document.getElementById('address-filter-type').addEventListener('change', renderAddressTransactions);
+    document.getElementById('address-filter-contract').addEventListener('input', renderAddressTransactions);
+    document.getElementById('btn-address-filter-clear').addEventListener('click', () => {
+      document.getElementById('address-filter-type').value = '';
+      document.getElementById('address-filter-contract').value = '';
+      renderAddressTransactions();
     });
 
     loadSummary();

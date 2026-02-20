@@ -141,6 +141,8 @@ class DesktopAgent:
             )
 
         def progress(cur, total):
+            if self.stop_event.is_set():
+                raise InterruptedError("Agent stop requested")
             if total:
                 pct = int(cur * 100 / total)
                 self.push_log(f"Прогресс {contract_id}: {pct}%")
@@ -158,6 +160,7 @@ class DesktopAgent:
             push_log=self.push_log,
             progress_callback=progress,
             submit_timeout_seconds=submit_timeout,
+            should_stop=self.stop_event.is_set,
         )
 
     def _check_updates(self, api):
@@ -171,6 +174,39 @@ class DesktopAgent:
                 )
         except Exception:
             return
+
+    @staticmethod
+    def _as_float(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _is_contract_completed(self, api, contract_id):
+        if not contract_id:
+            return False
+        try:
+            contracts = api.public_get("/contracts", timeout=10)
+        except Exception:
+            return False
+        if not isinstance(contracts, list):
+            return False
+        contract = next((item for item in contracts if item.get("contract_id") == contract_id), None)
+        if not isinstance(contract, dict):
+            return False
+        status = str(contract.get("status") or "").strip().lower()
+        if status in {"closed", "completed", "finished"}:
+            return True
+        completion_pct = self._as_float(contract.get("completion_pct"))
+        if completion_pct is not None and completion_pct >= 100.0:
+            return True
+        remaining_volume = self._as_float(contract.get("remaining_volume"))
+        if remaining_volume is not None and remaining_volume <= 0:
+            return True
+        free_volume = self._as_float(contract.get("free_volume"))
+        if free_volume is not None and free_volume <= 0:
+            return True
+        return False
 
     def _loop(self, cfg):
         api = ApiClient(cfg["base_url"], cfg["api_key"], cfg["verify_ssl"])
@@ -195,9 +231,11 @@ class DesktopAgent:
                     "updated_at": int(time.time()),
                 }
                 self._write_state(self.last_task_snapshot)
-                work_done, result_data, nonce = self._compute(api, cfg, task)
+                work_done, result_data, nonce, output_artifacts = self._compute(api, cfg, task)
                 if not result_data or nonce is None:
-                    self.push_log("Результат не получен, повтор позже.")
+                    self.push_log(
+                        f"Результат не получен (job={task.get('job_id')} contract={task.get('contract_id')}), повтор позже."
+                    )
                     self.stop_event.wait(8)
                     continue
                 api.request(
@@ -217,6 +255,7 @@ class DesktopAgent:
                         "work_units_done": int(work_done),
                         "result_data": result_data,
                         "nonce": nonce,
+                        "output_artifacts": output_artifacts if isinstance(output_artifacts, list) else [],
                     },
                     timeout=int(
                         ((task.get("task_profile") or {}).get("recommended_submit_timeout_seconds") or 900)
@@ -229,6 +268,12 @@ class DesktopAgent:
                         f"{repl.get('received_submissions', 0)}/{repl.get('required_submissions', '?')}"
                     )
                     self._clear_state()
+                    if not cfg.get("auto_next", True):
+                        self.push_log("Авто-следующая часть отключена, агент в режиме ожидания.")
+                        break
+                    if self._is_contract_completed(api, task.get("contract_id")):
+                        self.push_log("Контракт завершён. Агент остановлен автоматически.")
+                        break
                     self.stop_event.wait(2)
                     continue
                 reward = submit_result.get("reward_issued")
@@ -241,9 +286,19 @@ class DesktopAgent:
                 else:
                     self.push_log(f"Сдано успешно. Награда: {reward} {currency}".strip())
                 self._clear_state()
+                if not cfg.get("auto_next", True):
+                    self.push_log("Авто-следующая часть отключена, агент в режиме ожидания.")
+                    break
+                if self._is_contract_completed(api, task.get("contract_id")):
+                    self.push_log("Контракт завершён. Агент остановлен автоматически.")
+                    break
                 if cfg.get("check_updates", True):
                     self._check_updates(api)
             except Exception as exc:
+                if isinstance(exc, InterruptedError):
+                    self.push_log("Вычисление остановлено по запросу пользователя.")
+                    self.stop_event.set()
+                    continue
                 self.push_log(f"Ошибка выполнения: {exc}")
                 if self.last_task_snapshot:
                     failed = dict(self.last_task_snapshot)
@@ -256,9 +311,6 @@ class DesktopAgent:
             finally:
                 self.current_job_id = None
                 self.last_heartbeat_at = 0.0
-            if not cfg.get("auto_next", True):
-                self.push_log("Авто-следующая часть отключена, агент в режиме ожидания.")
-                break
             self.stop_event.wait(2)
         self._clear_state()
         self.push_log("Агент остановлен.")

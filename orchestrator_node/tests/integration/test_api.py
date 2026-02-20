@@ -1,6 +1,8 @@
 # Интеграционные тесты API оркестратора (Flask test client)
 import hashlib
+import io
 import random
+import zipfile
 import sys
 import os
 
@@ -8,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import pytest
 from app import app, blockchain
-from fx_oracles import current_epoch_id, get_oracle_registry, sign_submission
+from fx_oracles import build_commit_hash, current_epoch_id, get_oracle_registry, sign_submission
 
 
 @pytest.fixture
@@ -351,6 +353,29 @@ def test_metrics(client):
     assert "pending_transactions" in data
     assert "slo" in data
     assert "validation_latency_avg_seconds" in (data.get("slo") or {})
+    assert "demo_mode" in data
+    assert "demo_stats" in data
+
+
+def test_demo_claims_and_script(client):
+    claims_res = client.get("/demo/claims")
+    assert claims_res.status_code == 200
+    claims_payload = claims_res.get_json()
+    assert isinstance(claims_payload.get("claims"), list)
+    assert any(row.get("id") == "auditability" for row in claims_payload.get("claims", []))
+
+    script_res = client.get("/demo/script")
+    assert script_res.status_code == 200
+    script_payload = script_res.get_json()
+    assert isinstance(script_payload.get("steps"), list)
+    assert script_payload.get("duration_minutes") == 20
+
+
+def test_demo_seed_disabled_by_default(client):
+    res = client.post("/demo/seed", json={})
+    assert res.status_code == 403
+    body = res.get_json()
+    assert body.get("error") == "DEMO_MODE is disabled"
 
 
 def test_chain(client):
@@ -541,6 +566,98 @@ def test_provider_contract_flow(client, auth_headers):
     assert updated["budget_tokens_available"] == 0
 
 
+def test_provider_contract_results_finalize_and_download(client, auth_headers):
+    headers, client_id = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=headers,
+        json={
+            "sector_name": "Results sector",
+            "organization_name": "Results lab",
+            "compute_domain": "data",
+            "description": "Final results flow test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=headers,
+        json={"currency": "RUB", "amount": 12},
+    )
+    assert topup_res.status_code == 200
+    create_res = client.post(
+        "/provider/contracts",
+        headers=headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Results PoW demo",
+            "task_description": "Collect output artifacts into final snapshot",
+            "task_category": "Data",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 2,
+            "target_total_work_units": 200,
+            "difficulty": 2,
+            "initial_budget_tokens": 6,
+            "budget_currency": "RUB",
+            "activate_now": True,
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    task_res = client.get("/get_task", headers=headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    result_hash, nonce = _solve_pow(client_id, contract_id, task["difficulty"])
+    assert result_hash is not None
+    submit_res = client.post(
+        "/submit_work",
+        headers=headers,
+        json={
+            "client_id": client_id,
+            "contract_id": contract_id,
+            "job_id": task["job_id"],
+            "work_units_done": task["work_units_required"],
+            "result_data": result_hash,
+            "nonce": nonce,
+            "output_artifacts": [
+                {
+                    "name": "result-1.txt",
+                    "sha256": "b" * 64,
+                    "uri": "s3://bucket/result-1.txt",
+                    "size_bytes": 123,
+                }
+            ],
+        },
+    )
+    assert submit_res.status_code == 200
+
+    live_res = client.get(f"/provider/contracts/{contract_id}/results", headers=headers)
+    assert live_res.status_code == 200
+    live_payload = live_res.get_json()
+    assert live_payload.get("finalized") is False
+    assert (live_payload.get("live_manifest") or {}).get("artifacts_total", 0) >= 1
+
+    finalize_res = client.post(f"/provider/contracts/{contract_id}/results/finalize", headers=headers, json={})
+    assert finalize_res.status_code == 200
+    finalized_manifest = (finalize_res.get_json().get("results") or {}).get("finalized_manifest") or {}
+    assert finalized_manifest.get("contract_id") == contract_id
+    assert finalized_manifest.get("artifacts_total", 0) >= 1
+
+    download_res = client.get(f"/provider/contracts/{contract_id}/results/download", headers=headers)
+    assert download_res.status_code == 200
+    assert download_res.mimetype == "application/zip"
+    archive_bytes = download_res.data
+    assert archive_bytes and archive_bytes[:2] == b"PK"
+    with zipfile.ZipFile(io.BytesIO(archive_bytes), "r") as zf:
+        names = set(zf.namelist())
+        assert "manifest.json" in names
+        manifest = zf.read("manifest.json").decode("utf-8")
+        assert contract_id in manifest
+
+
 def test_provider_task_classes_catalog_and_auto_policy(client, auth_headers):
     headers, _ = auth_headers
     classes_res = client.get("/provider/task-classes", headers=headers)
@@ -595,6 +712,156 @@ def test_provider_task_classes_catalog_and_auto_policy(client, auth_headers):
     assert decentralized_meta.get("task_class") == "biomedical_modeling"
     assert decentralized_meta.get("validation_policy", {}).get("mode") == "challengeable"
     assert decentralized_meta.get("escrow_policy", {}).get("enabled") is True
+
+
+def test_provider_workload_presets_catalog(client, auth_headers):
+    headers, _ = auth_headers
+    presets_res = client.get("/provider/workload-presets", headers=headers)
+    assert presets_res.status_code == 200
+    payload = presets_res.get_json()
+    rows = payload.get("workload_presets") or []
+    assert any(row.get("preset_id") == "scientific_simulation_climate" for row in rows)
+    assert any(row.get("preset_id") == "ai_llm_inference_batch" for row in rows)
+    first = rows[0] if rows else {}
+    assert isinstance((first.get("benchmark_meta") or {}).get("chunking"), dict)
+
+
+def test_provider_ingestion_manifest_publish_and_chunk_issue(client, auth_headers):
+    headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=headers,
+        json={
+            "sector_name": "Ingestion sector",
+            "organization_name": "Ingestion lab",
+            "compute_domain": "data",
+            "description": "Ingestion flow test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=headers,
+        json={"currency": "RUB", "amount": 20},
+    )
+    assert topup_res.status_code == 200
+
+    create_res = client.post(
+        "/provider/contracts",
+        headers=headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Ingestion contract",
+            "task_description": "Chunked data processing",
+            "task_category": "Data",
+            "computation_type": "simple_pow",
+            "work_units_required": 100,
+            "reward_per_task": 2,
+            "target_total_work_units": 400,
+            "difficulty": 2,
+            "initial_budget_tokens": 8,
+            "budget_currency": "RUB",
+            "activate_now": True,
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    manifest_res = client.post(
+        f"/provider/contracts/{contract_id}/ingestion/manifest",
+        headers=headers,
+        json={
+            "total_units": 25000,
+            "dataset_artifacts": [
+                {
+                    "name": "dataset.parquet",
+                    "uri": "s3://demo/dataset.parquet",
+                    "sha256": "a" * 64,
+                    "size_bytes": 1024,
+                }
+            ],
+            "chunking": {"strategy": "partition", "chunk_unit": "rows", "chunk_size": 5000},
+        },
+    )
+    assert manifest_res.status_code == 200
+    assert manifest_res.get_json().get("chunk_total") == 5
+
+    publish_res = client.post(
+        f"/provider/contracts/{contract_id}/ingestion/publish",
+        headers=headers,
+        json={},
+    )
+    assert publish_res.status_code == 200
+    assert (publish_res.get_json().get("ingestion") or {}).get("status") == "published"
+
+    task_res = client.get("/get_task", headers=headers, query_string={"contract_id": contract_id})
+    assert task_res.status_code == 200
+    task = task_res.get_json()
+    assert isinstance(task.get("chunk"), dict)
+    assert task["chunk"].get("chunk_id")
+    assert task["chunk"].get("units") > 0
+
+
+def test_provider_ingestion_upload_autocalc_total_units(client, auth_headers):
+    headers, _ = auth_headers
+    sector_res = client.post(
+        "/provider/sectors",
+        headers=headers,
+        json={
+            "sector_name": "Upload ingestion sector",
+            "organization_name": "Upload lab",
+            "compute_domain": "biomed",
+            "description": "Upload flow test",
+        },
+    )
+    assert sector_res.status_code == 201
+    sector_id = sector_res.get_json()["sector_id"]
+    create_res = client.post(
+        "/provider/contracts",
+        headers=headers,
+        json={
+            "sector_id": sector_id,
+            "task_name": "Upload benchPEP",
+            "task_description": "Upload and auto chunk",
+            "task_category": "Biomedical Modeling",
+            "computation_type": "molecular_dynamics_benchpep",
+            "work_units_required": 1000,
+            "reward_per_task": 3,
+            "target_total_work_units": 4000,
+            "difficulty": 2,
+            "initial_budget_tokens": 0,
+            "budget_currency": "RUB",
+            "activate_now": False,
+        },
+    )
+    assert create_res.status_code == 201
+    contract_id = (create_res.get_json().get("contract") or create_res.get_json())["contract_id"]
+
+    upload_res = client.post(
+        f"/provider/contracts/{contract_id}/ingestion/upload",
+        headers=headers,
+        data={
+            "chunk_size": "500",
+            "files": (io.BytesIO(b"benchpep-binary-content"), "benchPEP.tpr"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert upload_res.status_code == 200
+    payload = upload_res.get_json()
+    ingestion = payload.get("ingestion") or {}
+    assert (ingestion.get("chunking") or {}).get("total_units", 0) > 0
+    assert len(ingestion.get("chunk_plan") or []) >= 1
+
+
+def test_provider_model1_bootstrap(client, auth_headers):
+    headers, _ = auth_headers
+    res = client.post("/provider/model1/bootstrap", headers=headers, json={"source_path": "C:/missing/benchPEP.tpr"})
+    assert res.status_code == 200
+    body = res.get_json()
+    assert (body.get("sector") or {}).get("sector_name") == "Model_1"
+    assert (body.get("contract") or {}).get("contract_id")
 
 
 def test_replicated_validation_requires_quorum(client, auth_headers):
@@ -1289,6 +1556,9 @@ def test_market_rates_update_is_stored_onchain(client, auth_headers):
 
 
 def test_multi_oracle_fx_finalize_flow(client):
+    auth = client.get("/register")
+    assert auth.status_code == 200
+    auth_headers = {"Authorization": f"Bearer {auth.get_json()['api_key']}"}
     registry = get_oracle_registry()
     epoch_id = current_epoch_id()
     oracle_ids = sorted(list(registry.keys()))[:3]
@@ -1310,18 +1580,79 @@ def test_multi_oracle_fx_finalize_flow(client):
         )
         assert submit_res.status_code == 201
 
-    finalize_res = client.post("/market/fx/finalize", json={"epoch_id": epoch_id})
+    finalize_res = client.post("/market/fx/finalize", headers=auth_headers, json={"epoch_id": epoch_id})
     assert finalize_res.status_code == 200
     finalized = finalize_res.get_json()
     assert finalized["status"] == "finalized"
+    assert "fx_epoch_finalized" in finalized
+    assert finalized["fx_epoch_finalized"]["confidence"] >= 0
+    assert finalized["fx_epoch_finalized"]["volatility_score"] >= 0
     epoch_info = finalized["epoch"]
     assert epoch_info["is_finalized"] is True
     assert epoch_info["finalization"] is not None
     assert epoch_info["finalization"]["meta"]["source"] == "multi_oracle"
     assert epoch_info["finalization"]["meta"]["epoch_id"] == epoch_id
+    assert epoch_info["weighted_median_rates_preview"]["USD"] > 0
+
+    commit_oracle_id = oracle_ids[0]
+    commit_hash = build_commit_hash(
+        oracle_id=commit_oracle_id,
+        epoch_id=f"{epoch_id}-next",
+        rates_to_rub={"RUB": 1.0, "USD": 97.0, "EUR": 104.0},
+        nonce="n1",
+    )
+    commit_res = client.post(
+        "/market/fx/oracle-commit",
+        json={
+            "oracle_id": commit_oracle_id,
+            "epoch_id": f"{epoch_id}-next",
+            "commit_hash": commit_hash,
+        },
+    )
+    assert commit_res.status_code == 201
 
     rates_res = client.get("/market/rates")
     assert rates_res.status_code == 200
     rates = rates_res.get_json()
     assert rates["rates_to_rub"]["USD"] > 0
     assert rates["rates_to_rub"]["EUR"] > 0
+
+
+def test_payment_hub_dispatch_and_reconciliation(client):
+    worker_reg = client.get("/register")
+    assert worker_reg.status_code == 200
+    worker_payload = worker_reg.get_json()
+    worker_headers = {"Authorization": f"Bearer {worker_payload['api_key']}"}
+
+    topup_res = client.post(
+        "/market/wallet/topup",
+        headers=worker_headers,
+        json={"currency": "USD", "amount": 10},
+    )
+    assert topup_res.status_code == 200
+
+    wd_res = client.post(
+        "/market/withdrawals",
+        headers=worker_headers,
+        json={"currency": "USD", "amount": 3, "card_number": "1234567812345678"},
+    )
+    assert wd_res.status_code == 201
+    withdrawal_id = wd_res.get_json()["withdrawal"]["withdrawal_id"]
+
+    ops_before = client.get("/market/payments/operations", headers=worker_headers)
+    assert ops_before.status_code == 200
+    assert any(op.get("operation_id") == withdrawal_id for op in ops_before.get_json()["operations"])
+
+    dispatch = client.post("/market/payments/dispatch", headers=worker_headers, json={"max_batch": 10})
+    assert dispatch.status_code == 200
+
+    ops_after = client.get("/market/payments/operations", headers=worker_headers)
+    assert ops_after.status_code == 200
+    op = next((x for x in ops_after.get_json()["operations"] if x.get("operation_id") == withdrawal_id), None)
+    assert op is not None
+    assert op["status"] in {"completed", "rejected", "retry", "processing"}
+
+    reconcile_res = client.post("/market/payments/reconcile", headers=worker_headers, json={})
+    assert reconcile_res.status_code == 200
+    report = reconcile_res.get_json()
+    assert "report_id" in report

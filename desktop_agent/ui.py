@@ -45,6 +45,7 @@ class DesktopApp:
         self.contracts_cache = []
         self.shutdown_lock = threading.Lock()
         self._build_ui()
+        self._bind_clipboard_shortcuts()
         self._load_saved()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         try:
@@ -147,6 +148,67 @@ class DesktopApp:
         self.log_text = tk.Text(frame, height=18, wrap="word")
         self.log_text.grid(row=12, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
         frame.rowconfigure(12, weight=1)
+        self._attach_input_context_menus(frame)
+
+    def _bind_clipboard_shortcuts(self):
+        for seq in ("<Control-v>", "<Control-V>", "<Shift-Insert>", "<<Paste>>"):
+            self.root.bind_all(seq, self._handle_global_paste, add="+")
+
+    def _handle_global_paste(self, event):
+        widget = event.widget
+        if widget is None:
+            return
+        # Поддерживаем paste для Entry/Combobox/Text без зависимости от системных биндингов Tk.
+        if isinstance(widget, (tk.Entry, ttk.Entry, ttk.Combobox)):
+            try:
+                text = self.root.clipboard_get()
+            except tk.TclError:
+                return "break"
+            try:
+                if widget.selection_present():
+                    widget.delete("sel.first", "sel.last")
+            except Exception:
+                pass
+            widget.insert("insert", text)
+            return "break"
+        if isinstance(widget, tk.Text):
+            try:
+                text = self.root.clipboard_get()
+            except tk.TclError:
+                return "break"
+            widget.insert("insert", text)
+            return "break"
+        return None
+
+    def _attach_input_context_menus(self, parent):
+        menu = tk.Menu(parent, tearoff=0)
+        menu.add_command(label="Вставить", command=lambda: self._paste_into_focus(parent))
+        widgets = []
+
+        def collect(node):
+            for child in node.winfo_children():
+                widgets.append(child)
+                collect(child)
+
+        collect(parent)
+        for widget in widgets:
+            if isinstance(widget, (tk.Entry, ttk.Entry, ttk.Combobox, tk.Text)):
+                widget.bind("<Button-3>", lambda e, m=menu: self._show_context_menu(e, m), add="+")
+
+    def _show_context_menu(self, event, menu):
+        try:
+            event.widget.focus_set()
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+        return "break"
+
+    def _paste_into_focus(self, parent):
+        widget = parent.focus_get()
+        if widget is None:
+            return
+        fake_event = type("Event", (), {"widget": widget})()
+        self._handle_global_paste(fake_event)
 
     def _log(self, message):
         ts = time.strftime("%H:%M:%S")
@@ -225,16 +287,7 @@ class DesktopApp:
             api = ApiClient(self.base_url.get().strip(), self.api_key.get().strip(), self.verify_ssl.get())
             me = api.request("GET", "/me")
             self.client_id.set(me.get("client_id", self.client_id.get().strip()))
-            rec = api.request(
-                "POST",
-                "/agent/devices/register",
-                payload={
-                    "device_id": self.device_id.get().strip(),
-                    "device_name": self.device_name.get().strip() or "Desktop agent",
-                    "agent_version": "0.3.0",
-                    "device_capabilities": collect_device_capabilities(),
-                },
-            )
+            rec = self._register_device_with_fallback(api)
             self.device_id.set(rec.get("device_id", self.device_id.get().strip()))
             self._log(f"OK /me: {me.get('client_id', '')[:8]}..., balance={me.get('balance', 0)}")
             write_settings(self._settings_payload())
@@ -302,26 +355,43 @@ class DesktopApp:
             self._log(err)
             return
         cfg = self._build_agent_cfg()
+        capabilities = cfg.get("device_capabilities") if isinstance(cfg.get("device_capabilities"), dict) else {}
+        engines = capabilities.get("supported_engines") if isinstance(capabilities, dict) else []
+        if not isinstance(engines, list) or not engines:
+            self._log("Не удалось определить вычислительные движки устройства. Проверьте окружение и повторите.")
+            return
         if not cfg["base_url"] or not cfg["api_key"] or not cfg["client_id"]:
             self._log("Нужно заполнить URL, API key и client_id.")
             return
         try:
             api = ApiClient(cfg["base_url"], cfg["api_key"], cfg["verify_ssl"])
-            api.request(
-                "POST",
-                "/agent/devices/register",
-                payload={
-                    "device_id": cfg["device_id"],
-                    "device_name": cfg["device_name"],
-                    "agent_version": "0.3.0",
-                    "device_capabilities": cfg.get("device_capabilities") or {},
-                },
-            )
+            rec = self._register_device_with_fallback(api)
+            cfg["device_id"] = rec.get("device_id") or cfg["device_id"]
+            self.device_id.set(cfg["device_id"])
         except Exception as exc:
             self._log(f"Не удалось зарегистрировать устройство: {exc}")
             return
         write_settings(self._settings_payload())
         self.agent.start(cfg)
+
+    def _register_device_with_fallback(self, api):
+        payload = {
+            "device_id": self.device_id.get().strip(),
+            "device_name": self.device_name.get().strip() or "Desktop agent",
+            "agent_version": "0.3.0",
+            "device_capabilities": collect_device_capabilities(),
+        }
+        try:
+            return api.request("POST", "/agent/devices/register", payload=payload)
+        except Exception as exc:
+            # Частый кейс: device_id уже занят другим client_id.
+            if "403" not in str(exc):
+                raise
+            new_id = f"dev-{int(time.time())}"
+            self._log(f"Device ID уже занят. Перегенерирую: {new_id}")
+            self.device_id.set(new_id)
+            payload["device_id"] = new_id
+            return api.request("POST", "/agent/devices/register", payload=payload)
 
     def _stop_agent(self):
         self.agent.stop()

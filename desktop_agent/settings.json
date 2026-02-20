@@ -1,16 +1,16 @@
 {
-  "base_url": "http://localhost:8080",
-  "client_id": "",
+  "base_url": "http://localhost:5000",
+  "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
   "verify_ssl": true,
   "start_time": "22:00",
   "end_time": "07:00",
   "auto_next": true,
   "check_updates": true,
   "throttle_percent": 30,
-  "device_id": "dev-1771441482",
-  "device_name": "Desktop agent",
-  "sector_id": "sec-ac16b15e3fd2",
-  "contract_id": "usr-db392bbebb87",
+  "device_id": "hesh1k-dev",
+  "device_name": "Desktop agent1",
+  "sector_id": "sec-f3d458b07f80",
+  "contract_id": "usr-696322e634b8",
   "device_capabilities": {
     "cpu_cores": 8,
     "ram_gb": 0.0,
@@ -22,5 +22,5 @@
     "os": "windows"
   },
   "scheduler_profile": "adaptive",
-  "api_key_encrypted": ""
+  "api_key_encrypted": "gAAAAABpl584d8ho0iSTlE7Y0bBYaeAHQ4uyPF144hLVbjm5iBUB_CkiPy_AHi1WJuzMg_TyC_yTQWww8oT6Klpkk52sKZDHFgtTFp4fdqe7zlo4utyvglgemgJoqHohnaWe4BLAXsAc"
 }

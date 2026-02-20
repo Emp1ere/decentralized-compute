@@ -6,5 +6,2812 @@
     "previous_hash": "0",
     "nonce": 0,
     "hash": "6dbf23122cb5046cc5c0c1b245c75f8e43c59ca8ffeac292715e5078e631d0c9"
+  },
+  {
+    "index": 1,
+    "timestamp": 1771519534.774094,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519534
+      }
+    ],
+    "previous_hash": "6dbf23122cb5046cc5c0c1b245c75f8e43c59ca8ffeac292715e5078e631d0c9",
+    "nonce": 0,
+    "hash": "75346aceb74a13d131bb9bd2c4bf36b52d22edda51099fb1153dbcb70f04170e"
+  },
+  {
+    "index": 2,
+    "timestamp": 1771519551.9977937,
+    "transactions": [
+      {
+        "type": "fiat_withdrawal_request",
+        "withdrawal_id": "wd-c2c21bfc41f9445b",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 100,
+        "payout_method": "bank_card",
+        "card_mask": "****2222",
+        "status": "queued",
+        "created_at": 1771519551
+      }
+    ],
+    "previous_hash": "75346aceb74a13d131bb9bd2c4bf36b52d22edda51099fb1153dbcb70f04170e",
+    "nonce": 0,
+    "hash": "5013365dea3a641612a31862fea43187963b9e19cdf983ead2675459a14b5173"
+  },
+  {
+    "index": 3,
+    "timestamp": 1771519600.7824063,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519600
+      }
+    ],
+    "previous_hash": "5013365dea3a641612a31862fea43187963b9e19cdf983ead2675459a14b5173",
+    "nonce": 0,
+    "hash": "4853c9e1bc9f15bded2dba8d8e99b2210367ced9d04bb6498e2de40e5bfbc47b"
+  },
+  {
+    "index": 4,
+    "timestamp": 1771519601.7932582,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519601
+      }
+    ],
+    "previous_hash": "4853c9e1bc9f15bded2dba8d8e99b2210367ced9d04bb6498e2de40e5bfbc47b",
+    "nonce": 0,
+    "hash": "793f02d4a16ce8c607dbe7e5163770418dd8c051554c30380379db0fcc4da484"
+  },
+  {
+    "index": 5,
+    "timestamp": 1771519601.93843,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519601
+      }
+    ],
+    "previous_hash": "793f02d4a16ce8c607dbe7e5163770418dd8c051554c30380379db0fcc4da484",
+    "nonce": 0,
+    "hash": "a51f828e39b75bef690e969b4cfc2bb9c9a3e29d8d034fca21d0866f853f28aa"
+  },
+  {
+    "index": 6,
+    "timestamp": 1771519602.0897477,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519602
+      }
+    ],
+    "previous_hash": "a51f828e39b75bef690e969b4cfc2bb9c9a3e29d8d034fca21d0866f853f28aa",
+    "nonce": 0,
+    "hash": "d8dcc92a97d3bec62b2a22f766655dc059cde1fab3f29751861c3757af3ecd16"
+  },
+  {
+    "index": 7,
+    "timestamp": 1771519602.2464812,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519602
+      }
+    ],
+    "previous_hash": "d8dcc92a97d3bec62b2a22f766655dc059cde1fab3f29751861c3757af3ecd16",
+    "nonce": 0,
+    "hash": "aee75b408178fc108bf792c3ad3b6bcd175e62de06455dcc692a44d355822126"
+  },
+  {
+    "index": 8,
+    "timestamp": 1771519602.3860028,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519602
+      }
+    ],
+    "previous_hash": "aee75b408178fc108bf792c3ad3b6bcd175e62de06455dcc692a44d355822126",
+    "nonce": 0,
+    "hash": "4d0b06cfb63b6b5f3b597dcf20758b1f59e249e3ef438b328e99a8f7642190ad"
+  },
+  {
+    "index": 9,
+    "timestamp": 1771519602.5262148,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519602
+      }
+    ],
+    "previous_hash": "4d0b06cfb63b6b5f3b597dcf20758b1f59e249e3ef438b328e99a8f7642190ad",
+    "nonce": 0,
+    "hash": "4a242f46156df6678a6b0345256d07afa9a6c55a163651badbea0b967b7676f3"
+  },
+  {
+    "index": 10,
+    "timestamp": 1771519602.644891,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771519602
+      }
+    ],
+    "previous_hash": "4a242f46156df6678a6b0345256d07afa9a6c55a163651badbea0b967b7676f3",
+    "nonce": 0,
+    "hash": "fb020cfe0f6668fd417f568add7fbadbdddfb27c6552ea89a9fdb27c3041cf1a"
+  },
+  {
+    "index": 11,
+    "timestamp": 1771532303.8722787,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771532303
+      }
+    ],
+    "previous_hash": "fb020cfe0f6668fd417f568add7fbadbdddfb27c6552ea89a9fdb27c3041cf1a",
+    "nonce": 0,
+    "hash": "131a316682c66ca460aad0d89e4b3328708821330dfe40b2259c8a2445e6d187"
+  },
+  {
+    "index": 12,
+    "timestamp": 1771532304.4319015,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771532304
+      }
+    ],
+    "previous_hash": "131a316682c66ca460aad0d89e4b3328708821330dfe40b2259c8a2445e6d187",
+    "nonce": 0,
+    "hash": "693515d7e5a4053c6b7c5c962166f04588dc615bd88309754e7949c338e6551b"
+  },
+  {
+    "index": 13,
+    "timestamp": 1771532316.835704,
+    "transactions": [
+      {
+        "type": "contract_create_event",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "sector_id": "sec-f3d458b07f80",
+        "task_name": "Peptides",
+        "task_category": "Пользовательская",
+        "computation_type": "molecular_dynamics_benchpep",
+        "reward_per_task": 1000,
+        "budget_currency": "RUB",
+        "status": "draft",
+        "created_at": 1771532316
+      },
+      {
+        "type": "contract_budget_fund_event",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 10000,
+        "created_at": 1771532316
+      },
+      {
+        "type": "contract_status_event",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "status": "active",
+        "updated_at": 1771532316
+      }
+    ],
+    "previous_hash": "693515d7e5a4053c6b7c5c962166f04588dc615bd88309754e7949c338e6551b",
+    "nonce": 0,
+    "hash": "d25e495860241cf633422afd5dab632ab2018de7ab0a0470667da52f1328c42c"
+  },
+  {
+    "index": 14,
+    "timestamp": 1771532909.751143,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 10000000,
+        "source": "bank_transfer",
+        "created_at": 1771532909
+      }
+    ],
+    "previous_hash": "d25e495860241cf633422afd5dab632ab2018de7ab0a0470667da52f1328c42c",
+    "nonce": 0,
+    "hash": "d097715831b6b1acfa71b8b98441aa01291b5084725bfe30e2887ca74d6886d9"
+  },
+  {
+    "index": 15,
+    "timestamp": 1771532915.4544232,
+    "transactions": [
+      {
+        "type": "contract_budget_fund_event",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 10000,
+        "created_at": 1771532915
+      }
+    ],
+    "previous_hash": "d097715831b6b1acfa71b8b98441aa01291b5084725bfe30e2887ca74d6886d9",
+    "nonce": 0,
+    "hash": "99145bfa62ee7364587c7e8de91b4776944071284a2103bc1f35897a4ee4d81e"
+  },
+  {
+    "index": 16,
+    "timestamp": 1771532933.6273644,
+    "transactions": [
+      {
+        "type": "contract_budget_fund_event",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 10000,
+        "created_at": 1771532933
+      }
+    ],
+    "previous_hash": "99145bfa62ee7364587c7e8de91b4776944071284a2103bc1f35897a4ee4d81e",
+    "nonce": 0,
+    "hash": "4aa64f2eeadac348abd842c21c815f6643deed273592aa537aafb91f40d88729"
+  },
+  {
+    "index": 17,
+    "timestamp": 1771533336.1366842,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-556dfe49654348a2",
+        "job_id": "job-99b826636ab6468f",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771533336
+      }
+    ],
+    "previous_hash": "4aa64f2eeadac348abd842c21c815f6643deed273592aa537aafb91f40d88729",
+    "nonce": 0,
+    "hash": "6c8c64f297e510fc7e533f0db63e07febe8e6e477b8df282e7ec4839148518f4"
+  },
+  {
+    "index": 18,
+    "timestamp": 1771535322.7640245,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-6c2b587668274898",
+        "job_id": "job-a1d68d83336744fb",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535322
+      }
+    ],
+    "previous_hash": "6c8c64f297e510fc7e533f0db63e07febe8e6e477b8df282e7ec4839148518f4",
+    "nonce": 0,
+    "hash": "d401df1e2241ca1fc0b5391a326ef73b43237c8f74620456f7daaf557fb50f68"
+  },
+  {
+    "index": 19,
+    "timestamp": 1771535342.4681423,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-5e11240df84a4fed",
+        "job_id": "job-e784193faaea4bd0",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535342
+      }
+    ],
+    "previous_hash": "d401df1e2241ca1fc0b5391a326ef73b43237c8f74620456f7daaf557fb50f68",
+    "nonce": 0,
+    "hash": "2f405f27548af09acc1c851abb5b510898b2be36282f5cfc24093c8d15fda62a"
+  },
+  {
+    "index": 20,
+    "timestamp": 1771535362.148369,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-a2fd4f9f071a48ac",
+        "job_id": "job-064b8fd6c6054c81",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535362
+      }
+    ],
+    "previous_hash": "2f405f27548af09acc1c851abb5b510898b2be36282f5cfc24093c8d15fda62a",
+    "nonce": 0,
+    "hash": "ad2b23564d2069fbf4c54bc765d78fb1b33665f7c82bd33f9c65bcfa988c7352"
+  },
+  {
+    "index": 21,
+    "timestamp": 1771535381.3967018,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-252005175128453d",
+        "job_id": "job-79196288342249d4",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535381
+      }
+    ],
+    "previous_hash": "ad2b23564d2069fbf4c54bc765d78fb1b33665f7c82bd33f9c65bcfa988c7352",
+    "nonce": 0,
+    "hash": "d9c62e4a88636e9c67c4ed80bd3c5f4d6d5f97e91634f907eb31df88540269c4"
+  },
+  {
+    "index": 22,
+    "timestamp": 1771535400.5966861,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-af1387bce7864d26",
+        "job_id": "job-0702c621800047e3",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535400
+      }
+    ],
+    "previous_hash": "d9c62e4a88636e9c67c4ed80bd3c5f4d6d5f97e91634f907eb31df88540269c4",
+    "nonce": 0,
+    "hash": "5a3f8d773f916e0f7699f7726aa7bdc5d945df890ec453a9c248b41f400cd4ae"
+  },
+  {
+    "index": 23,
+    "timestamp": 1771535420.1446383,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f2980a5b66a84e6d",
+        "job_id": "job-db0dcf13197c41bc",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535420
+      }
+    ],
+    "previous_hash": "5a3f8d773f916e0f7699f7726aa7bdc5d945df890ec453a9c248b41f400cd4ae",
+    "nonce": 0,
+    "hash": "9a39f4b68b3300e13aa4a1854ad9c3631f87e2cf3dae865d377e4b0fa66f52d0"
+  },
+  {
+    "index": 24,
+    "timestamp": 1771535440.5319266,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f89d6525d2104ceb",
+        "job_id": "job-536d7beabbec4c2a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535440
+      }
+    ],
+    "previous_hash": "9a39f4b68b3300e13aa4a1854ad9c3631f87e2cf3dae865d377e4b0fa66f52d0",
+    "nonce": 0,
+    "hash": "0360bc10e758f34483978b2062c6883d0b4243e3c2042d5b6ee268a1dcd00aa9"
+  },
+  {
+    "index": 25,
+    "timestamp": 1771535459.7564206,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-427111d101e2465e",
+        "job_id": "job-4ea7036af1c64b55",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535459
+      }
+    ],
+    "previous_hash": "0360bc10e758f34483978b2062c6883d0b4243e3c2042d5b6ee268a1dcd00aa9",
+    "nonce": 0,
+    "hash": "9da4574e78d6b492c8185504cabf9e7e8dff1c08561f05a4b417e2911a348880"
+  },
+  {
+    "index": 26,
+    "timestamp": 1771535478.85833,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-066e86959bb44537",
+        "job_id": "job-0b6fe28c238144e7",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535478
+      }
+    ],
+    "previous_hash": "9da4574e78d6b492c8185504cabf9e7e8dff1c08561f05a4b417e2911a348880",
+    "nonce": 0,
+    "hash": "0efa4591e5f291189bd1ae8b938ec2ec2e9edfbc8ecefd38468dc3d112f407e9"
+  },
+  {
+    "index": 27,
+    "timestamp": 1771535498.2441514,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-0b1c34c8da7a4c22",
+        "job_id": "job-62706db4ff10405a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535498
+      }
+    ],
+    "previous_hash": "0efa4591e5f291189bd1ae8b938ec2ec2e9edfbc8ecefd38468dc3d112f407e9",
+    "nonce": 0,
+    "hash": "414b1c5dbe534c807e6a0b1382d95b41074f32696aca2bac33fa28eef19ef847"
+  },
+  {
+    "index": 28,
+    "timestamp": 1771535517.557973,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-52145634aafd4acb",
+        "job_id": "job-d02dc56fa1074530",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535517
+      }
+    ],
+    "previous_hash": "414b1c5dbe534c807e6a0b1382d95b41074f32696aca2bac33fa28eef19ef847",
+    "nonce": 0,
+    "hash": "025bbcb5f06533d3edbe9771a73d111e9a369c997a48bcf8238cc3e18009f9d1"
+  },
+  {
+    "index": 29,
+    "timestamp": 1771535537.7718663,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-19b86f96027c48ed",
+        "job_id": "job-9f5b74b05fec497c",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535537
+      }
+    ],
+    "previous_hash": "025bbcb5f06533d3edbe9771a73d111e9a369c997a48bcf8238cc3e18009f9d1",
+    "nonce": 0,
+    "hash": "f87c0db9e71ae3c72bfbf64bd8fbfb9e373eec21a155d2898ba205955d069d69"
+  },
+  {
+    "index": 30,
+    "timestamp": 1771535559.6233165,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-eef08d83169d487a",
+        "job_id": "job-46fe2df485834a24",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535559
+      }
+    ],
+    "previous_hash": "f87c0db9e71ae3c72bfbf64bd8fbfb9e373eec21a155d2898ba205955d069d69",
+    "nonce": 0,
+    "hash": "5bcefa773626185968adf244855d3b6ce00e83cc186f92009db8ba6e5322e75d"
+  },
+  {
+    "index": 31,
+    "timestamp": 1771535579.8552678,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-44d11b57c1d8446a",
+        "job_id": "job-5ad6fe11390a40c4",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535579
+      }
+    ],
+    "previous_hash": "5bcefa773626185968adf244855d3b6ce00e83cc186f92009db8ba6e5322e75d",
+    "nonce": 0,
+    "hash": "4d2bfa3abda2d1763e12a6975a95e4dc3c1b93b4d363dd437454a3351d45ca8d"
+  },
+  {
+    "index": 32,
+    "timestamp": 1771535599.2288864,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-898c692539b34153",
+        "job_id": "job-c6ce4c3f6ce44fbf",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535599
+      }
+    ],
+    "previous_hash": "4d2bfa3abda2d1763e12a6975a95e4dc3c1b93b4d363dd437454a3351d45ca8d",
+    "nonce": 0,
+    "hash": "80967711ca91991244b61ad68ec8435413f4f75252ce4aa6ae5ed1eb051a43aa"
+  },
+  {
+    "index": 33,
+    "timestamp": 1771535629.4659345,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-9f48423a6f754074",
+        "job_id": "job-ea729289d0964729",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535629
+      }
+    ],
+    "previous_hash": "80967711ca91991244b61ad68ec8435413f4f75252ce4aa6ae5ed1eb051a43aa",
+    "nonce": 0,
+    "hash": "b0f7807c6a7b03517a6a0b6ac36ba24e9ee67ac834398ea13d7ada519957d521"
+  },
+  {
+    "index": 34,
+    "timestamp": 1771535658.2746813,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-2853a13c49324a77",
+        "job_id": "job-c07a4e4d6ebd4091",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535658
+      }
+    ],
+    "previous_hash": "b0f7807c6a7b03517a6a0b6ac36ba24e9ee67ac834398ea13d7ada519957d521",
+    "nonce": 0,
+    "hash": "a37a40747ad1312c48120455dfe4c1440030254edd30f76ce57377a5e6b669c6"
+  },
+  {
+    "index": 35,
+    "timestamp": 1771535687.1867995,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-d14cb74976864ba7",
+        "job_id": "job-7efd207d81984269",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535687
+      }
+    ],
+    "previous_hash": "a37a40747ad1312c48120455dfe4c1440030254edd30f76ce57377a5e6b669c6",
+    "nonce": 0,
+    "hash": "a8472c48ca1f80d538491fa09f260007296fd63502331fbc440bd3b133810d73"
+  },
+  {
+    "index": 36,
+    "timestamp": 1771535707.3253665,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-e23a643a028b41c5",
+        "job_id": "job-bf177c4422f44c91",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535707
+      }
+    ],
+    "previous_hash": "a8472c48ca1f80d538491fa09f260007296fd63502331fbc440bd3b133810d73",
+    "nonce": 0,
+    "hash": "b6aa21995f802652f65540103728922e887f9865ce8abf17e62a7a472fe7272d"
+  },
+  {
+    "index": 37,
+    "timestamp": 1771535728.1200485,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-2f8740e06a7548cf",
+        "job_id": "job-3afe965cfa714dcf",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535728
+      }
+    ],
+    "previous_hash": "b6aa21995f802652f65540103728922e887f9865ce8abf17e62a7a472fe7272d",
+    "nonce": 0,
+    "hash": "1985937a649b43fdf37455caea28188bb64bfddedf289e3367e83db1932e75bb"
+  },
+  {
+    "index": 38,
+    "timestamp": 1771535748.5431793,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-7689aad20afa4665",
+        "job_id": "job-6d9d6a7eb6c84a24",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535748
+      }
+    ],
+    "previous_hash": "1985937a649b43fdf37455caea28188bb64bfddedf289e3367e83db1932e75bb",
+    "nonce": 0,
+    "hash": "d0d6728a76f70ea0e02c4360dabdaa3a699dd8591e699b1b618318cbb5ce4926"
+  },
+  {
+    "index": 39,
+    "timestamp": 1771535768.5469663,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-a2bba1c6d98e490e",
+        "job_id": "job-0ee4c779b7934ff8",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535768
+      }
+    ],
+    "previous_hash": "d0d6728a76f70ea0e02c4360dabdaa3a699dd8591e699b1b618318cbb5ce4926",
+    "nonce": 0,
+    "hash": "bb788fae555f7cd888d2a0df615df3b639b8166ddffe00f3dae7abaec2e45db1"
+  },
+  {
+    "index": 40,
+    "timestamp": 1771535788.1529605,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f2fb4247d3a84de4",
+        "job_id": "job-96bc7b7f0f7544b4",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535788
+      }
+    ],
+    "previous_hash": "bb788fae555f7cd888d2a0df615df3b639b8166ddffe00f3dae7abaec2e45db1",
+    "nonce": 0,
+    "hash": "2a2cf9b47317acb87c2e1680dd75e2af93501c1da97da30545a209e04810793e"
+  },
+  {
+    "index": 41,
+    "timestamp": 1771535808.5582855,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-30b41f22fa2b4370",
+        "job_id": "job-1537c8f978ac47c3",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535808
+      }
+    ],
+    "previous_hash": "2a2cf9b47317acb87c2e1680dd75e2af93501c1da97da30545a209e04810793e",
+    "nonce": 0,
+    "hash": "3cf086d0657e0a3bf37b9eb69616435829411def432751c78ef5d9c5eb5a8e96"
+  },
+  {
+    "index": 42,
+    "timestamp": 1771535829.0357022,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-a0b6f61572b0439b",
+        "job_id": "job-1dbc4248dbbd4dd6",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535829
+      }
+    ],
+    "previous_hash": "3cf086d0657e0a3bf37b9eb69616435829411def432751c78ef5d9c5eb5a8e96",
+    "nonce": 0,
+    "hash": "2d50680feafc2e84891d7fae70d105d16100defe68a4fea7b3185a0c7573dd57"
+  },
+  {
+    "index": 43,
+    "timestamp": 1771535835.5019357,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 10,
+        "source": "bank_transfer",
+        "created_at": 1771535835
+      }
+    ],
+    "previous_hash": "2d50680feafc2e84891d7fae70d105d16100defe68a4fea7b3185a0c7573dd57",
+    "nonce": 0,
+    "hash": "1b4ec4e9d813e2f48a7f0e7b1f2d1c2801e6193a2a3ecf90dfe711b5c9d747c1"
+  },
+  {
+    "index": 44,
+    "timestamp": 1771535843.3868546,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-344de5470d154270",
+        "job_id": "job-e1eda837e6c449ff",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535843
+      }
+    ],
+    "previous_hash": "1b4ec4e9d813e2f48a7f0e7b1f2d1c2801e6193a2a3ecf90dfe711b5c9d747c1",
+    "nonce": 0,
+    "hash": "9e5e94b121ecd5762788ee2cd8cd40b65fceb36ba9a101cb0cb03d47fa857407"
+  },
+  {
+    "index": 45,
+    "timestamp": 1771535849.652938,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-d9a0aa3f935b42f1",
+        "job_id": "job-5673322e8935400a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535849
+      }
+    ],
+    "previous_hash": "9e5e94b121ecd5762788ee2cd8cd40b65fceb36ba9a101cb0cb03d47fa857407",
+    "nonce": 0,
+    "hash": "78418f1ef50dc71267497213e5b8e90f82bbcf3ecb07d9ff7aab99bd27ec7bf4"
+  },
+  {
+    "index": 46,
+    "timestamp": 1771535870.2567983,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-7bfcf3d03cda4267",
+        "job_id": "job-61dcd1436d054b68",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535870
+      }
+    ],
+    "previous_hash": "78418f1ef50dc71267497213e5b8e90f82bbcf3ecb07d9ff7aab99bd27ec7bf4",
+    "nonce": 0,
+    "hash": "814b0f1f840e571e49d7c25d6e590e3bc9112f95a5e4736f241ad9724bc3e860"
+  },
+  {
+    "index": 47,
+    "timestamp": 1771535891.0205176,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-4aacc9fd34f24e91",
+        "job_id": "job-a4d904c9cb2f4fd1",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535891
+      }
+    ],
+    "previous_hash": "814b0f1f840e571e49d7c25d6e590e3bc9112f95a5e4736f241ad9724bc3e860",
+    "nonce": 0,
+    "hash": "562a35f92f446fc559819eab56dde3c0050e37e028826546cca866d693022ae1"
+  },
+  {
+    "index": 48,
+    "timestamp": 1771535911.4635396,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-db208c44fa994113",
+        "job_id": "job-06c99920b15f4649",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535911
+      }
+    ],
+    "previous_hash": "562a35f92f446fc559819eab56dde3c0050e37e028826546cca866d693022ae1",
+    "nonce": 0,
+    "hash": "d127faaa34dce98570a920f4c255c5c4435adb0a8ea95c3c571e571c805f62ec"
+  },
+  {
+    "index": 49,
+    "timestamp": 1771535933.1600637,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-4e1a50cc06f34d58",
+        "job_id": "job-2ea188a04f65476e",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535933
+      }
+    ],
+    "previous_hash": "d127faaa34dce98570a920f4c255c5c4435adb0a8ea95c3c571e571c805f62ec",
+    "nonce": 0,
+    "hash": "48c801469f7bdf5473c0ac52e5b941dfdd2c47222947d0a2869785f89b1c352c"
+  },
+  {
+    "index": 50,
+    "timestamp": 1771535954.1238601,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-0e5d92b38af74cf0",
+        "job_id": "job-1ae861a971a746bf",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535954
+      }
+    ],
+    "previous_hash": "48c801469f7bdf5473c0ac52e5b941dfdd2c47222947d0a2869785f89b1c352c",
+    "nonce": 0,
+    "hash": "0ac5d89fae7313b44ddb0b8a1bd4526462895010e096afe64352a5be86a1e525"
+  },
+  {
+    "index": 51,
+    "timestamp": 1771535974.3285959,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-0f5a3991814d4260",
+        "job_id": "job-11d9e8a65b204751",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535974
+      }
+    ],
+    "previous_hash": "0ac5d89fae7313b44ddb0b8a1bd4526462895010e096afe64352a5be86a1e525",
+    "nonce": 0,
+    "hash": "0e6d5ed15874921e523f262d472ed53318e743a0eab47d2cb89e52060ea87376"
+  },
+  {
+    "index": 52,
+    "timestamp": 1771535990.2980404,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 10,
+        "source": "bank_transfer",
+        "created_at": 1771535990
+      }
+    ],
+    "previous_hash": "0e6d5ed15874921e523f262d472ed53318e743a0eab47d2cb89e52060ea87376",
+    "nonce": 0,
+    "hash": "dd78df0cc177ea059cf507e7a04637958e0a4e5beaca57b397d04418e2ef06b3"
+  },
+  {
+    "index": 53,
+    "timestamp": 1771535993.4035413,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-7065157c43cd47fa",
+        "job_id": "job-09c0608a13e04c9b",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535993
+      }
+    ],
+    "previous_hash": "dd78df0cc177ea059cf507e7a04637958e0a4e5beaca57b397d04418e2ef06b3",
+    "nonce": 0,
+    "hash": "a42433bc9837d41306065e03c0601b35104b6433d8cc60592071b221e7ce0bb8"
+  },
+  {
+    "index": 54,
+    "timestamp": 1771535994.2247,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-e519aad9c1c34061",
+        "job_id": "job-92d87d5ac4244581",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771535994
+      }
+    ],
+    "previous_hash": "a42433bc9837d41306065e03c0601b35104b6433d8cc60592071b221e7ce0bb8",
+    "nonce": 0,
+    "hash": "a00d0518a0b818e1f501293770b7bfd7f5c61ef13100fe449aa601972fe4ab98"
+  },
+  {
+    "index": 55,
+    "timestamp": 1771536013.945839,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-17cd6d682deb46a1",
+        "job_id": "job-1aa05c74b37b47ae",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536013
+      }
+    ],
+    "previous_hash": "a00d0518a0b818e1f501293770b7bfd7f5c61ef13100fe449aa601972fe4ab98",
+    "nonce": 0,
+    "hash": "0c27bfaad5b817490a79b7983a53145f4ee5661b3265d8ab62ac27485d3cd667"
+  },
+  {
+    "index": 56,
+    "timestamp": 1771536033.2515988,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-62ba7b85ac134df2",
+        "job_id": "job-48dbd01b4bc74d0a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536033
+      }
+    ],
+    "previous_hash": "0c27bfaad5b817490a79b7983a53145f4ee5661b3265d8ab62ac27485d3cd667",
+    "nonce": 0,
+    "hash": "4674c3179bafcba63a1c880084702faa60a39888ea88bf882be144fb415665bf"
+  },
+  {
+    "index": 57,
+    "timestamp": 1771536053.4628208,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-e8b83a512ece4514",
+        "job_id": "job-9a96077946634d3f",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536053
+      }
+    ],
+    "previous_hash": "4674c3179bafcba63a1c880084702faa60a39888ea88bf882be144fb415665bf",
+    "nonce": 0,
+    "hash": "cb473a86cae26a35823b0596e0f93a20945676d54f100bf09e07b8c6919603a6"
+  },
+  {
+    "index": 58,
+    "timestamp": 1771536074.0457604,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f1ebc51752784407",
+        "job_id": "job-e4ef573809ec4753",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536074
+      }
+    ],
+    "previous_hash": "cb473a86cae26a35823b0596e0f93a20945676d54f100bf09e07b8c6919603a6",
+    "nonce": 0,
+    "hash": "3923f174a8f575ad7bcbbf64ab35f0f7f07a0dc3aab37237be02452f2e451c46"
+  },
+  {
+    "index": 59,
+    "timestamp": 1771536094.3564808,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c20ae96bf1e84d62",
+        "job_id": "job-e90e24061a68442e",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536094
+      }
+    ],
+    "previous_hash": "3923f174a8f575ad7bcbbf64ab35f0f7f07a0dc3aab37237be02452f2e451c46",
+    "nonce": 0,
+    "hash": "fe007cb310109057a3f14d4faa1cdb2c26bf2b72a1911b3de93812665c54aff3"
+  },
+  {
+    "index": 60,
+    "timestamp": 1771536114.481132,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-5a3fa2600b414a03",
+        "job_id": "job-0b2ac878f7d94028",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536114
+      }
+    ],
+    "previous_hash": "fe007cb310109057a3f14d4faa1cdb2c26bf2b72a1911b3de93812665c54aff3",
+    "nonce": 0,
+    "hash": "9e298b4b0016d5d5153de87f06dd6d9b28a6869eb93f20946b2fc782a43eed20"
+  },
+  {
+    "index": 61,
+    "timestamp": 1771536135.400291,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c96f3e27f066493e",
+        "job_id": "job-eab15051e6c244eb",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536135
+      }
+    ],
+    "previous_hash": "9e298b4b0016d5d5153de87f06dd6d9b28a6869eb93f20946b2fc782a43eed20",
+    "nonce": 0,
+    "hash": "8e4aa820b2921e457b2be0e09679f7149289ad0fe0678f8bd03ad2531835513e"
+  },
+  {
+    "index": 62,
+    "timestamp": 1771536156.5801487,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-5fe376d307dd4cd0",
+        "job_id": "job-2c19b561b34f4d3e",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536156
+      }
+    ],
+    "previous_hash": "8e4aa820b2921e457b2be0e09679f7149289ad0fe0678f8bd03ad2531835513e",
+    "nonce": 0,
+    "hash": "48c3e6feea868a1581680adbf453aa3bf0c92a9446abc76c1d47fd7c5464f47c"
+  },
+  {
+    "index": 63,
+    "timestamp": 1771536179.9450836,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f74c993b3a5e4293",
+        "job_id": "job-80cd9f01f8564d0c",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536179
+      }
+    ],
+    "previous_hash": "48c3e6feea868a1581680adbf453aa3bf0c92a9446abc76c1d47fd7c5464f47c",
+    "nonce": 0,
+    "hash": "b593bab3a6143ed6520742c2e4fc89ded4014e9e365024e0df6544d60a3237ad"
+  },
+  {
+    "index": 64,
+    "timestamp": 1771536206.6176982,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-7ccaf7d126624689",
+        "job_id": "job-d4ff395fa6734de5",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536206
+      }
+    ],
+    "previous_hash": "b593bab3a6143ed6520742c2e4fc89ded4014e9e365024e0df6544d60a3237ad",
+    "nonce": 0,
+    "hash": "7017a7fdf0c862ce5ff1b777e884f3bd62728e5da92f4c5413b134c72bdd1284"
+  },
+  {
+    "index": 65,
+    "timestamp": 1771536236.6636515,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f33d852f45b54a2b",
+        "job_id": "job-86c380ace0e643af",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536236
+      }
+    ],
+    "previous_hash": "7017a7fdf0c862ce5ff1b777e884f3bd62728e5da92f4c5413b134c72bdd1284",
+    "nonce": 0,
+    "hash": "9707ce382d1b0906ed9eeff97c85b0ffd2d67c31c11f7bf3f2ac58ed91e016a3"
+  },
+  {
+    "index": 66,
+    "timestamp": 1771536259.6796088,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-13afec7254f94bda",
+        "job_id": "job-b1bd685e43e0457a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536259
+      }
+    ],
+    "previous_hash": "9707ce382d1b0906ed9eeff97c85b0ffd2d67c31c11f7bf3f2ac58ed91e016a3",
+    "nonce": 0,
+    "hash": "af176fe49f5b39e84b43502f76fb6a3ef524fb7ac61b38b27a90cba58db656d5"
+  },
+  {
+    "index": 67,
+    "timestamp": 1771536281.0123398,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-0946de485f1d41d2",
+        "job_id": "job-338144235fb147c0",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536281
+      }
+    ],
+    "previous_hash": "af176fe49f5b39e84b43502f76fb6a3ef524fb7ac61b38b27a90cba58db656d5",
+    "nonce": 0,
+    "hash": "50d063fd9796e27bcfca07ce0fd2d22c1d1283b60d756b0db13e23bf2f91d0f2"
+  },
+  {
+    "index": 68,
+    "timestamp": 1771536301.2248013,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-ddf50e5ebd76482f",
+        "job_id": "job-1220a260249b43ba",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536301
+      }
+    ],
+    "previous_hash": "50d063fd9796e27bcfca07ce0fd2d22c1d1283b60d756b0db13e23bf2f91d0f2",
+    "nonce": 0,
+    "hash": "390e085daab492bd11ac525d65e47096fff2012f1c159bf5874bdfba0bd328a3"
+  },
+  {
+    "index": 69,
+    "timestamp": 1771536322.719912,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-e069c9f776594ea5",
+        "job_id": "job-3d6fcf22aa064a75",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536322
+      }
+    ],
+    "previous_hash": "390e085daab492bd11ac525d65e47096fff2012f1c159bf5874bdfba0bd328a3",
+    "nonce": 0,
+    "hash": "5c0bc2773863f0919dc25fc64ccc2df29bfdd675cd7046073c6e3881a2fe9cb3"
+  },
+  {
+    "index": 70,
+    "timestamp": 1771536344.0974405,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-752207c8d09d49d7",
+        "job_id": "job-ee8016513956439d",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536344
+      }
+    ],
+    "previous_hash": "5c0bc2773863f0919dc25fc64ccc2df29bfdd675cd7046073c6e3881a2fe9cb3",
+    "nonce": 0,
+    "hash": "f4919f5056f8b1b2a690b80cd00127656b728bee0f82998519a40e8bfd5f4fc8"
+  },
+  {
+    "index": 71,
+    "timestamp": 1771536366.904713,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-454dcb958ff24f0c",
+        "job_id": "job-ef8347940ea74e72",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536366
+      }
+    ],
+    "previous_hash": "f4919f5056f8b1b2a690b80cd00127656b728bee0f82998519a40e8bfd5f4fc8",
+    "nonce": 0,
+    "hash": "9d9e0d82ebea7c91fcde76aac4d5119aca2952d86d1220b7ef3f8f4d0ab3d7d9"
+  },
+  {
+    "index": 72,
+    "timestamp": 1771536387.9294302,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-5ae93c6959564043",
+        "job_id": "job-43ab9b1ea23e492b",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536387
+      }
+    ],
+    "previous_hash": "9d9e0d82ebea7c91fcde76aac4d5119aca2952d86d1220b7ef3f8f4d0ab3d7d9",
+    "nonce": 0,
+    "hash": "89ccb243e5cfa34aad0d7d66cdf193b132d1ccf07a5f0ebb27bebe8fe982d843"
+  },
+  {
+    "index": 73,
+    "timestamp": 1771536415.1446497,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c732ad5e156b4645",
+        "job_id": "job-f0552cff79264972",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536415
+      }
+    ],
+    "previous_hash": "89ccb243e5cfa34aad0d7d66cdf193b132d1ccf07a5f0ebb27bebe8fe982d843",
+    "nonce": 0,
+    "hash": "0819cf64f535248c62c40fad9baa307dbc762f795149eabf8d2c889ec1e7c712"
+  },
+  {
+    "index": 74,
+    "timestamp": 1771536439.4484406,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-b91d11c1e7ea4ece",
+        "job_id": "job-6ab155e430784a59",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536439
+      }
+    ],
+    "previous_hash": "0819cf64f535248c62c40fad9baa307dbc762f795149eabf8d2c889ec1e7c712",
+    "nonce": 0,
+    "hash": "b971466875cda1be977664071128e4d6ca091e001ad1c9bba02a8b85a2363e06"
+  },
+  {
+    "index": 75,
+    "timestamp": 1771536462.1717627,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c3a0824734ee4b96",
+        "job_id": "job-dd6bb47b55374e7c",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536462
+      }
+    ],
+    "previous_hash": "b971466875cda1be977664071128e4d6ca091e001ad1c9bba02a8b85a2363e06",
+    "nonce": 0,
+    "hash": "d1190ba1ac04ec4295b44025738a09a6048c3bf27b669efdf212a14d8e20654c"
+  },
+  {
+    "index": 76,
+    "timestamp": 1771536483.3861487,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-010d6d8a88fb4fae",
+        "job_id": "job-e5069a10337d4120",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536483
+      }
+    ],
+    "previous_hash": "d1190ba1ac04ec4295b44025738a09a6048c3bf27b669efdf212a14d8e20654c",
+    "nonce": 0,
+    "hash": "3cebcb6fbced52c56ae683c60282baadae0d9b7b74c748c3ececa77b49c5bf5c"
+  },
+  {
+    "index": 77,
+    "timestamp": 1771536504.313671,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-9bed95b67d6c4869",
+        "job_id": "job-9346fa13f0ba40fa",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536504
+      }
+    ],
+    "previous_hash": "3cebcb6fbced52c56ae683c60282baadae0d9b7b74c748c3ececa77b49c5bf5c",
+    "nonce": 0,
+    "hash": "58d4f0d1aecba8ab61f67a807e71fa4d1efdd121be1e3cdfd134269a29cd8567"
+  },
+  {
+    "index": 78,
+    "timestamp": 1771536525.9331892,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-4833ba1386244723",
+        "job_id": "job-4d71ada98e7e4ce8",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536525
+      }
+    ],
+    "previous_hash": "58d4f0d1aecba8ab61f67a807e71fa4d1efdd121be1e3cdfd134269a29cd8567",
+    "nonce": 0,
+    "hash": "27515f138e744a7db4a1012fc2b72307a5a0824d8194f53e4532d09cd227fb7e"
+  },
+  {
+    "index": 79,
+    "timestamp": 1771536548.6944225,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-8cb5ef7c56154a90",
+        "job_id": "job-1fdee78a62ea497d",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536548
+      }
+    ],
+    "previous_hash": "27515f138e744a7db4a1012fc2b72307a5a0824d8194f53e4532d09cd227fb7e",
+    "nonce": 0,
+    "hash": "026f73553d85dfae72ec4609bfe69cbe93e10a6a332faf2fc08c55e12e0e084d"
+  },
+  {
+    "index": 80,
+    "timestamp": 1771536571.4685898,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-fe2647aa27394f24",
+        "job_id": "job-8f60bdb369d34360",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536571
+      }
+    ],
+    "previous_hash": "026f73553d85dfae72ec4609bfe69cbe93e10a6a332faf2fc08c55e12e0e084d",
+    "nonce": 0,
+    "hash": "7b5b06db58d02866ef4cf8ce695433fdd110bab9dd617ad448306592d8b0f485"
+  },
+  {
+    "index": 81,
+    "timestamp": 1771536597.4243972,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-54aa344980574b66",
+        "job_id": "job-b527d6e5efbd4920",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536597
+      }
+    ],
+    "previous_hash": "7b5b06db58d02866ef4cf8ce695433fdd110bab9dd617ad448306592d8b0f485",
+    "nonce": 0,
+    "hash": "0d544027d4ae61fff8d85ec0a89f73e3c1a049600367a1a80ecd595ddebe46ac"
+  },
+  {
+    "index": 82,
+    "timestamp": 1771536621.0467362,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-f42495bf87374545",
+        "job_id": "job-89310a32878b4a9c",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536621
+      }
+    ],
+    "previous_hash": "0d544027d4ae61fff8d85ec0a89f73e3c1a049600367a1a80ecd595ddebe46ac",
+    "nonce": 0,
+    "hash": "9700143a8207ab5babefe948bd7d3aed12967726656a09bad988dcaac9d9ef20"
+  },
+  {
+    "index": 83,
+    "timestamp": 1771536641.8888452,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-287501b814f44e09",
+        "job_id": "job-21703505542f409e",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536641
+      }
+    ],
+    "previous_hash": "9700143a8207ab5babefe948bd7d3aed12967726656a09bad988dcaac9d9ef20",
+    "nonce": 0,
+    "hash": "9591956285d26334a2572e89398e45d8a86b3fb6322a248c81bda837b083d1c8"
+  },
+  {
+    "index": 84,
+    "timestamp": 1771536662.2015228,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-54196c8fcde94052",
+        "job_id": "job-9eb751bc759d48c7",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536662
+      }
+    ],
+    "previous_hash": "9591956285d26334a2572e89398e45d8a86b3fb6322a248c81bda837b083d1c8",
+    "nonce": 0,
+    "hash": "d20d1f55caaa15ac711ad47a5593a33af92f11eaba157dc55f1aa311b727d893"
+  },
+  {
+    "index": 85,
+    "timestamp": 1771536683.0573804,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-9d40936906534fe1",
+        "job_id": "job-6fcf3085f8ce473a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536683
+      }
+    ],
+    "previous_hash": "d20d1f55caaa15ac711ad47a5593a33af92f11eaba157dc55f1aa311b727d893",
+    "nonce": 0,
+    "hash": "100a6f3872a9639030c241ee735a4008b39827621c92bdc9f3b3444ac41931a0"
+  },
+  {
+    "index": 86,
+    "timestamp": 1771536703.4450383,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-89fa343275804410",
+        "job_id": "job-30d78b7e019b46fe",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536703
+      }
+    ],
+    "previous_hash": "100a6f3872a9639030c241ee735a4008b39827621c92bdc9f3b3444ac41931a0",
+    "nonce": 0,
+    "hash": "abdd0ef8c49751eb87b41f632c035b6578f010099ccce696990ed349a3dcabf2"
+  },
+  {
+    "index": 87,
+    "timestamp": 1771536726.0080292,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-9e6e77d4b8394808",
+        "job_id": "job-681e1306c4714f41",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536726
+      }
+    ],
+    "previous_hash": "abdd0ef8c49751eb87b41f632c035b6578f010099ccce696990ed349a3dcabf2",
+    "nonce": 0,
+    "hash": "4d341d2bd11120a838bd7f69a7dee86c39c7dd4fc41239e792dae1f20ca26c60"
+  },
+  {
+    "index": 88,
+    "timestamp": 1771536750.6528285,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-fe360c9425304e86",
+        "job_id": "job-97846691fe5e45a9",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536750
+      }
+    ],
+    "previous_hash": "4d341d2bd11120a838bd7f69a7dee86c39c7dd4fc41239e792dae1f20ca26c60",
+    "nonce": 0,
+    "hash": "6f7857bd77b9bb6265150a9ff06c42b584d2964b986235cba20811ad70649316"
+  },
+  {
+    "index": 89,
+    "timestamp": 1771536777.1974535,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-89ad901f009a4165",
+        "job_id": "job-28bd68b41cfb4e6e",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536777
+      }
+    ],
+    "previous_hash": "6f7857bd77b9bb6265150a9ff06c42b584d2964b986235cba20811ad70649316",
+    "nonce": 0,
+    "hash": "ec582ea4251a9f529191173f388013fd7f58891a25edac721a8f166f999774cc"
+  },
+  {
+    "index": 90,
+    "timestamp": 1771536801.8693988,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-59609242b86a4743",
+        "job_id": "job-713bf256ad064988",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536801
+      }
+    ],
+    "previous_hash": "ec582ea4251a9f529191173f388013fd7f58891a25edac721a8f166f999774cc",
+    "nonce": 0,
+    "hash": "064485ca1622978a5da8b78c0197da94d2b6f7f30912e196642f82f1fc017ef1"
+  },
+  {
+    "index": 91,
+    "timestamp": 1771536834.594033,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-19acfb4958b940ca",
+        "job_id": "job-dfdeeb09a36a4032",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536834
+      }
+    ],
+    "previous_hash": "064485ca1622978a5da8b78c0197da94d2b6f7f30912e196642f82f1fc017ef1",
+    "nonce": 0,
+    "hash": "d91da56653a892f153217a6c1b94339770b0380c8ad544f3afdc697482457081"
+  },
+  {
+    "index": 92,
+    "timestamp": 1771536869.2660263,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-8ea5805487634888",
+        "job_id": "job-f614ae1859a941db",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536869
+      }
+    ],
+    "previous_hash": "d91da56653a892f153217a6c1b94339770b0380c8ad544f3afdc697482457081",
+    "nonce": 0,
+    "hash": "1ce4262d79546ce226282cf4b8b6640379baaad493de2e8c25aba5067fdc799b"
+  },
+  {
+    "index": 93,
+    "timestamp": 1771536904.3047857,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-46f0247ccecf478b",
+        "job_id": "job-32e7e37770dd4f3a",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536904
+      }
+    ],
+    "previous_hash": "1ce4262d79546ce226282cf4b8b6640379baaad493de2e8c25aba5067fdc799b",
+    "nonce": 0,
+    "hash": "788ec15b2fe3cebb8823a8411b6e5f9079620108e08b343ed94d8b8fdc4531af"
+  },
+  {
+    "index": 94,
+    "timestamp": 1771536938.4900923,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-10f21be523954291",
+        "job_id": "job-2363aad5a94d42c4",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536938
+      }
+    ],
+    "previous_hash": "788ec15b2fe3cebb8823a8411b6e5f9079620108e08b343ed94d8b8fdc4531af",
+    "nonce": 0,
+    "hash": "d2c1b1838cb7b25cbfcd255b61d3884aa04b33151e20172ba8c04590b9b51675"
+  },
+  {
+    "index": 95,
+    "timestamp": 1771536977.8102238,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-4e281f00d5704a53",
+        "job_id": "job-c0d95dc28efb4198",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771536977
+      }
+    ],
+    "previous_hash": "d2c1b1838cb7b25cbfcd255b61d3884aa04b33151e20172ba8c04590b9b51675",
+    "nonce": 0,
+    "hash": "b2a7e84bd875a0da88e01d3877a5f67417bdd7a2bcf1f9c14972c6a6ce4a1531"
+  },
+  {
+    "index": 96,
+    "timestamp": 1771537021.3654857,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-ba8f7c22ed42436a",
+        "job_id": "job-4e0d299f99f048fe",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537021
+      }
+    ],
+    "previous_hash": "b2a7e84bd875a0da88e01d3877a5f67417bdd7a2bcf1f9c14972c6a6ce4a1531",
+    "nonce": 0,
+    "hash": "10732d3f5feaa7bee7fa3c05aabcb5f52b6bb84b5707410db482e245c0fbe268"
+  },
+  {
+    "index": 97,
+    "timestamp": 1771537032.5668116,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-md-benchpep-001",
+        "work_units": 12000,
+        "attempt_id": 1,
+        "result_data": "87e422aa8ae090a3b708a025b43316ceed54d98d88bf8a798aa67ec186f77dc6",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "ef2099b23a3355eddace36045f38abccac8c5834c4c149bab5335ef9c308a4b5",
+        "provider_client_id": "e1e678fd-39b1-47d4-a164-2b498879f35c",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-md-benchpep-001",
+        "currency": "USD",
+        "amount": 120,
+        "work_units": 12000,
+        "created_at": 1771537032
+      }
+    ],
+    "previous_hash": "10732d3f5feaa7bee7fa3c05aabcb5f52b6bb84b5707410db482e245c0fbe268",
+    "nonce": 0,
+    "hash": "76123cdcfaadebbd682b979c6421079d74c41c4cd06189c597e04546cca217f0"
+  },
+  {
+    "index": 98,
+    "timestamp": 1771537050.3173192,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-e218523863c04f2b",
+        "job_id": "job-3e7e240175ff4c76",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537050
+      }
+    ],
+    "previous_hash": "76123cdcfaadebbd682b979c6421079d74c41c4cd06189c597e04546cca217f0",
+    "nonce": 0,
+    "hash": "be18202bf8135163f82957321a74256323a36d033641fd1c469cd23237985bde"
+  },
+  {
+    "index": 99,
+    "timestamp": 1771537071.335632,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-ce0c3c57f42548ce",
+        "job_id": "job-6656fe634e0b4587",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537071
+      }
+    ],
+    "previous_hash": "be18202bf8135163f82957321a74256323a36d033641fd1c469cd23237985bde",
+    "nonce": 0,
+    "hash": "8b5a8bbe8ba1aa9dd77713452aed2a81114e0dbc7bff1cf060739fc87f4404f1"
+  },
+  {
+    "index": 100,
+    "timestamp": 1771537092.0049117,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-0388f70d4f6f4fe1",
+        "job_id": "job-bbd8122ad4ce441f",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537092
+      }
+    ],
+    "previous_hash": "8b5a8bbe8ba1aa9dd77713452aed2a81114e0dbc7bff1cf060739fc87f4404f1",
+    "nonce": 0,
+    "hash": "70eed950e60f32d8ec6e527911dc4e8bc30f88c37ef91e48ec4989c904e2f1ff"
+  },
+  {
+    "index": 101,
+    "timestamp": 1771537114.727943,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-ed02212c626e4887",
+        "job_id": "job-6292e7e7d93e47ab",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537114
+      }
+    ],
+    "previous_hash": "70eed950e60f32d8ec6e527911dc4e8bc30f88c37ef91e48ec4989c904e2f1ff",
+    "nonce": 0,
+    "hash": "bc425d17e53f8d1d9f89b5100b7550db2149c65a3ba3a6174e3a3fb9cadacc35"
+  },
+  {
+    "index": 102,
+    "timestamp": 1771537136.2685106,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-eae4f5b8ebee4016",
+        "job_id": "job-e0b5dce9b6284f46",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537136
+      }
+    ],
+    "previous_hash": "bc425d17e53f8d1d9f89b5100b7550db2149c65a3ba3a6174e3a3fb9cadacc35",
+    "nonce": 0,
+    "hash": "031038d33ab69dbbfe6a0f314bf1114e4704875fa53d8dc9fdbd039a17372fd7"
+  },
+  {
+    "index": 103,
+    "timestamp": 1771537159.312334,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-e461f539de5a4b2d",
+        "job_id": "job-a5269d2fc5044157",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537159
+      }
+    ],
+    "previous_hash": "031038d33ab69dbbfe6a0f314bf1114e4704875fa53d8dc9fdbd039a17372fd7",
+    "nonce": 0,
+    "hash": "a4a94ae011a1f050710f70dc53c0d45de137fad7b5924834001356ec1a312b82"
+  },
+  {
+    "index": 104,
+    "timestamp": 1771537185.9939725,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c8fe2ac008984387",
+        "job_id": "job-5b53338cbd594bbd",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537185
+      }
+    ],
+    "previous_hash": "a4a94ae011a1f050710f70dc53c0d45de137fad7b5924834001356ec1a312b82",
+    "nonce": 0,
+    "hash": "0f12e852e0a07878c91fd464ccb71457a78e3d61c0464979a2ceba67c97184a7"
+  },
+  {
+    "index": 105,
+    "timestamp": 1771537212.9054136,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-488010dcfc8441ed",
+        "job_id": "job-52707e9933234470",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537212
+      }
+    ],
+    "previous_hash": "0f12e852e0a07878c91fd464ccb71457a78e3d61c0464979a2ceba67c97184a7",
+    "nonce": 0,
+    "hash": "fcb4f08a35dcdb87585f971b4933d5c23e30ea00bd5ac31a10f239f9270823f1"
+  },
+  {
+    "index": 106,
+    "timestamp": 1771537220.4297118,
+    "transactions": [
+      {
+        "type": "fiat_topup",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 1000,
+        "source": "bank_transfer",
+        "created_at": 1771537220
+      }
+    ],
+    "previous_hash": "fcb4f08a35dcdb87585f971b4933d5c23e30ea00bd5ac31a10f239f9270823f1",
+    "nonce": 0,
+    "hash": "276e8207aaf14b31560666fbf2f9e1ddf8018afb1bfdf80d82d470e68157858a"
+  },
+  {
+    "index": 107,
+    "timestamp": 1771537225.652661,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-0bc630f5a3b34169",
+        "job_id": "job-6fa37abb24d1452c",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537225
+      }
+    ],
+    "previous_hash": "276e8207aaf14b31560666fbf2f9e1ddf8018afb1bfdf80d82d470e68157858a",
+    "nonce": 0,
+    "hash": "093412f174f06cf58ebd019881dcfa29d572e3ce7848bdf6a4912c375466a999"
+  },
+  {
+    "index": 108,
+    "timestamp": 1771537237.1571863,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-a21d9098c4b440dd",
+        "job_id": "job-806021f83209410c",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537237
+      }
+    ],
+    "previous_hash": "093412f174f06cf58ebd019881dcfa29d572e3ce7848bdf6a4912c375466a999",
+    "nonce": 0,
+    "hash": "851be8df72fb9b639820739bb153d522e1cee61270a3c63a3ceb838ee87c07f6"
+  },
+  {
+    "index": 109,
+    "timestamp": 1771537252.127892,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "56e2dde318676fde220046f55f2d15b70026928a5a9adc77a04a55cbf448c8b8",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "fddb6d1f365fb075c5c58d654da2f18c1803cc729498904cee16dc2594370ddc",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537251
+      }
+    ],
+    "previous_hash": "851be8df72fb9b639820739bb153d522e1cee61270a3c63a3ceb838ee87c07f6",
+    "nonce": 0,
+    "hash": "010737a7d5af99d791c7514b94816475f7344af32f44bc2efdca70cbbac9942a"
+  },
+  {
+    "index": 110,
+    "timestamp": 1771537254.9084582,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c7e9cac33eff4022",
+        "job_id": "job-c09ce90e982c4026",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537254
+      }
+    ],
+    "previous_hash": "010737a7d5af99d791c7514b94816475f7344af32f44bc2efdca70cbbac9942a",
+    "nonce": 0,
+    "hash": "a670ef5a136fd09d552172a7a22e095d7ea1a76158d14921a00789f54eeace2d"
+  },
+  {
+    "index": 111,
+    "timestamp": 1771537263.0025728,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-c799f39af7bf44f1",
+        "job_id": "job-6e35f9b7413f447f",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537262
+      }
+    ],
+    "previous_hash": "a670ef5a136fd09d552172a7a22e095d7ea1a76158d14921a00789f54eeace2d",
+    "nonce": 0,
+    "hash": "e9b9c2e31d8673eb17061a0218147b15e838548ee139b1345ad701c6e003591c"
+  },
+  {
+    "index": 112,
+    "timestamp": 1771537282.3751118,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "6b8cdf1e77e4e30eeb2dec443080cf1a7766dce1b8736f78e3960d972eb05c30",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "e3791d4f1be8a2061a319038788fa8f81b8ce7bcccd03dfef7750f73a7ec2d89",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537282
+      }
+    ],
+    "previous_hash": "e9b9c2e31d8673eb17061a0218147b15e838548ee139b1345ad701c6e003591c",
+    "nonce": 0,
+    "hash": "7a43b76132df91fc4683cb28f7bfffec9f7b0bc8ce3d74326a436508b17ccd68"
+  },
+  {
+    "index": 113,
+    "timestamp": 1771537285.2195885,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-7e7e05ca84a84b7c",
+        "job_id": "job-ea635697ac6b4127",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537285
+      }
+    ],
+    "previous_hash": "7a43b76132df91fc4683cb28f7bfffec9f7b0bc8ce3d74326a436508b17ccd68",
+    "nonce": 0,
+    "hash": "cf2c4acf6fdc196e20886a0546d6aa51cfcad46b041d1fa9dbabeebd17d9f6b1"
+  },
+  {
+    "index": 114,
+    "timestamp": 1771537291.823276,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-59e9005aceab42f3",
+        "job_id": "job-81b5e17edd244d65",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537291
+      }
+    ],
+    "previous_hash": "cf2c4acf6fdc196e20886a0546d6aa51cfcad46b041d1fa9dbabeebd17d9f6b1",
+    "nonce": 0,
+    "hash": "a40c377f276e4982977c4cc90cff5ce583b9c66cfaeed4d5fbddf57e940fa04a"
+  },
+  {
+    "index": 115,
+    "timestamp": 1771537317.8192308,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "4b7a1a03fa6543a6ff4866c0a56cc12cb77e9e01e5564b7ca9f962bfbf5de5ff",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "fb509b7271a76e04df9fa3d91d74e2ef078954d52c063b911974c5dbc47bf85e",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537317
+      }
+    ],
+    "previous_hash": "a40c377f276e4982977c4cc90cff5ce583b9c66cfaeed4d5fbddf57e940fa04a",
+    "nonce": 0,
+    "hash": "a9d3605c6c0933dc96969c603b559b7c7ed60e257d4ef5965850077f9fe88780"
+  },
+  {
+    "index": 116,
+    "timestamp": 1771537320.7994344,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-31969fc5736149ca",
+        "job_id": "job-0a89cf40ec7f487b",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537320
+      }
+    ],
+    "previous_hash": "a9d3605c6c0933dc96969c603b559b7c7ed60e257d4ef5965850077f9fe88780",
+    "nonce": 0,
+    "hash": "1cea7f45fd29e7f458492160fc7dad1744994b164ba8dfa71b786e98d50db88d"
+  },
+  {
+    "index": 117,
+    "timestamp": 1771537325.8199742,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-ddde43bf331f4835",
+        "job_id": "job-cd3ceccfc28847ae",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537325
+      }
+    ],
+    "previous_hash": "1cea7f45fd29e7f458492160fc7dad1744994b164ba8dfa71b786e98d50db88d",
+    "nonce": 0,
+    "hash": "49c98790078b02775f27cd6df199aa112e186eb126fcc569a751ddaba92f7713"
+  },
+  {
+    "index": 118,
+    "timestamp": 1771537349.3728478,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "092c527a789d81be92c9c99b8d760efc4cde6ce16ac31c0f6e368d2aaa3ae385",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "98f9ed948af1fc1bbb21af8496dd5d6a043a370748024912955e783788c59560",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537349
+      }
+    ],
+    "previous_hash": "49c98790078b02775f27cd6df199aa112e186eb126fcc569a751ddaba92f7713",
+    "nonce": 0,
+    "hash": "52e51eb07a3518fa9b6ee9572ef4f91b0350595d72b58c7a72db68b6ba056400"
+  },
+  {
+    "index": 119,
+    "timestamp": 1771537352.2954736,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-08c539cd3ad046ec",
+        "job_id": "job-d3be512002a34026",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537352
+      }
+    ],
+    "previous_hash": "52e51eb07a3518fa9b6ee9572ef4f91b0350595d72b58c7a72db68b6ba056400",
+    "nonce": 0,
+    "hash": "d84efc73dca3813d1f7fc2820b6b1c855cf80a52a84a75b9f51894e9a0e5c03b"
+  },
+  {
+    "index": 120,
+    "timestamp": 1771537356.9905505,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-a4031a4731c548e1",
+        "job_id": "job-2399461e0ab549a7",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537356
+      }
+    ],
+    "previous_hash": "d84efc73dca3813d1f7fc2820b6b1c855cf80a52a84a75b9f51894e9a0e5c03b",
+    "nonce": 0,
+    "hash": "5000dbbeb04ff0ca7792e8f78b082123542d44a5d18413f5a2a195f5531a2b1f"
+  },
+  {
+    "index": 121,
+    "timestamp": 1771537384.6328256,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "65908f6e9b726e98c379d3f4b2f7efe0c79ce0b6353ed4cf2938b151be38d25a",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "24552db642e8e3658cc10b1af85ef0cd099a04488195926903e75afe65c2f963",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537384
+      }
+    ],
+    "previous_hash": "5000dbbeb04ff0ca7792e8f78b082123542d44a5d18413f5a2a195f5531a2b1f",
+    "nonce": 0,
+    "hash": "0aab9776e6bc04cf9007eac4f367a68c7980a3667c20e9b2921e506c257ce3bd"
+  },
+  {
+    "index": 122,
+    "timestamp": 1771537387.2238638,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-789178c98bbc4805",
+        "job_id": "job-f078d7029a4d45fe",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537387
+      }
+    ],
+    "previous_hash": "0aab9776e6bc04cf9007eac4f367a68c7980a3667c20e9b2921e506c257ce3bd",
+    "nonce": 0,
+    "hash": "422234f5421653a33fe74ee524bb00ee3f96f7c6ccb0b5ea3cf8047f6ccbf189"
+  },
+  {
+    "index": 123,
+    "timestamp": 1771537389.3203144,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-7284cd33e45f4378",
+        "job_id": "job-1d7dd1171a234da6",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537389
+      }
+    ],
+    "previous_hash": "422234f5421653a33fe74ee524bb00ee3f96f7c6ccb0b5ea3cf8047f6ccbf189",
+    "nonce": 0,
+    "hash": "6e4abd6be1ebb34a188a278e56d2d4d9f3ea734baf5a0359a9e54859b0034429"
+  },
+  {
+    "index": 124,
+    "timestamp": 1771537416.455384,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "bd3d1500eac787316d4009e3e21c59cb97e76dca7a1aae5492deeb88184a3633",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "b3001afca523e4f18e20d72594c58522e4c40b8042d6a8c1d1320ff04eadc6fb",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537416
+      }
+    ],
+    "previous_hash": "6e4abd6be1ebb34a188a278e56d2d4d9f3ea734baf5a0359a9e54859b0034429",
+    "nonce": 0,
+    "hash": "6c045b0665e8dc572d0cd0d36bff74949421f2d8ebf2b8d378ae4a53bd6bc875"
+  },
+  {
+    "index": 125,
+    "timestamp": 1771537418.7953568,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-fb563ebc60c54cb6",
+        "job_id": "job-fcdc3c95cb4842b4",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537418
+      }
+    ],
+    "previous_hash": "6c045b0665e8dc572d0cd0d36bff74949421f2d8ebf2b8d378ae4a53bd6bc875",
+    "nonce": 0,
+    "hash": "f3d49058ef1515c99d5cbadede33a1fdf670cdda9a52ec4ce6bca0b61cca0520"
+  },
+  {
+    "index": 126,
+    "timestamp": 1771537419.751999,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-6ecdf5b2478e4652",
+        "job_id": "job-3e13be56fff641d3",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537419
+      }
+    ],
+    "previous_hash": "f3d49058ef1515c99d5cbadede33a1fdf670cdda9a52ec4ce6bca0b61cca0520",
+    "nonce": 0,
+    "hash": "13b7e7dc56fe3b5f4400afed68421d46040e62113baa57d3694d5cba0798b0cd"
+  },
+  {
+    "index": 127,
+    "timestamp": 1771537450.949285,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "108171e71aa070c34f47235aca611c308f428f2e1b49b490bf40d6c966334b2f",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "9ea56593e1fa7ca7e0f4fd00864373c5b2fedf17bbd4b06d1d69d3eb78d74987",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537450
+      }
+    ],
+    "previous_hash": "13b7e7dc56fe3b5f4400afed68421d46040e62113baa57d3694d5cba0798b0cd",
+    "nonce": 0,
+    "hash": "7a08972a62ad68a85d3f6a5e54f10da02f15fd6ccaf867ccd0dc96cab092b9d7"
+  },
+  {
+    "index": 128,
+    "timestamp": 1771537453.106913,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-d432c85da67943c9",
+        "job_id": "job-5bfcb8864f8843ae",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537453
+      }
+    ],
+    "previous_hash": "7a08972a62ad68a85d3f6a5e54f10da02f15fd6ccaf867ccd0dc96cab092b9d7",
+    "nonce": 0,
+    "hash": "59ba621e09e8bb115ab6f9ad976f08701112f14491c20c0a9e4d6c7b7b02f4a3"
+  },
+  {
+    "index": 129,
+    "timestamp": 1771537453.1720605,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-dd80328f267d4d4f",
+        "job_id": "job-776971cd7f464002",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537453
+      }
+    ],
+    "previous_hash": "59ba621e09e8bb115ab6f9ad976f08701112f14491c20c0a9e4d6c7b7b02f4a3",
+    "nonce": 0,
+    "hash": "d82cf98386dbbe9cee840511f29256dfa4ab4135619d69bc00e7d135fc40a96b"
+  },
+  {
+    "index": 130,
+    "timestamp": 1771537487.2620318,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "59a56e939735234aabb2de58cbbd3aff342ba435f3054d3beca994caba105e53",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "cc679994b39ed21639ced36cbd0b05b65e843ae60ecfd292ab0fdfa3edcf4441",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537487
+      }
+    ],
+    "previous_hash": "d82cf98386dbbe9cee840511f29256dfa4ab4135619d69bc00e7d135fc40a96b",
+    "nonce": 0,
+    "hash": "a65feeda1bb9e5160e101b9b6c0e53148758bd8b5a56b7e36f9c3447e32679c5"
+  },
+  {
+    "index": 131,
+    "timestamp": 1771537488.616118,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-32976d12ac1a4f3d",
+        "job_id": "job-8cec18ad22304332",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537488
+      }
+    ],
+    "previous_hash": "a65feeda1bb9e5160e101b9b6c0e53148758bd8b5a56b7e36f9c3447e32679c5",
+    "nonce": 0,
+    "hash": "d4a97db5cbfb4236838e234f464856f16aa34278bce470283aeadf83c37f44b1"
+  },
+  {
+    "index": 132,
+    "timestamp": 1771537489.424628,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-32e33dba01ce4705",
+        "job_id": "job-0692d996ecab43e6",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537489
+      }
+    ],
+    "previous_hash": "d4a97db5cbfb4236838e234f464856f16aa34278bce470283aeadf83c37f44b1",
+    "nonce": 0,
+    "hash": "46b8da0e1f377bbf33c2a2a140fff6ce8d02d7930ba3cc9dd390cae9d6d8d9ea"
+  },
+  {
+    "index": 133,
+    "timestamp": 1771537522.71682,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "65a6c58a874bd49c31723c1aa5daa551548ffc03ec291469eb8abe0e903690e9",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "90ce5e3baf6c222caf86c3145799a8dbeb3e412f35f49e9f96fd499d9872b81c",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537522
+      }
+    ],
+    "previous_hash": "46b8da0e1f377bbf33c2a2a140fff6ce8d02d7930ba3cc9dd390cae9d6d8d9ea",
+    "nonce": 0,
+    "hash": "97a27425156b773ec89d62fefe5ce9e4eb4ebfbf13ad1ee6d67ed60428f7671d"
+  },
+  {
+    "index": 134,
+    "timestamp": 1771537523.9466605,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-fec418ea253e4fd3",
+        "job_id": "job-81397d54d5c749c9",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537523
+      }
+    ],
+    "previous_hash": "97a27425156b773ec89d62fefe5ce9e4eb4ebfbf13ad1ee6d67ed60428f7671d",
+    "nonce": 0,
+    "hash": "67e7d42b7a21e6b408a03559b2c51903c9d166c4bf66d81a01a50b3a0c9d2f1d"
+  },
+  {
+    "index": 135,
+    "timestamp": 1771537524.9054105,
+    "transactions": [
+      {
+        "type": "contract_worker_escrow_hold",
+        "hold_id": "esc-007b65e700364fb9",
+        "job_id": "job-9ac94475d8234c68",
+        "contract_id": "usr-696322e634b8",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "currency": "RUB",
+        "amount": 8,
+        "created_at": 1771537524
+      }
+    ],
+    "previous_hash": "67e7d42b7a21e6b408a03559b2c51903c9d166c4bf66d81a01a50b3a0c9d2f1d",
+    "nonce": 0,
+    "hash": "f3d0e0753019f754d92bb828906f439608ca917df312080ba8982aa3dc4691fd"
+  },
+  {
+    "index": 136,
+    "timestamp": 1771537556.452102,
+    "transactions": [
+      {
+        "type": "work_receipt",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "work_units": 1000,
+        "attempt_id": 1,
+        "result_data": "eae158dcdff1aabf765ef0834db825504c4370099c1461ca8cb555031a413e0e",
+        "artifact_manifest_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fee": 1,
+        "output_artifacts": []
+      },
+      {
+        "type": "contract_reward_settlement",
+        "reward_id": "b4b363f4da53a36186168fe6f883f7f62e3543fa64517662fa66f0de224053d5",
+        "provider_client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
+        "worker_client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "contract_id": "usr-696322e634b8",
+        "currency": "RUB",
+        "amount": 1000,
+        "work_units": 1000,
+        "created_at": 1771537556
+      }
+    ],
+    "previous_hash": "f3d0e0753019f754d92bb828906f439608ca917df312080ba8982aa3dc4691fd",
+    "nonce": 0,
+    "hash": "0a651703584d42613d9561d195f7c3a4f3272ddfbb57bb0798efccd4cdcd4c26"
   }
 ]

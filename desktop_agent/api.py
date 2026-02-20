@@ -40,7 +40,22 @@ class ApiClient:
             timeout=timeout,
             verify=self.verify_ssl,
         )
-        response.raise_for_status()
+        if not response.ok:
+            details = ""
+            try:
+                body = response.json() if response.content else {}
+            except ValueError:
+                body = {}
+            if isinstance(body, dict):
+                msg = body.get("user_message") or body.get("error") or body.get("message")
+                code = body.get("code")
+                if msg and code:
+                    details = f"{msg} [{code}]"
+                elif msg:
+                    details = str(msg)
+            if not details:
+                details = response.text.strip() or response.reason
+            raise RuntimeError(f"{response.status_code} {response.reason}: {details}")
         return response.json() if response.content else {}
 
     def public_get(self, path, timeout=15):
