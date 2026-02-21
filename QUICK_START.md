@@ -92,3 +92,7 @@ docker logs client_worker_2
 - **Вкладка "Статистика"**: Метрики узла (длина цепочки, клиенты, pending, запросы, ошибки)
 - **Вкладка "Блокчейн"**: Просмотр всех блоков
 - **Вкладка "Задачи"**: История сданных работ
+
+## DSCM v2
+
+См. [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), [DSCM_IMPLEMENTATION_NOTES.md](DSCM_IMPLEMENTATION_NOTES.md).

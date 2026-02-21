@@ -7,6 +7,8 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
+from payment_providers import get_provider_for_region
+
 
 PAYMENT_HUB_ENGINE_VERSION = os.environ.get("PAYMENT_HUB_ENGINE_VERSION", "payment-hub-v1")
 PAYMENT_HUB_POLICY_VERSION = os.environ.get("PAYMENT_HUB_POLICY_VERSION", "pay-policy-v1")
@@ -97,6 +99,8 @@ def ensure_operation(withdrawal: dict) -> Tuple[dict, bool]:
             "currency": withdrawal.get("currency"),
             "amount": int(withdrawal.get("amount", 0) or 0),
             "card_mask": withdrawal.get("card_mask"),
+            "destination": withdrawal.get("destination") or (f"sandbox:{withdrawal.get('client_id', '')}" if withdrawal.get("client_id") else "sandbox:unknown"),
+            "region": (withdrawal.get("region") or "RU").strip().upper(),
             "provider": PAYMENT_HUB_PROVIDER_NAME,
             "provider_ref": None,
             "status": "queued",
@@ -189,10 +193,23 @@ def dispatch_pending(*, max_batch: int = 50) -> dict:
                 row["status"] = "rejected"
                 row["last_error"] = "max retries reached"
             else:
+                provider = get_provider_for_region(row.get("region", "RU"))
+                payout_data, payout_err = provider.create_payout(
+                    amount=int(row.get("amount", 0) or 0),
+                    currency=str(row.get("currency") or "RUB"),
+                    client_id=str(row.get("client_id") or ""),
+                    destination=str(row.get("destination") or f"sandbox:{row.get('client_id', '')}"),
+                    metadata={"operation_id": operation_id, "retries": retries},
+                )
                 sample = _hash_ratio(f"{operation_id}:{retries}")
-                if sample <= PAYMENT_HUB_SUCCESS_RATE:
-                    row["status"] = "completed"
+                if payout_err:
+                    row["status"] = "retry"
                     row["provider_ref"] = _next_provider_ref(operation_id, retries)
+                    row["last_error"] = payout_err
+                    row["retries"] = retries + 1
+                elif sample <= PAYMENT_HUB_SUCCESS_RATE:
+                    row["status"] = "completed"
+                    row["provider_ref"] = (payout_data or {}).get("provider_ref") or _next_provider_ref(operation_id, retries)
                     row["last_error"] = None
                 else:
                     row["status"] = "retry"

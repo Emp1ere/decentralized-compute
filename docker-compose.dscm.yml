@@ -1,0 +1,88 @@
+# DSCM v2: PostgreSQL, MinIO, Fabric Sidecar (опционально)
+# Использование: docker-compose -f docker-compose.yml -f docker-compose.dscm.yml up -d
+# Оркестраторы получают DATABASE_URL, MINIO_* при использовании этого файла.
+
+services:
+  orchestrator_node_1:
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-dscm}:${POSTGRES_PASSWORD:-dscm_secret}@postgres:5432/${POSTGRES_DB:-dscm}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  orchestrator_node_2:
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-dscm}:${POSTGRES_PASSWORD:-dscm_secret}@postgres:5432/${POSTGRES_DB:-dscm}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  orchestrator_node_3:
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-dscm}:${POSTGRES_PASSWORD:-dscm_secret}@postgres:5432/${POSTGRES_DB:-dscm}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: dscm_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dscm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dscm_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-dscm}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./orchestrator_node/migrations/postgres_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dscm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: dscm_minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+  # Go Fabric Sidecar (заглушка до настройки Fabric)
+  fabric_sidecar:
+    build:
+      context: ./fabric_sidecar
+      dockerfile: Dockerfile
+    container_name: dscm_fabric_sidecar
+    ports:
+      - "7051:7051"
+    environment:
+      - FABRIC_GATEWAY_URL=${FABRIC_GATEWAY_URL:-}
+      - FABRIC_CHANNEL=${FABRIC_CHANNEL:-public-marketplace}
+    profiles:
+      - fabric
+
+volumes:
+  postgres_data:
+  minio_data:

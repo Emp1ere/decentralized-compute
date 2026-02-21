@@ -172,4 +172,7 @@ def run_task(
         return _run_python_compute(task, cfg, push_log, progress_callback)
     if engine in ("python_cli", "gromacs"):
         return _run_external(task, cfg, push_log, submit_timeout_seconds, progress_callback, should_stop)
+    if engine == "docker":
+        from .docker_runner import run_docker_task
+        return run_docker_task(task, cfg, push_log, progress_callback, submit_timeout_seconds, should_stop)
     raise ValueError(f"Unsupported runner engine: {engine}")

@@ -104,6 +104,23 @@ TASK_CLASS_PROFILES = {
         },
         "validation_style": "bitwise_or_hash_match",
     },
+    # DSCM v2: redundancy 3x (2/3), challenge 24h (ТЗ раздел 5)
+    "dscm_verified": {
+        "title": "DSCM verified (3x redundancy, 24h challenge)",
+        "domains": ["scientific", "tee", "high_value"],
+        "validation_policy": {
+            "mode": "challengeable",
+            "replication_factor": 3,
+            "quorum_threshold": 2,
+            "challenge_window_seconds": 24 * 3600,
+        },
+        "escrow_policy": {
+            "enabled": True,
+            "worker_collateral": 10,
+            "penalty_percent_on_reject": 30,
+        },
+        "validation_style": "redundancy_2_of_3",
+    },
 }
 
 

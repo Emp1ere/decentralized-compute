@@ -9,6 +9,7 @@ SUPPORTED_COMPUTATION_TYPES = (
     "radiative",
     "gravitational_waves",
     "molecular_dynamics_benchpep",
+    "tee",  # TEE/SGX — placeholder, Phase 4
 )
 
 DEFAULT_DIFFICULTY_BY_COMPUTATION = {
@@ -117,6 +118,13 @@ def verify_contract_result(
             return expected_result == result_data
         except Exception:
             return False
+
+    # TEE (SGX): placeholder — требуется attestation (ТЗ раздел 5, Phase 4)
+    if expected_computation_type == "tee":
+        if not (result_data and isinstance(result_data, str)):
+            return False
+        # TODO: verify SGX attestation, quote
+        return False
 
     return False
 

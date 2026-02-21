@@ -1,0 +1,16 @@
+{
+  "name": "dscm-chaincode",
+  "version": "1.0.0",
+  "description": "DSCM Chaincode: Marketplace, Contract, Reputation, EscrowTrigger",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Tests not yet implemented\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.0"
+  }
+}

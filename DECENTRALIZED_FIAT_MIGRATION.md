@@ -2,6 +2,8 @@
 
 This document describes the target architecture for this repository branch.
 
+**См. также:** [DSCM v2 ТЗ](DSCM_v2_final.docx), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md).
+
 ## Why desktop-agent stays
 
 Desktop Agent remains a core component. It evolves from "task executor" to

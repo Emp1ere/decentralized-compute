@@ -120,6 +120,14 @@ from simulated_compliance_provider import (
     get_case as simulated_get_case,
 )
 from workload_presets import get_workload_preset, list_workload_presets
+from minio_adapter import (
+    is_configured as minio_is_configured,
+    upload_ingestion as minio_upload_ingestion,
+    upload_result as minio_upload_result,
+    download_result as minio_download_result,
+    get_presigned_download_url as minio_presigned_download,
+    get_presigned_upload_url_results as minio_presigned_upload_results,
+)
 import hashlib
 import uuid
 import os
@@ -350,6 +358,7 @@ def _store_uploaded_artifacts(*, contract_id, files):
     target_dir = os.path.join(INGESTION_STORAGE_DIR, contract_id, manifest_id)
     os.makedirs(target_dir, exist_ok=True)
     artifacts = []
+    use_minio = minio_is_configured()
     for storage in files:
         filename = secure_filename(storage.filename or "")
         if not filename:
@@ -358,14 +367,14 @@ def _store_uploaded_artifacts(*, contract_id, files):
         storage.save(abs_path)
         with open(abs_path, "rb") as f:
             blob = f.read()
-        artifacts.append(
-            {
-                "name": filename,
-                "uri": f"file://{abs_path}",
-                "sha256": hashlib.sha256(blob).hexdigest(),
-                "size_bytes": len(blob),
-            }
-        )
+        sha = hashlib.sha256(blob).hexdigest()
+        if use_minio:
+            object_key = f"{contract_id}/{manifest_id}/{filename}"
+            ok, err = minio_upload_ingestion(object_key, blob)
+            uri = f"minio://{object_key}" if ok else f"file://{abs_path}"
+        else:
+            uri = f"file://{abs_path}"
+        artifacts.append({"name": filename, "uri": uri, "sha256": sha, "size_bytes": len(blob)})
     return manifest_id, artifacts
 
 
@@ -2645,6 +2654,41 @@ def market_jobs_available():
     return jsonify({"jobs": jobs}), 200
 
 
+@app.route("/market/artifacts/presigned-download", methods=["GET"])
+@limiter.limit("120 per minute")
+def market_artifacts_presigned_download():
+    """Presigned URL для скачивания артефакта из MinIO (воркер загружает входные данные)."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    object_key = (request.args.get("object_key") or "").strip()
+    if not object_key:
+        return jsonify({"error": "object_key required"}), 400
+    bucket = request.args.get("bucket", "ingestion").strip() or "ingestion"
+    from minio_adapter import MINIO_BUCKET_INGESTION, MINIO_BUCKET_RESULTS
+    b = MINIO_BUCKET_RESULTS if bucket == "results" else MINIO_BUCKET_INGESTION
+    url = minio_presigned_download(object_key, bucket=b, expires_seconds=1800)
+    if not url:
+        return jsonify({"error": "MinIO not configured or presigned URL failed"}), 503
+    return jsonify({"url": url, "object_key": object_key}), 200
+
+
+@app.route("/market/artifacts/presigned-upload-results", methods=["GET"])
+@limiter.limit("60 per minute")
+def market_artifacts_presigned_upload_results():
+    """Presigned URL для загрузки результата воркером в MinIO."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    object_key = (request.args.get("object_key") or "").strip()
+    if not object_key:
+        return jsonify({"error": "object_key required"}), 400
+    url = minio_presigned_upload_results(object_key, expires_seconds=1800)
+    if not url:
+        return jsonify({"error": "MinIO not configured or presigned URL failed"}), 503
+    return jsonify({"url": url, "object_key": object_key}), 200
+
+
 @app.route("/market/wallet", methods=["GET"])
 @limiter.limit("120 per minute")
 def market_wallet():
@@ -3939,18 +3983,19 @@ def provider_contract_results_download(contract_id):
             if not isinstance(item, dict):
                 continue
             uri = str(item.get("uri") or "")
-            if not uri.startswith("file://"):
-                continue
-            abs_path = uri[7:]
-            if not os.path.isfile(abs_path):
-                continue
-            safe_name = secure_filename(item.get("name") or os.path.basename(abs_path))
-            if not safe_name:
-                safe_name = os.path.basename(abs_path)
-            try:
-                zf.write(abs_path, arcname=f"artifacts/{safe_name}")
-            except OSError:
-                continue
+            safe_name = secure_filename(item.get("name") or "artifact") or "artifact"
+            if uri.startswith("file://"):
+                abs_path = uri[7:]
+                if os.path.isfile(abs_path):
+                    try:
+                        zf.write(abs_path, arcname=f"artifacts/{safe_name}")
+                    except Exception:
+                        pass
+            elif uri.startswith("minio://") and minio_is_configured():
+                object_key = uri[7:]
+                data, err = minio_download_result(object_key)
+                if data and not err:
+                    zf.writestr(f"artifacts/{safe_name}", data)
     archive.seek(0)
     return send_file(
         archive,
