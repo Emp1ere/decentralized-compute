@@ -17,6 +17,8 @@ from contract_market import (
 from onchain_accounting import (
     DEFAULT_CURRENCY as MARKET_DEFAULT_CURRENCY,
     get_effective_fx_rules,
+    governance_is_validator_admitted_from_chain,
+    governance_snapshot_from_chain,
     get_wallet_amount,
     get_wallet_from_chain,
     is_reward_settled,
@@ -83,13 +85,6 @@ from decentralized_runtime_store import (
     add_validator_verdict,
     enforce_dispute_deadlines,
     export_runtime_state,
-    governance_ack_rollout,
-    governance_admit_node,
-    governance_admit_validator,
-    governance_finalize_rollout,
-    governance_is_validator_admitted,
-    governance_propose_rollout,
-    governance_snapshot,
     bump_reputation,
     check_and_register_replay,
     create_dispute,
@@ -3986,7 +3981,7 @@ def metrics():
         current_leader = get_current_leader()
         is_current_leader = (current_leader == NODE_ID)
         stage3_slo = _stage3_observability_metrics()
-        governance = governance_snapshot()
+        governance = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
     except Exception as e:
         logger.exception("metrics_error")
         return jsonify({"error": "metrics failed"}), 500
@@ -4601,7 +4596,9 @@ def replication_add_verdict(group_id):
     validator_id = get_client_id_from_auth()
     if validator_id is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    if not governance_is_validator_admitted(validator_client_id=validator_id):
+    if not governance_is_validator_admitted_from_chain(
+        blockchain.chain, blockchain.pending_transactions, validator_id
+    ):
         return jsonify({"error": "Validator is not admitted by governance"}), 403
     data = request.get_json(silent=True) or {}
     decision = (data.get("decision") or "").strip().lower()
@@ -4772,7 +4769,7 @@ def governance_info():
             "node_id": NODE_ID,
             "protocol_version": NETWORK_PROTOCOL_VERSION,
             "supported_protocol_versions": SUPPORTED_PROTOCOL_VERSIONS,
-            "governance": governance_snapshot(),
+            "governance": governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions),
         }
     ), 200
 
@@ -4788,14 +4785,24 @@ def governance_admission():
         if str(data.get("admission_token") or "").strip() != GOVERNANCE_ADMISSION_TOKEN:
             return jsonify({"error": "Invalid admission token"}), 403
     node_id = (data.get("node_id") or "").strip()
-    rec, err = governance_admit_node(
-        node_id=node_id,
-        admitted_by=requester,
-        node_meta=data.get("meta") if isinstance(data.get("meta"), dict) else {},
-    )
-    if err:
-        return jsonify({"error": err}), 400
-    return jsonify({"node": rec, "governance": governance_snapshot()}), 201
+    if not node_id:
+        return jsonify({"error": "node_id is required"}), 400
+    tx = {
+        "type": "governance_admit_node",
+        "node_id": node_id,
+        "admitted_by": requester,
+        "meta": data.get("meta") if isinstance(data.get("meta"), dict) else {},
+    }
+    blockchain.add_transaction(tx)
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rec = (snapshot.get("admitted_nodes") or {}).get(node_id) or {
+        "node_id": node_id,
+        "admitted_at": now_ts(),
+        "admitted_by": requester,
+        "status": "admitted",
+        "meta": tx.get("meta", {}),
+    }
+    return jsonify({"node": rec, "governance": snapshot}), 201
 
 
 @app.route("/network/governance/validators/admit", methods=["POST"])
@@ -4809,14 +4816,24 @@ def governance_admit_validator_endpoint():
         if str(data.get("admission_token") or "").strip() != GOVERNANCE_ADMISSION_TOKEN:
             return jsonify({"error": "Invalid admission token"}), 403
     validator_client_id = (data.get("validator_client_id") or "").strip()
-    rec, err = governance_admit_validator(
-        validator_client_id=validator_client_id,
-        admitted_by=requester,
-        validator_meta=data.get("meta") if isinstance(data.get("meta"), dict) else {},
-    )
-    if err:
-        return jsonify({"error": err}), 400
-    return jsonify({"validator": rec, "governance": governance_snapshot()}), 201
+    if not validator_client_id:
+        return jsonify({"error": "validator_client_id is required"}), 400
+    tx = {
+        "type": "governance_admit_validator",
+        "validator_client_id": validator_client_id,
+        "admitted_by": requester,
+        "meta": data.get("meta") if isinstance(data.get("meta"), dict) else {},
+    }
+    blockchain.add_transaction(tx)
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rec = (snapshot.get("admitted_validators") or {}).get(validator_client_id) or {
+        "validator_client_id": validator_client_id,
+        "admitted_at": now_ts(),
+        "admitted_by": requester,
+        "status": "admitted",
+        "meta": tx.get("meta", {}),
+    }
+    return jsonify({"validator": rec, "governance": snapshot}), 201
 
 
 @app.route("/network/governance/rollout/propose", methods=["POST"])
@@ -4833,13 +4850,15 @@ def governance_rollout_propose():
         required_acks = int(data.get("required_acks", max(1, len(NODE_IDS))) or max(1, len(NODE_IDS)))
     except (TypeError, ValueError):
         required_acks = max(1, len(NODE_IDS))
-    rollout, err = governance_propose_rollout(
-        protocol_version=version,
-        proposed_by=requester,
-        required_acks=required_acks,
-    )
-    if err:
-        return jsonify({"error": err}), 400
+    tx = {
+        "type": "governance_rollout_propose",
+        "protocol_version": version,
+        "proposed_by": requester,
+        "required_acks": max(1, required_acks),
+    }
+    blockchain.add_transaction(tx)
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rollout = snapshot.get("protocol_rollout") or {}
     return jsonify({"rollout": rollout}), 201
 
 
@@ -4849,9 +4868,14 @@ def governance_rollout_ack():
     requester = get_client_id_from_auth()
     if requester is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    rollout, err = governance_ack_rollout(node_id=NODE_ID)
-    if err:
-        return jsonify({"error": err}), 409
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rollout = snapshot.get("protocol_rollout")
+    if not rollout or rollout.get("status") in (None, "finalized"):
+        return jsonify({"error": "No active protocol rollout"}), 409
+    tx = {"type": "governance_rollout_ack", "node_id": NODE_ID}
+    blockchain.add_transaction(tx)
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rollout = snapshot.get("protocol_rollout") or {}
     return jsonify({"rollout": rollout, "acked_by": requester, "node_id": NODE_ID}), 200
 
 
@@ -4861,9 +4885,14 @@ def governance_rollout_finalize():
     requester = get_client_id_from_auth()
     if requester is None:
         return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
-    rollout, err = governance_finalize_rollout(finalized_by=requester)
-    if err:
-        return jsonify({"error": err}), 409
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rollout = snapshot.get("protocol_rollout")
+    if not rollout or rollout.get("status") != "ready":
+        return jsonify({"error": "Rollout is not ready"}), 409
+    tx = {"type": "governance_rollout_finalize", "finalized_by": requester}
+    blockchain.add_transaction(tx)
+    snapshot = governance_snapshot_from_chain(blockchain.chain, blockchain.pending_transactions)
+    rollout = snapshot.get("protocol_rollout") or {}
     return jsonify({"rollout": rollout}), 200
 
 

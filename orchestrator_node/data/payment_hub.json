@@ -113,6 +113,44 @@
       "onchain_last_status_at": 1771675085,
       "policy_version": "pay-policy-v1",
       "engine_version": "payment-hub-v1"
+    },
+    "wd-fa6bf4540d834965": {
+      "operation_id": "wd-fa6bf4540d834965",
+      "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+      "currency": "RUB",
+      "amount": 100,
+      "card_mask": "****2222",
+      "provider": "simulated-bank",
+      "provider_ref": null,
+      "status": "queued",
+      "retries": 0,
+      "idempotency_key": "wd:wd-fa6bf4540d834965",
+      "last_error": null,
+      "created_at": 1771676306,
+      "updated_at": 1771676306,
+      "onchain_last_status": null,
+      "onchain_last_status_at": null,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    "wd-21765545e09845e2": {
+      "operation_id": "wd-21765545e09845e2",
+      "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+      "currency": "RUB",
+      "amount": 100,
+      "card_mask": "****2222",
+      "provider": "simulated-bank",
+      "provider_ref": null,
+      "status": "queued",
+      "retries": 0,
+      "idempotency_key": "wd:wd-21765545e09845e2",
+      "last_error": null,
+      "created_at": 1771676320,
+      "updated_at": 1771676320,
+      "onchain_last_status": null,
+      "onchain_last_status_at": null,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
     }
   },
   "webhook_events": [
@@ -387,6 +425,24 @@
       "report_id": "recon-1771675085",
       "client_id": "cec0aa39-07f5-49da-827c-f857d623d52d",
       "created_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-fa6bf4540d834965",
+      "type": "withdrawal_operation_created",
+      "operation_id": "wd-fa6bf4540d834965",
+      "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+      "created_at": 1771676306,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-21765545e09845e2",
+      "type": "withdrawal_operation_created",
+      "operation_id": "wd-21765545e09845e2",
+      "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+      "created_at": 1771676320,
       "policy_version": "pay-policy-v1",
       "engine_version": "payment-hub-v1"
     }

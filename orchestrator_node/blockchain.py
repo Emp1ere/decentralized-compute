@@ -14,7 +14,7 @@ import logging
 import os
 import threading
 import sys
-from onchain_accounting import is_valid_onchain_economic_tx
+from onchain_accounting import is_valid_governance_tx, is_valid_onchain_economic_tx
 
 logger = logging.getLogger("blockchain")
 
@@ -107,6 +107,8 @@ def _is_valid_chain_tx(tx):
         return _is_valid_reward_tx(tx)
     if tx_type == "work_receipt":
         return _is_valid_work_receipt_tx(tx)
+    if is_valid_governance_tx(tx):
+        return True
     return is_valid_onchain_economic_tx(tx)
 
 
@@ -254,6 +256,8 @@ class Blockchain:
             raise ValueError("Invalid reward transaction: need 'to' (non-empty str) and 'amount' (number >= 0)")
         elif tx_type == "work_receipt" and not _is_valid_work_receipt_tx(transaction):
             raise ValueError("Invalid work_receipt: need client_id, contract_id, work_units (number >= 0)")
+        elif is_valid_governance_tx(transaction):
+            pass
         elif tx_type not in ("reward", "work_receipt") and not is_valid_onchain_economic_tx(transaction):
             raise ValueError(f"Invalid economic transaction type='{tx_type}'")
 

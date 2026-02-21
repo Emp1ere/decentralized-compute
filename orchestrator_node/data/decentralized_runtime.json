@@ -6141,7 +6141,7 @@
       "contract_id": "usr-fef0b2e7f482",
       "opened_by": "3eb4b4f5-d30d-453f-abc6-7d32dead14ca",
       "reason": "need manual review",
-      "state": "resolved_reject",
+      "state": "closed_reject",
       "review_deadline_at": 1771675385,
       "appeal_deadline_at": 1771678985,
       "events": [
@@ -6171,10 +6171,20 @@
           "payload": {
             "challenge_id": "chg-1f59a7a376894735"
           }
+        },
+        {
+          "event": "deadline_close_appeal_window",
+          "from_state": "resolved_reject",
+          "to_state": "closed_reject",
+          "at": 1771678986,
+          "by": "system",
+          "payload": {
+            "reason": "appeal_deadline_expired"
+          }
         }
       ],
       "created_at": 1771675085,
-      "updated_at": 1771675085
+      "updated_at": 1771678986
     }
   },
   "governance": {

@@ -49,6 +49,14 @@ ONCHAIN_ECONOMIC_TX_TYPES = {
     "contract_worker_escrow_penalty",
 }
 
+ONCHAIN_GOVERNANCE_TX_TYPES = {
+    "governance_admit_node",
+    "governance_admit_validator",
+    "governance_rollout_propose",
+    "governance_rollout_ack",
+    "governance_rollout_finalize",
+}
+
 
 def now_ts() -> int:
     return int(time.time())
@@ -330,6 +338,126 @@ def is_valid_onchain_economic_tx(tx: dict) -> bool:
         )
 
     return False
+
+
+def is_valid_governance_tx(tx: dict) -> bool:
+    if not isinstance(tx, dict):
+        return False
+    tx_type = tx.get("type")
+    if tx_type not in ONCHAIN_GOVERNANCE_TX_TYPES:
+        return False
+    if tx_type == "governance_admit_node":
+        return (
+            isinstance(tx.get("node_id"), str)
+            and bool((tx.get("node_id") or "").strip())
+            and isinstance(tx.get("admitted_by"), str)
+            and bool(tx.get("admitted_by"))
+        )
+    if tx_type == "governance_admit_validator":
+        return (
+            isinstance(tx.get("validator_client_id"), str)
+            and bool((tx.get("validator_client_id") or "").strip())
+            and isinstance(tx.get("admitted_by"), str)
+            and bool(tx.get("admitted_by"))
+        )
+    if tx_type == "governance_rollout_propose":
+        return (
+            isinstance(tx.get("protocol_version"), str)
+            and bool((tx.get("protocol_version") or "").strip())
+            and isinstance(tx.get("proposed_by"), str)
+            and bool(tx.get("proposed_by"))
+            and _positive_int(tx.get("required_acks")) is not None
+        )
+    if tx_type == "governance_rollout_ack":
+        return isinstance(tx.get("node_id"), str) and bool((tx.get("node_id") or "").strip())
+    if tx_type == "governance_rollout_finalize":
+        return isinstance(tx.get("finalized_by"), str) and bool(tx.get("finalized_by"))
+    return False
+
+
+def _apply_governance_tx(state: dict, block_index: int, ts: int, tx: dict) -> None:
+    tx_type = tx.get("type")
+    meta = tx.get("meta") if isinstance(tx.get("meta"), dict) else {}
+    if tx_type == "governance_admit_node":
+        node_id = (tx.get("node_id") or "").strip()
+        if node_id:
+            state["admitted_nodes"][node_id] = {
+                "node_id": node_id,
+                "admitted_at": ts,
+                "admitted_by": tx.get("admitted_by", ""),
+                "status": "admitted",
+                "meta": meta,
+                "updated_at": ts,
+            }
+        return
+    if tx_type == "governance_admit_validator":
+        vid = (tx.get("validator_client_id") or "").strip()
+        if vid:
+            state["admitted_validators"][vid] = {
+                "validator_client_id": vid,
+                "admitted_at": ts,
+                "admitted_by": tx.get("admitted_by", ""),
+                "status": "admitted",
+                "meta": meta,
+                "updated_at": ts,
+            }
+        return
+    if tx_type == "governance_rollout_propose":
+        state["protocol_rollout"] = {
+            "protocol_version": (tx.get("protocol_version") or "").strip(),
+            "proposed_by": tx.get("proposed_by", ""),
+            "required_acks": int(tx.get("required_acks") or 1),
+            "acks": [],
+            "status": "proposed",
+            "created_at": ts,
+            "updated_at": ts,
+        }
+        return
+    if tx_type == "governance_rollout_ack":
+        rollout = state.get("protocol_rollout")
+        if rollout and rollout.get("status") == "proposed":
+            node_id = (tx.get("node_id") or "").strip()
+            if node_id and node_id not in (rollout.get("acks") or []):
+                rollout.setdefault("acks", []).append(node_id)
+            if len(rollout.get("acks", [])) >= int(rollout.get("required_acks", 1)):
+                rollout["status"] = "ready"
+            rollout["updated_at"] = ts
+        return
+    if tx_type == "governance_rollout_finalize":
+        rollout = state.get("protocol_rollout")
+        if rollout and rollout.get("status") == "ready":
+            rollout["status"] = "finalized"
+            rollout["finalized_by"] = tx.get("finalized_by", "")
+            rollout["finalized_at"] = ts
+            rollout["updated_at"] = ts
+
+
+def governance_from_chain(chain: Iterable) -> dict:
+    state = {"admitted_nodes": {}, "admitted_validators": {}, "protocol_rollout": None}
+    for block_index, ts, tx in _iter_block_txs(chain):
+        if tx.get("type") in ONCHAIN_GOVERNANCE_TX_TYPES:
+            _apply_governance_tx(state, block_index, ts, tx)
+    return state
+
+
+def governance_snapshot_from_chain(chain: Iterable, pending: Optional[list] = None) -> dict:
+    state = governance_from_chain(chain)
+    if pending:
+        for tx in pending:
+            if tx.get("type") in ONCHAIN_GOVERNANCE_TX_TYPES:
+                _apply_governance_tx(state, 0, now_ts(), tx)
+    return state
+
+
+def governance_is_validator_admitted_from_chain(
+    chain: Iterable, pending: Optional[list], validator_client_id: str
+) -> bool:
+    vid = (validator_client_id or "").strip()
+    if not vid:
+        return False
+    snapshot = governance_snapshot_from_chain(chain, pending)
+    rec = (snapshot.get("admitted_validators") or {}).get(vid)
+    return rec and (rec.get("status") or "").strip() == "admitted"
 
 
 def get_effective_fx_rules(chain: Iterable) -> dict:
