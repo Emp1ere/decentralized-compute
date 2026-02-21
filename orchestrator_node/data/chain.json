@@ -2813,5 +2813,31 @@
     "previous_hash": "f3d0e0753019f754d92bb828906f439608ca917df312080ba8982aa3dc4691fd",
     "nonce": 0,
     "hash": "0a651703584d42613d9561d195f7c3a4f3272ddfbb57bb0798efccd4cdcd4c26"
+  },
+  {
+    "index": 137,
+    "timestamp": 1771673544.1037657,
+    "transactions": [
+      {
+        "type": "fiat_conversion",
+        "client_id": "1a9c9bd6-b7b8-47a2-a284-87d9f4ca7eb2",
+        "from_currency": "RUB",
+        "to_currency": "USD",
+        "source_amount": 100,
+        "target_amount": 1,
+        "spread_percent": 1.5,
+        "created_at": 1771673544,
+        "meta": {
+          "oracle_epoch_id": null,
+          "volatility_score": 0.0,
+          "liquidity_pressure": 0.0,
+          "policy_version": "econ-policy-v1",
+          "engine_version": "fx-engine-v2"
+        }
+      }
+    ],
+    "previous_hash": "0a651703584d42613d9561d195f7c3a4f3272ddfbb57bb0798efccd4cdcd4c26",
+    "nonce": 0,
+    "hash": "fe77cb6b27c6e04971cbf394cb15d999d006822121cff03f95f6f10f7db4e8db"
   }
 ]

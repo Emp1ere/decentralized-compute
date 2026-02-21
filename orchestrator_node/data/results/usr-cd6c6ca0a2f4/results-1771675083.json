@@ -1,0 +1,37 @@
+{
+  "contract_id": "usr-cd6c6ca0a2f4",
+  "status": "active",
+  "generated_at": 1771675083,
+  "artifact_manifest_hash": "e8b5a7e9b6451ceb556ed5a1f5637743f4f50599eac7f8c690ca9900404d8473",
+  "artifacts_total": 1,
+  "artifacts_local_uri": 0,
+  "artifacts_remote_uri": 1,
+  "total_work_receipts": 1,
+  "onchain": {
+    "contract_id": "usr-cd6c6ca0a2f4",
+    "provider_client_id": "24d4ce19-fb46-4ae2-afab-c4c14d60fc7b",
+    "budget_currency": "RUB",
+    "status": "active",
+    "task_name": "Results PoW demo",
+    "reward_per_task": 2,
+    "created_at": 1771675083,
+    "updated_at": 1771675083,
+    "funded_total": 6,
+    "settled_total": 2,
+    "jobs_completed": 1,
+    "work_units_done": 100,
+    "budget_total": 6,
+    "budget_spent": 2,
+    "budget_refunded": 0,
+    "budget_available": 4
+  },
+  "items": [
+    {
+      "name": "result-1.txt",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "uri": "s3://bucket/result-1.txt",
+      "size_bytes": 123,
+      "is_local_uri": false
+    }
+  ]
+}

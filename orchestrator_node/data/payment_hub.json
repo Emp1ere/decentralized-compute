@@ -64,15 +64,53 @@
       "amount": 3,
       "card_mask": "****5678",
       "provider": "simulated-bank",
-      "provider_ref": "simulated-bank-wd-4acd93dcdfae46bb-0",
-      "status": "retry",
+      "provider_ref": "simulated-bank-wd-4acd93dcdfae46bb-1",
+      "status": "completed",
       "retries": 1,
       "idempotency_key": "wd:wd-4acd93dcdfae46bb",
-      "last_error": "temporary provider failure",
+      "last_error": null,
       "created_at": 1771544380,
-      "updated_at": 1771544380,
-      "onchain_last_status": "processing",
-      "onchain_last_status_at": 1771544380,
+      "updated_at": 1771675085,
+      "onchain_last_status": "completed",
+      "onchain_last_status_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    "wd-b5810f108ed54e8c": {
+      "operation_id": "wd-b5810f108ed54e8c",
+      "client_id": "834adced-52c1-4d58-b787-156e76dd9def",
+      "currency": "USD",
+      "amount": 3,
+      "card_mask": "****5678",
+      "provider": "simulated-bank",
+      "provider_ref": "simulated-bank-wd-b5810f108ed54e8c-0",
+      "status": "completed",
+      "retries": 0,
+      "idempotency_key": "wd:wd-b5810f108ed54e8c",
+      "last_error": null,
+      "created_at": 1771675085,
+      "updated_at": 1771675085,
+      "onchain_last_status": "completed",
+      "onchain_last_status_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    "wd-39bb669fc26f47f1": {
+      "operation_id": "wd-39bb669fc26f47f1",
+      "client_id": "cec0aa39-07f5-49da-827c-f857d623d52d",
+      "currency": "USD",
+      "amount": 3,
+      "card_mask": "****5678",
+      "provider": "simulated-bank",
+      "provider_ref": "simulated-bank-wd-39bb669fc26f47f1-0",
+      "status": "completed",
+      "retries": 0,
+      "idempotency_key": "wd:wd-39bb669fc26f47f1",
+      "last_error": null,
+      "created_at": 1771675085,
+      "updated_at": 1771675085,
+      "onchain_last_status": "completed",
+      "onchain_last_status_at": 1771675085,
       "policy_version": "pay-policy-v1",
       "engine_version": "payment-hub-v1"
     }
@@ -129,6 +167,45 @@
         "error": "temporary provider failure"
       },
       "created_at": 1771544380
+    },
+    {
+      "event_id": "evt-wd-4acd93dcdfae46bb-1771675085",
+      "provider": "simulated-bank",
+      "event": "withdrawal.status",
+      "operation_id": "wd-4acd93dcdfae46bb",
+      "payload": {
+        "operation_id": "wd-4acd93dcdfae46bb",
+        "status": "completed",
+        "provider_ref": "simulated-bank-wd-4acd93dcdfae46bb-1",
+        "error": null
+      },
+      "created_at": 1771675085
+    },
+    {
+      "event_id": "evt-wd-b5810f108ed54e8c-1771675085",
+      "provider": "simulated-bank",
+      "event": "withdrawal.status",
+      "operation_id": "wd-b5810f108ed54e8c",
+      "payload": {
+        "operation_id": "wd-b5810f108ed54e8c",
+        "status": "completed",
+        "provider_ref": "simulated-bank-wd-b5810f108ed54e8c-0",
+        "error": null
+      },
+      "created_at": 1771675085
+    },
+    {
+      "event_id": "evt-wd-39bb669fc26f47f1-1771675085",
+      "provider": "simulated-bank",
+      "event": "withdrawal.status",
+      "operation_id": "wd-39bb669fc26f47f1",
+      "payload": {
+        "operation_id": "wd-39bb669fc26f47f1",
+        "status": "completed",
+        "provider_ref": "simulated-bank-wd-39bb669fc26f47f1-0",
+        "error": null
+      },
+      "created_at": 1771675085
     }
   ],
   "reconciliations": [
@@ -148,6 +225,15 @@
       "mismatch_count": 0,
       "mismatches": [],
       "created_at": 1771544380
+    },
+    {
+      "report_id": "recon-1771675085",
+      "provider": "simulated-bank",
+      "client_id": "cec0aa39-07f5-49da-827c-f857d623d52d",
+      "checked_operations": 1,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "created_at": 1771675085
     }
   ],
   "documents": [
@@ -241,6 +327,66 @@
       "report_id": "recon-1771544380",
       "client_id": "c611acac-275f-4be8-a893-42a2913209cd",
       "created_at": 1771544380,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-b5810f108ed54e8c",
+      "type": "withdrawal_operation_created",
+      "operation_id": "wd-b5810f108ed54e8c",
+      "client_id": "834adced-52c1-4d58-b787-156e76dd9def",
+      "created_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-39bb669fc26f47f1",
+      "type": "withdrawal_operation_created",
+      "operation_id": "wd-39bb669fc26f47f1",
+      "client_id": "cec0aa39-07f5-49da-827c-f857d623d52d",
+      "created_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-4acd93dcdfae46bb-1771675085",
+      "type": "payment_status_update",
+      "operation_id": "wd-4acd93dcdfae46bb",
+      "client_id": "c611acac-275f-4be8-a893-42a2913209cd",
+      "status": "completed",
+      "provider_ref": "simulated-bank-wd-4acd93dcdfae46bb-1",
+      "created_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-b5810f108ed54e8c-1771675085",
+      "type": "payment_status_update",
+      "operation_id": "wd-b5810f108ed54e8c",
+      "client_id": "834adced-52c1-4d58-b787-156e76dd9def",
+      "status": "completed",
+      "provider_ref": "simulated-bank-wd-b5810f108ed54e8c-0",
+      "created_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-wd-39bb669fc26f47f1-1771675085",
+      "type": "payment_status_update",
+      "operation_id": "wd-39bb669fc26f47f1",
+      "client_id": "cec0aa39-07f5-49da-827c-f857d623d52d",
+      "status": "completed",
+      "provider_ref": "simulated-bank-wd-39bb669fc26f47f1-0",
+      "created_at": 1771675085,
+      "policy_version": "pay-policy-v1",
+      "engine_version": "payment-hub-v1"
+    },
+    {
+      "document_id": "doc-recon-1771675085",
+      "type": "reconciliation_report",
+      "report_id": "recon-1771675085",
+      "client_id": "cec0aa39-07f5-49da-827c-f857d623d52d",
+      "created_at": 1771675085,
       "policy_version": "pay-policy-v1",
       "engine_version": "payment-hub-v1"
     }

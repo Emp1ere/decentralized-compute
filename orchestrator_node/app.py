@@ -2615,6 +2615,41 @@ def market_fx_epoch(epoch_id):
     return jsonify(_oracle_epoch_summary(normalized_epoch)), 200
 
 
+@app.route("/market/jobs/available", methods=["GET"])
+@limiter.limit("60 per minute")
+def market_jobs_available():
+    """Список контрактов (задач), доступных для взятия вычислителем."""
+    client_id = get_client_id_from_auth()
+    if client_id is None:
+        return jsonify({"error": "Missing or invalid Authorization (Bearer api_key)"}), 401
+    device_capabilities = {}
+    if request.args.get("device_capabilities"):
+        try:
+            import json as _json
+            device_capabilities = _json.loads(request.args.get("device_capabilities") or "{}")
+        except (TypeError, ValueError):
+            device_capabilities = {}
+    candidates = _available_contract_runtimes()
+    candidates = [r for r in candidates if _matches_task_requirements(r, device_capabilities)]
+    jobs = []
+    for r in candidates:
+        record = r.get("record") or {}
+        spec = r.get("spec") or {}
+        jobs.append({
+            "contract_id": r.get("contract_id"),
+            "sector_id": record.get("sector_id"),
+            "sector_name": record.get("sector_name"),
+            "task_name": record.get("task_name"),
+            "reward_per_task": int(record.get("reward_per_task", 0) or spec.get("reward_per_task", 0) or 0),
+            "reward_currency": _normalized_budget_currency(spec.get("reward_currency")) or MARKET_DEFAULT_CURRENCY,
+            "work_units": int(spec.get("work_units_required", 0) or record.get("work_units_required", 0) or 0),
+            "computation_type": record.get("computation_type") or spec.get("computation_type") or "simple_pow",
+            "status": record.get("status"),
+            "available": True,
+        })
+    return jsonify({"jobs": jobs}), 200
+
+
 @app.route("/market/wallet", methods=["GET"])
 @limiter.limit("120 per minute")
 def market_wallet():

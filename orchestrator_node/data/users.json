@@ -9,7 +9,7 @@
     },
     {
       "login": "emp1re",
-      "password_hash": "pbkdf2:sha256:1000000$MQaLYGHRomH6bcuH$e0e47b61c4a1900513fb5b5286d2f3fa4c9f61ef1f0e1968e2f8bb7acf195adc",
+      "password_hash": "pbkdf2:sha256:1000000$2y$10$mcfaWG9VyAVAiEBQzPdQme8uGbG8vGk0DhoZ6N.N3ilPFuu8MN78q",
       "client_id": "5732bb89-c4bf-4d0e-b088-908414fd22c8",
       "api_key": "P3MPYmC1FT1HFm2jZSiRL0Fplwa6QN0jpvRq1MWgbo4",
       "nickname": "emp1re"

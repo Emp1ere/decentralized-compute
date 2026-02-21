@@ -251,6 +251,7 @@
         <button class="tab-btn active" data-tab="tab-auth">Аккаунт</button>
         <button class="tab-btn" data-tab="tab-profile">Профиль</button>
         <button class="tab-btn" data-tab="tab-compute">Вычисления</button>
+        <button class="tab-btn" data-tab="tab-market-jobs">Биржа</button>
         <button class="tab-btn" data-tab="tab-provider">Заказчик</button>
         <button class="tab-btn" data-tab="tab-market">Финансы и проверки</button>
         <button class="tab-btn" data-tab="tab-governance">Управление сетью</button>
@@ -467,6 +468,21 @@
       </div>
     </div>
 
+    <div id="tab-market-jobs" class="tab card">
+      <h2>Биржа</h2>
+      <p class="hint">Доступные задачи (контракты) для взятия. Выберите задачу и нажмите «Взять».</p>
+      <div class="row">
+        <button id="btn-market-jobs-refresh">Обновить список</button>
+      </div>
+      <div class="table-responsive" style="margin-top:12px">
+        <table id="market-jobs-table">
+          <thead><tr><th>Контракт</th><th>Сектор</th><th>Награда</th><th>Ед. работы</th><th>Тип вычислений</th><th>Действие</th></tr></thead>
+          <tbody id="market-jobs-tbody"></tbody>
+        </table>
+      </div>
+      <div id="market-jobs-empty" class="muted small" style="margin-top:12px;display:none">Нет доступных задач.</div>
+    </div>
+
     <div id="tab-provider" class="tab card">
       <h2>Контракты заказчика</h2>
       <div class="grid-2">
@@ -650,7 +666,11 @@
           <h3>Кошелек</h3>
           <p class="hint">Ваши текущие балансы по валютам.</p>
           <button id="btn-wallet-refresh">Обновить кошелек</button>
-          <pre id="wallet-json" class="mono small">-</pre>
+          <div id="wallet-status" class="status" style="margin-top:8px">—</div>
+          <details class="expert-only" style="margin-top:8px">
+            <summary class="small muted">Технические детали (JSON)</summary>
+            <pre id="wallet-json" class="mono small">-</pre>
+          </details>
           <div class="row">
             <div class="field">
               <label class="field-label" for="topup-amount">Сумма пополнения</label>
@@ -685,7 +705,11 @@
             </div>
           </div>
           <button id="btn-convert">Конвертировать</button>
-          <pre id="convert-json" class="mono small">-</pre>
+          <div id="convert-status" class="status" style="margin-top:8px">—</div>
+          <details class="expert-only" style="margin-top:8px">
+            <summary class="small muted">Технические детали (JSON)</summary>
+            <pre id="convert-json" class="mono small">-</pre>
+          </details>
         </div>
       </div>
       <div class="grid-2" style="margin-top:10px">
@@ -994,16 +1018,19 @@
         <div class="filters">
           <select id="ex-detail-filter-type">
             <option value="">Все типы tx</option>
-            <option value="reward">reward</option>
-            <option value="work_receipt">work_receipt</option>
-            <option value="fiat_topup">fiat_topup</option>
-            <option value="fiat_withdrawal_request">fiat_withdrawal_request</option>
-            <option value="fiat_conversion">fiat_conversion</option>
-            <option value="contract_reward_settlement">contract_reward_settlement</option>
-            <option value="contract_create_event">contract_create_event</option>
-            <option value="contract_budget_fund_event">contract_budget_fund_event</option>
-            <option value="contract_budget_refund_event">contract_budget_refund_event</option>
-            <option value="contract_status_event">contract_status_event</option>
+            <option value="reward">Награда</option>
+            <option value="work_receipt">Подтверждение работы</option>
+            <option value="fiat_topup">Пополнение</option>
+            <option value="fiat_withdrawal_request">Заявка на вывод</option>
+            <option value="fiat_conversion">Конвертация</option>
+            <option value="contract_reward_settlement">Выплата по контракту</option>
+            <option value="contract_create_event">Создание контракта</option>
+            <option value="contract_budget_fund_event">Пополнение бюджета контракта</option>
+            <option value="contract_budget_refund_event">Возврат бюджета контракта</option>
+            <option value="contract_status_event">Событие статуса контракта</option>
+            <option value="contract_worker_escrow_hold">Резерв эскроу</option>
+            <option value="contract_worker_escrow_release">Освобождение эскроу</option>
+            <option value="contract_worker_escrow_penalty">Штраф эскроу</option>
           </select>
           <input id="ex-detail-filter-contract" placeholder="Фильтр по ID контракта">
           <button id="btn-ex-detail-filter-clear">Сброс</button>
@@ -1035,16 +1062,19 @@
         <div class="filters">
           <select id="ex-address-filter-type">
             <option value="">Все типы tx</option>
-            <option value="reward">reward</option>
-            <option value="work_receipt">work_receipt</option>
-            <option value="fiat_topup">fiat_topup</option>
-            <option value="fiat_withdrawal_request">fiat_withdrawal_request</option>
-            <option value="fiat_conversion">fiat_conversion</option>
-            <option value="contract_reward_settlement">contract_reward_settlement</option>
-            <option value="contract_create_event">contract_create_event</option>
-            <option value="contract_budget_fund_event">contract_budget_fund_event</option>
-            <option value="contract_budget_refund_event">contract_budget_refund_event</option>
-            <option value="contract_status_event">contract_status_event</option>
+            <option value="reward">Награда</option>
+            <option value="work_receipt">Подтверждение работы</option>
+            <option value="fiat_topup">Пополнение</option>
+            <option value="fiat_withdrawal_request">Заявка на вывод</option>
+            <option value="fiat_conversion">Конвертация</option>
+            <option value="contract_reward_settlement">Выплата по контракту</option>
+            <option value="contract_create_event">Создание контракта</option>
+            <option value="contract_budget_fund_event">Пополнение бюджета контракта</option>
+            <option value="contract_budget_refund_event">Возврат бюджета контракта</option>
+            <option value="contract_status_event">Событие статуса контракта</option>
+            <option value="contract_worker_escrow_hold">Резерв эскроу</option>
+            <option value="contract_worker_escrow_release">Освобождение эскроу</option>
+            <option value="contract_worker_escrow_penalty">Штраф эскроу</option>
           </select>
           <input id="ex-address-filter-contract" placeholder="Фильтр по ID контракта">
           <button id="btn-ex-address-filter-clear">Сброс</button>
@@ -1391,6 +1421,24 @@
       return ["RUB", "USD", "EUR"].map((cur) => `${cur}: ${safe[cur] ?? 0}`).join(" · ");
     }
 
+    const TX_TYPE_RU = {
+      reward: "Награда",
+      work_receipt: "Подтверждение работы",
+      fiat_topup: "Пополнение",
+      fiat_withdrawal_request: "Заявка на вывод",
+      fiat_conversion: "Конвертация",
+      contract_reward_settlement: "Выплата по контракту",
+      contract_create_event: "Создание контракта",
+      contract_budget_fund_event: "Пополнение бюджета контракта",
+      contract_budget_refund_event: "Возврат бюджета контракта",
+      contract_status_event: "Событие статуса контракта",
+      contract_worker_escrow_hold: "Резерв эскроу",
+      contract_worker_escrow_release: "Освобождение эскроу",
+      contract_worker_escrow_penalty: "Штраф эскроу",
+    };
+    function txTypeToRussian(type) {
+      return TX_TYPE_RU[type] || type || "—";
+    }
     function txBadgeClass(type) {
       if (type === "reward" || type === "contract_reward_settlement") return "badge badge-reward";
       if (type === "work_receipt") return "badge badge-work-receipt";
@@ -1582,6 +1630,9 @@
 
     async function refreshWallet() {
       const { body } = await api("/market/wallet");
+      const balances = body.balances || {};
+      const parts = ["RUB", "USD", "EUR"].map((c) => `${c} ${balances[c] ?? 0}`);
+      $("wallet-status").textContent = "Баланс: " + parts.join(", ");
       $("wallet-json").textContent = pp(body);
     }
 
@@ -1693,6 +1744,56 @@
       renderJobsDashboard(body);
     }
 
+    async function refreshMarketJobs() {
+      const { body } = await api("/market/jobs/available");
+      const jobs = Array.isArray(body.jobs) ? body.jobs : [];
+      const tbody = $("market-jobs-tbody");
+      const emptyEl = $("market-jobs-empty");
+      tbody.innerHTML = "";
+      if (!jobs.length) {
+        emptyEl.style.display = "block";
+        return;
+      }
+      emptyEl.style.display = "none";
+      for (const job of jobs) {
+        const tr = document.createElement("tr");
+        const contractId = job.contract_id || "-";
+        const sector = job.sector_name || job.sector_id || "-";
+        const reward = `${job.reward_per_task ?? 0} ${job.reward_currency || "RUB"}`;
+        const workUnits = String(job.work_units ?? 0);
+        const compType = job.computation_type || "simple_pow";
+        const btn = document.createElement("button");
+        btn.textContent = "Взять";
+        btn.className = "primary";
+        btn.onclick = () => takeJobFromMarket(contractId);
+        tr.innerHTML = `<td class="mono">${contractId}</td><td>${sector}</td><td>${reward}</td><td>${workUnits}</td><td>${compType}</td><td></td>`;
+        tr.lastElementChild.appendChild(btn);
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function takeJobFromMarket(contractId) {
+      try {
+        const payload = {
+          contract_id: contractId,
+          scheduler_profile: "adaptive",
+          device_capabilities: buildWebDeviceCapabilities(),
+        };
+        const { body } = await api("/agent/get_task", { method: "POST", payload });
+        state.task = body;
+        $("task-json").textContent = pp(body);
+        setComputeTaskCard(body);
+        $("compute-contract-id").value = contractId;
+        document.querySelectorAll(".tab-btn").forEach((el) => el.classList.remove("active"));
+        document.querySelectorAll(".tab").forEach((el) => el.classList.remove("active"));
+        $("tab-compute").classList.add("active");
+        document.querySelector('.tab-btn[data-tab="tab-compute"]').classList.add("active");
+        showToast("Задача получена. Перейдите на вкладку «Вычисления».", "ok");
+      } catch (e) {
+        showToast("Ошибка: " + e.message, "err");
+      }
+    }
+
     async function refreshProfile() {
       const { body } = await api("/me");
       renderProfile(body);
@@ -1754,14 +1855,15 @@
       const tbody = $("ex-detail-tx-body");
       tbody.innerHTML = "";
       for (const tx of filtered) {
-        const type = tx.type || "-";
+        const type = tx.type || "";
+        const typeRu = txTypeToRussian(type);
         const from = (tx.from || tx.client_id || "-").toString().slice(0, 20);
         const to = (tx.to || "-").toString().slice(0, 20);
         const amount = tx.amount != null ? tx.amount : (tx.fee != null ? `-${tx.fee}` : "-");
         const contract = tx.contract_id || "-";
         const work = tx.work_units != null ? tx.work_units : "-";
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td><span class="${txBadgeClass(type)}">${type}</span></td><td class="mono">${from}</td><td class="mono">${to}</td><td>${amount}</td><td class="mono">${contract}</td><td>${work}</td>`;
+        tr.innerHTML = `<td><span class="${txBadgeClass(type)}">${typeRu}</span></td><td class="mono">${from}</td><td class="mono">${to}</td><td>${amount}</td><td class="mono">${contract}</td><td>${work}</td>`;
         tbody.appendChild(tr);
       }
     }
@@ -1801,7 +1903,7 @@
         if (tx.type === "contract_budget_refund_event") details = `Возврат бюджета контракта: +${tx.amount ?? 0} ${tx.currency || ""}`;
         if (tx.type === "contract_status_event") details = `Статус контракта: ${tx.status || ""}`;
         if (!details) details = `tx_id: ${String(tx.event_id || tx.id || "n/a").slice(0, 24)}`;
-        tr.innerHTML = `<td><a href="#" class="mono ex-block-link" data-index="${block_index}">${block_index}</a></td><td><span class="${txBadgeClass(tx.type || "")}">${tx.type || "-"}</span></td><td>${details}</td>`;
+        tr.innerHTML = `<td><a href="#" class="mono ex-block-link" data-index="${block_index}">${block_index}</a></td><td><span class="${txBadgeClass(tx.type || "")}">${txTypeToRussian(tx.type || "")}</span></td><td>${details}</td>`;
         tbody.appendChild(tr);
       }
       document.querySelectorAll(".ex-block-link").forEach((el) => {
@@ -1872,15 +1974,34 @@
       }
     }
 
+    const TAB_REFRESH_MAP = {
+      "tab-profile": [refreshProfile, refreshMyJobs, refreshMyDevices],
+      "tab-compute": [refreshWorkerProgress, refreshMyJobs],
+      "tab-market-jobs": [refreshMarketJobs],
+      "tab-provider": [refreshProviderData],
+      "tab-market": [refreshWallet, refreshTreasury, refreshFxOracles, refreshFxEpoch, refreshPaymentsOps, refreshReconcileReports],
+      "tab-governance": [refreshGovernance],
+      "tab-explorer": [refreshExplorerSummary],
+    };
+    async function refreshForTab(tab) {
+      const fns = TAB_REFRESH_MAP[tab];
+      if (!fns) return;
+      const hasAuth = !!(state.auth?.api_key);
+      if (tab !== "tab-explorer" && !hasAuth) return;
+      for (const fn of fns) {
+        try { await fn(); } catch (e) { /* ignore */ }
+      }
+    }
     function setupTabs() {
       const buttons = Array.from(document.querySelectorAll(".tab-btn[data-tab]"));
       buttons.forEach((btn) => {
-        btn.onclick = () => {
+        btn.onclick = async () => {
           const tab = btn.getAttribute("data-tab");
           document.querySelectorAll(".tab-btn").forEach((el) => el.classList.remove("active"));
           document.querySelectorAll(".tab").forEach((el) => el.classList.remove("active"));
           btn.classList.add("active");
           $(tab).classList.add("active");
+          await refreshForTab(tab);
         };
       });
     }
@@ -2419,6 +2540,10 @@
       try { await refreshProviderData(); } catch (e) { alert(e.message); }
     };
 
+    $("btn-market-jobs-refresh").onclick = async () => {
+      try { await refreshMarketJobs(); } catch (e) { showToast("Ошибка: " + e.message, "err"); }
+    };
+
     $("btn-ingestion-refresh").onclick = async () => {
       try {
         await refreshIngestionDetails();
@@ -2619,7 +2744,7 @@
       try {
         await refreshWallet();
       } catch (e) {
-        alert(e.message);
+        $("wallet-status").textContent = "Ошибка: " + e.message;
       }
     };
 
@@ -2652,9 +2777,12 @@
           },
           retries: 2,
         });
+        const msg = `Конвертация выполнена: ${body.source_amount ?? amount} ${body.from_currency || ""} → ${body.target_amount ?? 0} ${body.to_currency || ""}`;
+        $("convert-status").textContent = msg;
         $("convert-json").textContent = pp(body);
         $("btn-wallet-refresh").click();
       } catch (e) {
+        $("convert-status").textContent = "Ошибка: " + e.message;
         $("convert-json").textContent = e.message;
       }
     };
