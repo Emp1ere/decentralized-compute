@@ -16,7 +16,7 @@
 1. Откройте **cmd** (Win+R → `cmd` → Enter).
 2. Перейдите в папку оркестратора:
    ```text
-   cd /d "C:\Users\Alexandra\OneDrive\Рабочий стол\Прогер\distributed-compute\orchestrator_node"
+   cd /d "C:\Users\Alexandra\OneDrive\Desktop\Projects\decentralized-compute\orchestrator_node"
    ```
    (подставьте свой путь, если проект лежит в другом месте).
 3. Выполните:

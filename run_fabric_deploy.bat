@@ -3,6 +3,7 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 echo Deploying DSCM chaincode to Fabric testnet
+echo NOTE: Prefer run_fabric_deploy_wsl.bat (WSL) - Git Bash has path issues.
 echo.
 
 if not exist "fabric-samples\test-network" (
@@ -11,6 +12,7 @@ if not exist "fabric-samples\test-network" (
     exit /b 1
 )
 
+set "FABRIC_CFG_PATH=%~dp0fabric-samples\config"
 set "BASH="
 if exist "C:\Program Files\Git\bin\bash.exe" set "BASH=C:\Program Files\Git\bin\bash.exe"
 if exist "C:\Program Files (x86)\Git\bin\bash.exe" set "BASH=C:\Program Files (x86)\Git\bin\bash.exe"

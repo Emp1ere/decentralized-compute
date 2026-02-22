@@ -35,7 +35,7 @@
 2. Откройте **командную строку** (Win+R → `cmd` → Enter).
 3. Перейдите в папку проекта, например:
    ```bat
-   cd /d "C:\Users\ВАШЕ_ИМЯ\OneDrive\Рабочий стол\Прогер\distributed-compute"
+   cd /d "C:\Users\ВАШЕ_ИМЯ\OneDrive\Desktop\Projects\decentralized-compute"
    ```
    (подставьте свой путь к папке, где лежит `start.bat` и `docker-compose.yml`).
 4. Выполните:

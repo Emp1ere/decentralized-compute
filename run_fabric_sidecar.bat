@@ -14,7 +14,7 @@ set FABRIC_CRYPTO_PATH=%CRYPTO_PATH%
 set FABRIC_PEER_ENDPOINT=localhost:7051
 set FABRIC_CHANNEL=public-marketplace
 set FABRIC_CHAINCODE_NAME=dscm
-set PORT=7051
+set PORT=8080
 
 echo Starting Sidecar with Fabric...
 echo   FABRIC_CRYPTO_PATH=%FABRIC_CRYPTO_PATH%

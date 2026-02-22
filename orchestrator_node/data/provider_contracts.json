@@ -3456,7 +3456,7 @@
           "dataset_artifacts": [
             {
               "name": "benchPEP.tpr",
-              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-608bf9d7c355\\ing-2d3a1db0f6b5457d\\benchPEP.tpr",
+              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Desktop\\Projects\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-608bf9d7c355\\ing-2d3a1db0f6b5457d\\benchPEP.tpr",
               "sha256": "e98f77b3ddba82ef801e849e9a1a80b6f0ed13513fd26f65d35a94d05c1456c3",
               "size_bytes": 23
             }
@@ -3898,7 +3898,7 @@
         },
         "results": {
           "finalized_at": 1771544334,
-          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\results\\usr-8558ae680196\\results-1771544334.json",
+          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Desktop\\Projects\\decentralized-compute\\orchestrator_node\\data\\results\\usr-8558ae680196\\results-1771544334.json",
           "finalized_manifest": {
             "contract_id": "usr-8558ae680196",
             "status": "active",
@@ -4069,7 +4069,7 @@
         },
         "results": {
           "finalized_at": 1771544378,
-          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\results\\usr-93d1d8933941\\results-1771544378.json",
+          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Desktop\\Projects\\decentralized-compute\\orchestrator_node\\data\\results\\usr-93d1d8933941\\results-1771544378.json",
           "finalized_manifest": {
             "contract_id": "usr-93d1d8933941",
             "status": "active",
@@ -4297,7 +4297,7 @@
           "dataset_artifacts": [
             {
               "name": "benchPEP.tpr",
-              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-cbade4b2590a\\ing-9ce718dcb8504a56\\benchPEP.tpr",
+              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Desktop\\Projects\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-cbade4b2590a\\ing-9ce718dcb8504a56\\benchPEP.tpr",
               "sha256": "e98f77b3ddba82ef801e849e9a1a80b6f0ed13513fd26f65d35a94d05c1456c3",
               "size_bytes": 23
             }
@@ -4789,7 +4789,7 @@
         },
         "results": {
           "finalized_at": 1771675083,
-          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\results\\usr-cd6c6ca0a2f4\\results-1771675083.json",
+          "manifest_path": "C:\\Users\\Alexandra\\OneDrive\\Desktop\\Projects\\decentralized-compute\\orchestrator_node\\data\\results\\usr-cd6c6ca0a2f4\\results-1771675083.json",
           "finalized_manifest": {
             "contract_id": "usr-cd6c6ca0a2f4",
             "status": "active",
@@ -5017,7 +5017,7 @@
           "dataset_artifacts": [
             {
               "name": "benchPEP.tpr",
-              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Рабочий стол\\Прогер\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-46713167c29f\\ing-bb53745d454a41fa\\benchPEP.tpr",
+              "uri": "file://C:\\Users\\Alexandra\\OneDrive\\Desktop\\Projects\\decentralized-compute\\orchestrator_node\\data\\ingestion\\usr-46713167c29f\\ing-bb53745d454a41fa\\benchPEP.tpr",
               "sha256": "e98f77b3ddba82ef801e849e9a1a80b6f0ed13513fd26f65d35a94d05c1456c3",
               "size_bytes": 23
             }

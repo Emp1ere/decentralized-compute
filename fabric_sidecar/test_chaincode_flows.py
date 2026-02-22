@@ -2,7 +2,7 @@
 """
 10 сквозных транзакций DSCM chaincode (Phase 1b).
 Вызовы через Fabric Sidecar HTTP API.
-Запуск: python test_chaincode_flows.py [--base-url http://localhost:7051]
+Запуск: python test_chaincode_flows.py [--base-url http://localhost:8080]
 """
 import argparse
 import json
@@ -11,7 +11,7 @@ import uuid
 
 import httpx
 
-BASE_URL = "http://localhost:7051"
+BASE_URL = "http://localhost:8080"
 
 
 def invoke(base: str, contract: str, fn: str, args: list) -> dict:

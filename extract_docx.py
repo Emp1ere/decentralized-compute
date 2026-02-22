@@ -28,7 +28,7 @@ search_paths = [
     os.path.join(base, 'DSCM_v2_final.docx'),
     os.path.expanduser(r'~\DSCM_v2_final.docx'),
     r'C:\Users\Alexandra\DSCM_v2_final.docx',
-    r'C:\Users\Alexandra\OneDrive\Рабочий стол\Прогер\DSCM_v2_final.docx',
+    r'C:\Users\Alexandra\OneDrive\Desktop\Projects\decentralized-compute\DSCM_v2_final.docx',
 ]
 
 for p in search_paths:
